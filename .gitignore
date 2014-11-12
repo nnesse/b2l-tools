@@ -1,0 +1,7 @@
+*.swn
+*.swo
+*.swp
+*~
+
+examples/simple
+*.o
