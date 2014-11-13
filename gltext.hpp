@@ -210,13 +210,13 @@ class renderer
 		VERTEX_COORD_LOC = 0,
 		TEXTURE_COORD_LOC = 1,
 		VBOX_LOC = 2,
-		UVW_LOC = 3
+		UVW_LOC = 3,
+		COLOR_LOC = 4,
 	};
 
 	int m_scale_loc;
 	int m_disp_loc;
 	int m_sampler_loc;
-	int m_color_loc;
 public:
 	renderer(std::string typeface_path = "");
 	~renderer();

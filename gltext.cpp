@@ -30,7 +30,10 @@ THE SOFTWARE.
 #include <iostream>
 #include <math.h>
 
+
 namespace gl_text {
+
+static const int texture_size = 1024;
 
 //
 // text
@@ -68,8 +71,8 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 		inst.uvw[2] = glyph.w;
 		inst.v_bounds.upper_left[0] = m_x_cursor + glyph.left;
 		inst.v_bounds.upper_left[1] = -glyph.top;
-		inst.v_bounds.lower_right[0] = (m_x_cursor + glyph.left) + glyph.width;
-		inst.v_bounds.lower_right[1] = (-glyph.top) + glyph.height;
+		inst.v_bounds.lower_right[0] = glyph.width;
+		inst.v_bounds.lower_right[1] = glyph.height;
 		inst.color[0] = r;
 		inst.color[1] = g;
 		inst.color[2] = b;
@@ -97,7 +100,7 @@ renderer::renderer(std::string typeface_path) :
 	m_use_ARB_multi_bind = GLEW_ARB_multi_bind;
 	m_use_ARB_vertex_attrib_binding = GLEW_ARB_vertex_attrib_binding;
 	m_use_EXT_direct_state_access = GLEW_EXT_direct_state_access;
-#else
+#elif GLTEXT_USE_GLBINDIFY
 	m_use_ARB_buffer_storage = gl::ARB_buffer_storage;
 	m_use_ARB_texture_storage = gl::ARB_texture_storage;
 	m_use_ARB_multi_bind = gl::ARB_multi_bind;
@@ -215,10 +218,10 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 			first = false;
 			height = g->height;
 		}
-		if ((u + g->width) > 1024) {
+		if ((u + g->width) > texture_size) {
 			u = 0;
 			v += height;
-			if ((v + g->height) > 1024) {
+			if ((v + g->height) > texture_size) {
 				u = 0;
 				v = 0;
 				w++;
@@ -236,13 +239,13 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 	//
 	//Blit the glyph bitmaps into a CPU texture
 	//
-	std::vector<uint8_t> atlas_buffer(tex_array_size * 1024 * 1024);
+	std::vector<uint8_t> atlas_buffer(tex_array_size * texture_size * texture_size);
 	for (glyph *g : glyphs) {
-		uint8_t *dest = atlas_buffer.data() + g->u + (g->v * 1024) + (g->w * 1024 * 1024);
+		uint8_t *dest = atlas_buffer.data() + g->u + (g->v * texture_size) + (g->w * texture_size * texture_size);
 		uint8_t *source = g->buffer.data();
 		for (int i = 0; i < g->height; i++) {
 			memcpy(dest, source, g->width);
-			dest += 1024;
+			dest += texture_size;
 			source += g->pitch;
 		}
 	}
@@ -258,19 +261,19 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 				GL_TEXTURE_2D_ARRAY,
 				1, /* layers */
 				GL_R8,
-				1024, 1024, tex_array_size /* uvw size */);
+				texture_size, texture_size, tex_array_size /* uvw size */);
 			glTextureSubImage3DEXT(m_tex,
 				GL_TEXTURE_2D_ARRAY,
 				0, /* layer */
 				0, 0, 0, /* uvw offset */
-				1024, 1024, tex_array_size, /* uvw size */
+				texture_size, texture_size, tex_array_size, /* uvw size */
 				GL_RED, GL_UNSIGNED_BYTE, atlas_buffer.data());
 		} else {
 			glTextureImage3DEXT(m_tex,
 				GL_TEXTURE_2D_ARRAY,
 				0, /* layers */
 				GL_R8,
-				1024, 1024, tex_array_size /* uvw size */,
+				texture_size, texture_size, tex_array_size /* uvw size */,
 				0, /* border */
 				GL_RED,
 				GL_UNSIGNED_BYTE,
@@ -287,19 +290,19 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 				GL_TEXTURE_2D_ARRAY,
 				1, /* layers */
 				GL_R8,
-				1024, 1024, tex_array_size /* uvw size */);
+				texture_size, texture_size, tex_array_size /* uvw size */);
 			glTexSubImage3D(
 				GL_TEXTURE_2D_ARRAY,
 				0, /* layer */
 				0, 0, 0, /* uvw offset */
-				1024, 1024, tex_array_size, /* uvw size */
+				texture_size, texture_size, tex_array_size, /* uvw size */
 				GL_RED, GL_UNSIGNED_BYTE, atlas_buffer.data());
 		} else {
 			glTexImage3D(
 				GL_TEXTURE_2D_ARRAY,
 				0, /* layers */
 				GL_R8,
-				1024, 1024, tex_array_size /* uvw size */,
+				texture_size, texture_size, tex_array_size /* uvw size */,
 				0, /* border */
 				GL_RED,
 				GL_UNSIGNED_BYTE,
@@ -328,10 +331,11 @@ bool renderer::init_program()
 		"#version 330\n"
 		"uniform sampler2DArray sampler;\n"
 		"in vec3 texcoord_f;\n"
+		"in vec4 color_f;\n"
 		"out vec4 frag_color;\n"
 		"void main()\n"
 		"{\n"
-		"	frag_color = vec4(texture(sampler, vec3(texcoord_f.xyz)).r);\n"
+		"	frag_color = color_f * vec4(texelFetch(sampler, ivec3(texcoord_f), 0).r);\n"
 		"}\n";
 
 	const char *vertex_shader_text =
@@ -341,19 +345,15 @@ bool renderer::init_program()
 		"layout (location = 0) in vec2 vertex_v;\n"
 		"layout (location = 1) in vec2 texcoord_v;\n"
 		"layout (location = 2) in vec4 vbox;\n"
-		"layout (location = 3) in uvec4 uvw;\n"
+		"layout (location = 3) in uvec3 uvw;\n"
+		"layout (location = 4) in vec4 color;\n"
 		"out vec3 texcoord_f;\n"
+		"out vec4 color_f;\n"
 		"void main()\n"
 		"{\n"
-			"vec2 v1 = vbox.xy;\n"
-			"vec2 v2 = vbox.zw;\n"
-			"vec2 quad_size = v2 - v1;\n"
-			"gl_Position.xy = v1 + disp + (vertex_v * quad_size);\n"
-			"gl_Position.xy *= vec2(2, -2) * scale;\n"
-			"gl_Position.xy += vec2(-1, +1);\n"
-			"gl_Position.z = 1.0;\n"
-			"gl_Position.w = 1.0;\n"
-			"texcoord_f = vec3((uvw.xy + texcoord_v * quad_size)/1024, uvw.w);\n"
+			"gl_Position = vec4((vbox.xy + disp + (vertex_v * vbox.zw)) * scale + vec2(-1, 1), 1, 1);\n"
+			"texcoord_f = vec3(uvw) + vec3(texcoord_v * vbox.zw, 0);\n"
+			"color_f = color;\n"
 		"}\n";
 
 	//std::cout << m_use_ARB_buffer_storage << ":" << m_use_ARB_multi_bind << ":" << m_use_ARB_vertex_attrib_binding << ":" << m_use_EXT_direct_state_access << std::endl;
@@ -378,11 +378,14 @@ bool renderer::init_program()
 	glCompileShader(m_vertex_shader);
 	glGetShaderiv(m_vertex_shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
+		char info_log[1000];
+		glGetShaderInfoLog(m_vertex_shader, sizeof(info_log), NULL, info_log);
+		std::cout << "renderer: Vertex shader compile failed" << std::endl
+			<< info_log << std::endl;
 		glDeleteShader(m_fragment_shader);
 		m_fragment_shader = 0;
 		glDeleteShader(m_vertex_shader);
 		m_vertex_shader = 0;
-		std::cout << "renderer: Vertex shader compile failed" << std::endl;
 		return false;
 	}
 
@@ -398,7 +401,12 @@ bool renderer::init_program()
 		m_vertex_shader = 0;
 		glDeleteProgram(m_glsl_program);
 		m_glsl_program = 0;
-		std::cout << "renderer: Program link failed" << std::endl;
+
+		char info_log[1000];
+		glGetProgramInfoLog(m_glsl_program, sizeof(info_log), NULL, info_log);
+		std::cout << "renderer: Program link failed" << std::endl
+			<< info_log << std::endl;
+
 		return false;
 	}
 	//
@@ -410,6 +418,7 @@ bool renderer::init_program()
 	glEnableVertexAttribArray(VERTEX_COORD_LOC);
 	glEnableVertexAttribArray(UVW_LOC);
 	glEnableVertexAttribArray(VBOX_LOC);
+	glEnableVertexAttribArray(COLOR_LOC);
 
 	//
 	// Glyph quad buffer setup
@@ -488,8 +497,15 @@ bool renderer::init_program()
 			offsetof(text::glyph_instance, v_bounds));
 		glVertexAttribBinding(VBOX_LOC, 1);
 
-		glVertexAttribIFormat(UVW_LOC,
+		glVertexAttribFormat(COLOR_LOC,
 			4,
+			GL_FLOAT,
+			GL_FALSE,
+			offsetof(text::glyph_instance, color));
+		glVertexAttribBinding(COLOR_LOC, 1);
+
+		glVertexAttribIFormat(UVW_LOC,
+			3,
 			GL_UNSIGNED_INT,
 			offsetof(text::glyph_instance, uvw));
 		glVertexAttribBinding(UVW_LOC, 1);
@@ -524,9 +540,17 @@ bool renderer::init_program()
 			sizeof(text::glyph_instance),
 			(void *)offsetof(text::glyph_instance, v_bounds));
 
+		glVertexAttribDivisor(COLOR_LOC, 1);
+		glVertexAttribPointer(COLOR_LOC,
+			4,
+			GL_FLOAT,
+			GL_FALSE,
+			sizeof(text::glyph_instance),
+			(void *)offsetof(text::glyph_instance, color));
+
 		glVertexAttribDivisor(UVW_LOC, 1);
 		glVertexAttribIPointer(UVW_LOC,
-			4,
+			3,
 			GL_UNSIGNED_INT,
 			sizeof(text::glyph_instance),
 			(void *)offsetof(text::glyph_instance, uvw));
@@ -536,7 +560,6 @@ bool renderer::init_program()
 	m_scale_loc = glGetUniformLocation(m_glsl_program, "scale");
 	m_disp_loc = glGetUniformLocation(m_glsl_program, "disp");
 	m_sampler_loc = glGetUniformLocation(m_glsl_program, "sampler");
-	m_color_loc = glGetUniformLocation(m_glsl_program, "color");
 	if (m_use_EXT_direct_state_access) {
 		glProgramUniform1iEXT(m_glsl_program, m_sampler_loc, 0);
 	} else {
@@ -587,7 +610,7 @@ bool renderer::render(text &txt, int dx, int dy)
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
 	}
 
-	glUniform2f(m_scale_loc, 1.0/size_x, 1.0/size_y);
+	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
 	glUniform2f(m_disp_loc, dx, dy);
 	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, num_chars);
 }
