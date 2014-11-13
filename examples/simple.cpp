@@ -50,7 +50,7 @@ int main(void)
 	glfwSetErrorCallback(error_callback);
 
 	if (!glfwInit())
-		exit(EXIT_FAILURE);
+		exit(-1);
 
 	glfwWindowHint(GLFW_SAMPLES, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -58,10 +58,9 @@ int main(void)
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	window = glfwCreateWindow(1024, 256, "Simple text output example", NULL, NULL);
-	if (!window)
-	{
+	if (!window) {
 		glfwTerminate();
-		exit(EXIT_FAILURE);
+		exit(-1);
 	}
 
 	glfwMakeContextCurrent(window);
@@ -83,17 +82,11 @@ int main(void)
 
 	glfwSetKeyCallback(window, key_callback);
 
-	while (!glfwWindowShouldClose(window))
-	{
-		float ratio;
+	while (!glfwWindowShouldClose(window)) {
 		int width, height;
-
 		glfwGetFramebufferSize(window, &width, &height);
-		ratio = width / (float) height;
-
 		gl::Viewport(0, 0, width, height);
 		gl::Clear(GL_COLOR_BUFFER_BIT);
-
 		renderer.render(test_line, 0, 128);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
