@@ -110,6 +110,10 @@ renderer::renderer(std::string typeface_path) :
 	FT_Init_FreeType(&m_ft_library);
 }
 
+font::texture::~texture() {
+	glDeleteTextures(1, &m_id);
+}
+
 renderer::~renderer()
 {
 	if (m_fragment_shader)

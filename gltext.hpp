@@ -118,9 +118,7 @@ class font {
 		GLuint get_name() {
 			return m_id;
 		}
-		~texture() {
-			gl::DeleteTextures(1, &m_id);
-		}
+		~texture();
 	};
 	typedef std::shared_ptr<texture> texture_ptr;
 	texture_ptr m_texture;
