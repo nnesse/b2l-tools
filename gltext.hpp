@@ -111,20 +111,20 @@ class font {
 		return m_glyphs[c];
 	}
 
-	class texture {
+	class atlas{
 		GLuint m_id;
 	public:
-		texture(GLuint id) : m_id(id) { }
+		atlas(GLuint id) : m_id(id) { }
 		GLuint get_name() {
 			return m_id;
 		}
-		~texture();
+		~atlas();
 	};
-	typedef std::shared_ptr<texture> texture_ptr;
-	texture_ptr m_texture;
+	typedef std::shared_ptr<atlas> atlas_ptr;
+	atlas_ptr m_atlas;
 
-	texture_ptr get_texture() const {
-		return m_texture;
+	atlas_ptr get_atlas() const {
+		return m_atlas;
 	}
 public:
 	~font() { }
@@ -162,12 +162,13 @@ public:
 		return m_y_max - m_y_min;
 	}
 private:
-	font::texture_ptr m_texture;
+	font::atlas_ptr m_atlas;
 	std::vector<glyph_instance> m_instance_buffer;
 	int m_x_cursor;
 	int m_y_min;
 	int m_y_max;
 	int m_width;
+	GLuint m_gl_buffer;
 };
 
 //
@@ -188,7 +189,11 @@ class renderer
 	FT_Library m_ft_library;
 	std::unordered_map<std::string, FT_Face> m_typeface_cache;
 	GLuint m_glsl_program;
+	GLuint m_glsl_geometry_program;
+
 	GLuint m_vertex_shader;
+	GLuint m_vertex_point_shader;
+	GLuint m_geometry_shader;
 	GLuint m_fragment_shader;
 	std::string m_typeface_path;
 
