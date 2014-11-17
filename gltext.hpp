@@ -189,12 +189,13 @@ class renderer
 	FT_Library m_ft_library;
 	std::unordered_map<std::string, FT_Face> m_typeface_cache;
 	GLuint m_glsl_program;
-	GLuint m_glsl_geometry_program;
 
 	GLuint m_vertex_shader;
-	GLuint m_vertex_point_shader;
-	GLuint m_geometry_shader;
 	GLuint m_fragment_shader;
+
+	GLuint m_vertex_passthrough_shader;
+	GLuint m_geometry_shader;
+
 	std::string m_typeface_path;
 
 	bool m_use_ARB_buffer_storage;
@@ -206,15 +207,12 @@ class renderer
 	bool init_program();
 	GLuint m_gl_buffer;
 	GLuint m_gl_index_buffer;
-	GLuint m_gl_inst_buffer;
 	GLuint m_gl_vertex_array;
 
 	enum vertex_attrib_locations {
-		VERTEX_COORD_LOC = 0,
-		TEXTURE_COORD_LOC = 1,
-		VBOX_LOC = 2,
-		UVW_LOC = 3,
-		COLOR_LOC = 4,
+		VBOX_LOC = 0,
+		UVW_LOC = 1,
+		COLOR_LOC = 2,
 	};
 
 	int m_scale_loc;

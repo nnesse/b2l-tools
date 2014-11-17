@@ -339,42 +339,43 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 
 bool renderer::init_program()
 {
-	const char *vertex_point_shader_text =
+	const char *vertex_passthrough_shader_text =
 		"#version 330\n"
-		"layout (location = 0) in vec2 glyph_pos;\n"
-		"layout (location = 1) in uint glyph_index_v;\n"
-		"out point {\n"
-			"uint glyph_index_g;\n"
-		"};\n"
+		"layout (location = 0) in vec4 vbox_v;\n"
+		"layout (location = 1) in uvec3 uvw_v;\n"
+		"layout (location = 2) in vec4 color_v;\n"
+		"out vec4 vbox;\n"
+		"out uvec3 uvw;\n"
+		"out vec4 color;\n"
 		"void main()\n"
 		"{\n"
-			"glyph_index_g = glyph_index_v;\n"
-			"gl_Position = vec4(glyph_pos, 1, 1);\n"
+				"vbox = vbox_v;\n"
+				"uvw = uvw_v;\n"
+				"color = color_v;\n"
+				"gl_Position = vec4(0, 0, 1, 1);\n"
 		"}\n";
 
 	const char *geometry_shader_text =
 		"#version 330\n"
 		"layout(points) in;\n"
 		"layout(triangle_strip, max_vertices=4) out;\n"
+		"in vec4 vbox[1];\n"
+		"in uvec3 uvw[1];\n"
+		"in vec4 color[1];\n"
 		"uniform vec2 scale;\n"
 		"uniform vec2 disp;\n"
 		"\n"
-		"in point {\n"
-			"uint glyph_index_g;\n"
-		"};\n"
-		"\n"
 		"out vec3 texcoord_f;\n"
+		"out vec4 color_f;\n"
 		"\n"
 		"uniform usampler1D uvw_sampler;\n"
 		"uniform usampler1D uvsize_sampler;\n"
 		"\n"
 		"void genVertex(vec2 corner)\n"
 		"{\n"
-			"uvec3 uvw = texelFetch(uvw_sampler, int(glyph_index_g), 0).xyz;\n"
-			"uvec2 uvsize = texelFetch(uvw_sampler, int(glyph_index_g), 0).xy;\n"
-			"vec2 glyph_pos = gl_in[0].gl_Position.xy;\n"
-			"gl_Position = vec4((glyph_pos + disp + (corner * uvsize)) * scale + vec2(-1, 1), 1, 1);\n"
-			"texcoord_f = vec3(uvw) + vec3(corner * uvsize, 0);\n"
+			"gl_Position = vec4((vbox[0].xy + disp + (corner * vbox[0].zw)) * scale + vec2(-1, 1), 1, 1);\n"
+			"texcoord_f = vec3(uvw[0]) + vec3(corner * vbox[0].zw, 0);\n"
+			"color_f = color[0];\n"
 			"EmitVertex();\n"
 		"}\n"
 		"\n"
@@ -382,8 +383,8 @@ bool renderer::init_program()
 		"{\n"
 			"genVertex(vec2(0,0));\n"
 			"genVertex(vec2(1,0));\n"
-			"genVertex(vec2(1,1));\n"
 			"genVertex(vec2(0,1));\n"
+			"genVertex(vec2(1,1));\n"
 			"EndPrimitive();\n"
 		"}\n";
 
@@ -395,25 +396,7 @@ bool renderer::init_program()
 		"out vec4 frag_color;\n"
 		"void main()\n"
 		"{\n"
-		"	frag_color = color_f * vec4(texelFetch(sampler, ivec3(texcoord_f), 0).r);\n"
-		"}\n";
-
-	const char *vertex_shader_text =
-		"#version 330\n"
-		"uniform vec2 scale;\n"
-		"uniform vec2 disp;\n"
-		"layout (location = 0) in vec2 vertex_v;\n"
-		"layout (location = 1) in vec2 texcoord_v;\n"
-		"layout (location = 2) in vec4 vbox;\n"
-		"layout (location = 3) in uvec3 uvw;\n"
-		"layout (location = 4) in vec4 color;\n"
-		"out vec3 texcoord_f;\n"
-		"out vec4 color_f;\n"
-		"void main()\n"
-		"{\n"
-			"gl_Position = vec4((vbox.xy + disp + (vertex_v * vbox.zw)) * scale + vec2(-1, 1), 1, 1);\n"
-			"texcoord_f = vec3(uvw) + vec3(texcoord_v * vbox.zw, 0);\n"
-			"color_f = color;\n"
+			"frag_color = color_f * vec4(texelFetch(sampler, ivec3(texcoord_f), 0).r);\n"
 		"}\n";
 
 	//std::cout << m_use_ARB_buffer_storage << ":" << m_use_ARB_multi_bind << ":" << m_use_ARB_vertex_attrib_binding << ":" << m_use_EXT_direct_state_access << std::endl;
@@ -452,46 +435,27 @@ bool renderer::init_program()
 		return false;
 	}
 
-	m_vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(m_vertex_shader, 1, (const char **)&vertex_shader_text, NULL);
-	glCompileShader(m_vertex_shader);
-	glGetShaderiv(m_vertex_shader, GL_COMPILE_STATUS, &success);
+	m_vertex_passthrough_shader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(m_vertex_passthrough_shader, 1, (const char **)&vertex_passthrough_shader_text, NULL);
+	glCompileShader(m_vertex_passthrough_shader);
+	glGetShaderiv(m_vertex_passthrough_shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		char info_log[1000];
-		glGetShaderInfoLog(m_vertex_shader, sizeof(info_log), NULL, info_log);
-		std::cout << "renderer: Vertex shader compile failed" << std::endl
-			<< info_log << std::endl;
-		glDeleteShader(m_fragment_shader);
-		m_fragment_shader = 0;
-		glDeleteShader(m_vertex_shader);
-		m_vertex_shader = 0;
-		glDeleteShader(m_geometry_shader);
-		m_geometry_shader = 0;
-		return false;
-	}
-
-	m_vertex_point_shader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(m_vertex_point_shader, 1, (const char **)&vertex_point_shader_text, NULL);
-	glCompileShader(m_vertex_point_shader);
-	glGetShaderiv(m_vertex_point_shader, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		char info_log[1000];
-		glGetShaderInfoLog(m_vertex_point_shader, sizeof(info_log), NULL, info_log);
+		glGetShaderInfoLog(m_vertex_passthrough_shader, sizeof(info_log), NULL, info_log);
 		std::cout << "renderer: Vertex point shader compile failed" << std::endl
 			<< info_log << std::endl;
 		glDeleteShader(m_fragment_shader);
 		m_fragment_shader = 0;
-		glDeleteShader(m_vertex_point_shader);
-		m_vertex_point_shader = 0;
-		glDeleteShader(m_vertex_shader);
-		m_vertex_shader = 0;
+		glDeleteShader(m_vertex_passthrough_shader);
+		m_vertex_passthrough_shader = 0;
 		glDeleteShader(m_geometry_shader);
 		m_geometry_shader = 0;
 		return false;
 	}
 
 	m_glsl_program = glCreateProgram();
-	glAttachShader(m_glsl_program, m_vertex_shader);
+	glAttachShader(m_glsl_program, m_vertex_passthrough_shader);
+	glAttachShader(m_glsl_program, m_geometry_shader);
 	glAttachShader(m_glsl_program, m_fragment_shader);
 	glLinkProgram(m_glsl_program);
 	glGetProgramiv(m_glsl_program, GL_LINK_STATUS, &success);
@@ -502,34 +466,10 @@ bool renderer::init_program()
 			<< info_log << std::endl;
 		glDeleteShader(m_fragment_shader);
 		m_fragment_shader = 0;
-		glDeleteShader(m_vertex_shader);
-		m_vertex_shader = 0;
+		glDeleteShader(m_vertex_passthrough_shader);
+		m_vertex_passthrough_shader = 0;
 		glDeleteProgram(m_glsl_program);
 		m_glsl_program = 0;
-		glDeleteShader(m_geometry_shader);
-		m_geometry_shader = 0;
-		return false;
-	}
-
-	m_glsl_geometry_program = glCreateProgram();
-	glAttachShader(m_glsl_geometry_program, m_vertex_point_shader);
-	glAttachShader(m_glsl_geometry_program, m_geometry_shader);
-	glAttachShader(m_glsl_geometry_program, m_fragment_shader);
-	glLinkProgram(m_glsl_geometry_program);
-	glGetProgramiv(m_glsl_geometry_program, GL_LINK_STATUS, &success);
-	if (!success) {
-		char info_log[1000];
-		glGetProgramInfoLog(m_glsl_geometry_program, sizeof(info_log), NULL, info_log);
-		std::cout << "renderer: Geometry program link failed" << std::endl
-			<< info_log << std::endl;
-		glDeleteShader(m_fragment_shader);
-		m_fragment_shader = 0;
-		glDeleteShader(m_vertex_shader);
-		m_vertex_shader = 0;
-		glDeleteProgram(m_glsl_program);
-		m_glsl_program = 0;
-		glDeleteShader(m_geometry_shader);
-		m_geometry_shader = 0;
 		return false;
 	}
 
@@ -537,75 +477,11 @@ bool renderer::init_program()
 	// Common setup for GL 3.x and GL 4.x
 	//
 	glGenBuffers(1, &m_gl_buffer);
-	glEnableVertexAttribArray(TEXTURE_COORD_LOC);
-	glEnableVertexAttribArray(VERTEX_COORD_LOC);
 	glEnableVertexAttribArray(UVW_LOC);
 	glEnableVertexAttribArray(VBOX_LOC);
 	glEnableVertexAttribArray(COLOR_LOC);
 
-	//
-	// Glyph quad buffer setup
-	//
-	GLfloat quad[] = {
-		0,0,
-		1,0,
-		0,1,
-		1,1};
-	if (m_use_EXT_direct_state_access) {
-		if (m_use_ARB_buffer_storage) {
-			glNamedBufferStorageEXT(m_gl_buffer,
-					4 * 8,
-					quad,
-					0);
-		} else {
-			glNamedBufferDataEXT(m_gl_buffer,
-					4 * 8,
-					quad,
-					GL_STATIC_DRAW);
-		}
-	} else {
-		glBindBuffer(GL_ARRAY_BUFFER, m_gl_buffer);
-		if (m_use_ARB_buffer_storage) {
-			glBufferStorage(GL_ARRAY_BUFFER,
-					4 * 8,
-					quad,
-					0);
-		} else {
-			glBufferData(GL_ARRAY_BUFFER,
-					4 * 8,
-					quad,
-					GL_STATIC_DRAW);
-		}
-	}
-
 	if (m_use_ARB_vertex_attrib_binding) {
-		glBindVertexBuffer(
-			0, /*binding point */
-			m_gl_buffer,
-			0, /* offset */
-			sizeof(GLfloat) * 2 /* stride */);
-
-		//
-		// Glyph quad array setup
-		//
-		glVertexAttribBinding(TEXTURE_COORD_LOC, 0);
-		glVertexAttribFormat(TEXTURE_COORD_LOC,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			0);
-		glVertexAttribBinding(VERTEX_COORD_LOC, 0);
-		glVertexAttribFormat(VERTEX_COORD_LOC,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			0);
-
-		//
-		// Glyph instance buffer setup
-		//
-		glVertexBindingDivisor(1, 1);
-
 		//
 		// Glyph instance array setup
 		//
@@ -628,23 +504,6 @@ bool renderer::init_program()
 			GL_UNSIGNED_INT,
 			offsetof(text::glyph_instance, uvw));
 		glVertexAttribBinding(UVW_LOC, 1);
-	} else { //USE_VERTEX_ATTRIB_BINDING
-		//
-		// Glyph quad array setup
-		//
-		glBindBuffer(GL_ARRAY_BUFFER, m_gl_buffer);
-		glVertexAttribPointer(VERTEX_COORD_LOC,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			sizeof(GLfloat) * 2,
-			0);
-		glVertexAttribPointer(TEXTURE_COORD_LOC,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			sizeof(GLfloat) * 2,
-			0);
 	}
 
 	//Cache uniform locations
@@ -664,32 +523,30 @@ int first_go = 1;
 
 //
 // Render text 'txt' at position (dx, dy) wrapping text to fit in clip rect
-//   (clip_x, clip_y) -> (clip_x + clip_w, clip_y + clip_h).
+//	 (clip_x, clip_y) -> (clip_x + clip_w, clip_y + clip_h).
 //
 bool renderer::render(text &txt, int dx, int dy)
 {
 	size_t num_chars = txt.m_instance_buffer.size();
-	if(first_go) {
-		if (!m_glsl_program)
-			if (!init_program())
-				return false;
+	if (!m_glsl_program) {
+		if (!init_program())
+			return false;
 		glUseProgram(m_glsl_program);
 		glBindVertexArray(m_gl_vertex_array);
-		first_go = 0;
+		GLint viewport[4];
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		float size_x = viewport[2];
+		float size_y = viewport[3];
+		glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
+		GLuint tex_name = txt.m_atlas->get_name();
+		if (m_use_ARB_multi_bind) {
+			glBindTextures(0 /* tex unit */, 1, &tex_name);
+		} else {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
+		}
 	}
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	float size_x = viewport[2];
-	float size_y = viewport[3];
-	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
 
-	GLuint tex_name = txt.m_atlas->get_name();
-	if (m_use_ARB_multi_bind) {
-		glBindTextures(0 /* tex unit */, 1, &tex_name);
-	} else {
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
-	}
 	if (m_use_ARB_vertex_attrib_binding) {
 		glBindVertexBuffer(1, /*binding point */
 			txt.m_gl_buffer,
@@ -697,7 +554,7 @@ bool renderer::render(text &txt, int dx, int dy)
 			sizeof(text::glyph_instance) /* stride */);
 	} else {
 		glBindBuffer(GL_ARRAY_BUFFER, txt.m_gl_buffer);
-		glVertexAttribDivisor(VBOX_LOC, 1);
+
 		glVertexAttribPointer(VBOX_LOC,
 			4,
 			GL_FLOAT,
@@ -705,7 +562,6 @@ bool renderer::render(text &txt, int dx, int dy)
 			sizeof(text::glyph_instance),
 			(void *)offsetof(text::glyph_instance, v_bounds));
 
-		glVertexAttribDivisor(COLOR_LOC, 1);
 		glVertexAttribPointer(COLOR_LOC,
 			4,
 			GL_FLOAT,
@@ -713,7 +569,6 @@ bool renderer::render(text &txt, int dx, int dy)
 			sizeof(text::glyph_instance),
 			(void *)offsetof(text::glyph_instance, color));
 
-		glVertexAttribDivisor(UVW_LOC, 1);
 		glVertexAttribIPointer(UVW_LOC,
 			3,
 			GL_UNSIGNED_INT,
@@ -721,7 +576,8 @@ bool renderer::render(text &txt, int dx, int dy)
 			(void *)offsetof(text::glyph_instance, uvw));
 	}
 	glUniform2f(m_disp_loc, dx, dy);
-	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, num_chars);
+
+	glDrawArrays(GL_POINTS, 0, num_chars);
 }
 
 }
