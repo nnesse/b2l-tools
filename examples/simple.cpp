@@ -22,15 +22,12 @@ THE SOFTWARE.
 
 */
 
-#include "gl_3_3.hpp"
 #include "gltext.hpp"
 
 #include <GLFW/glfw3.h>
 
 #include <stdlib.h>
 #include <stdio.h>
-
-using namespace glbindify;
 
 static void error_callback(int error, const char* description)
 {
@@ -55,7 +52,11 @@ int main(void)
 	glfwWindowHint(GLFW_SAMPLES, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+#if GLTEXT_USE_GLEW
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+#else
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#endif
 
 	window = glfwCreateWindow(1024, 256, "Simple text output example", NULL, NULL);
 	if (!window) {
@@ -64,8 +65,12 @@ int main(void)
 	}
 
 	glfwMakeContextCurrent(window);
-	
+
+#if GLTEXT_USE_GLEW
+	glewInit();
+#else
 	glbindify::gl::init();
+#endif
 
 	gl_text::renderer renderer;
 
@@ -78,15 +83,31 @@ int main(void)
 		.charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ().0123456789"
 	});
 	renderer.generate_fonts(font_desc, fonts);
-	gl_text::text test_line(fonts[0], 1, 0, 0, 1, "The quick brown fox jumps over the lazy dog (). 0123456789");
+	const char *test_string = "The quick brown fox jumps over the lazy dog (). 0123456789";
+	gl_text::text test_line(fonts[0], 1, 0, 0, 1, test_string);
 
 	glfwSetKeyCallback(window, key_callback);
+
+#if GLTEXT_USE_GLEW
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+#else
+	glbindify::glEnable(GL_BLEND);
+	glbindify::glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+#endif
+
+	glfwSwapInterval(0);
 
 	while (!glfwWindowShouldClose(window)) {
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
-		gl::Viewport(0, 0, width, height);
-		gl::Clear(GL_COLOR_BUFFER_BIT);
+#if GLTEXT_USE_GLEW
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT);
+#else
+		glbindify::glViewport(0, 0, width, height);
+		glbindify::glClear(GL_COLOR_BUFFER_BIT);
+#endif
 		renderer.render(test_line, 0, 128);
 		glfwSwapBuffers(window);
 		glfwPollEvents();

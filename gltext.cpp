@@ -40,7 +40,7 @@ static const int texture_size = 1024;
 //
 
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str) :
-	m_atlas(font->get_atlas())
+	m_atlas(font->get_atlas()), m_gl_buffer(0)
 {
 	m_instance_buffer.resize(str.size());
 
@@ -82,11 +82,6 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 		m_y_min = std::min(-glyph.top, m_y_min);
 		m_y_max = std::max(-glyph.top + glyph.height, m_y_max);
 	}
-	glGenBuffers(1, &m_gl_buffer);
-	glNamedBufferStorageEXT(m_gl_buffer,
-			sizeof(glyph_instance) * m_instance_buffer.size(),
-			m_instance_buffer.data(),
-			0);
 }
 
 //
@@ -476,7 +471,6 @@ bool renderer::init_program()
 	//
 	// Common setup for GL 3.x and GL 4.x
 	//
-	glGenBuffers(1, &m_gl_buffer);
 	glEnableVertexAttribArray(UVW_LOC);
 	glEnableVertexAttribArray(VBOX_LOC);
 	glEnableVertexAttribArray(COLOR_LOC);
@@ -544,6 +538,36 @@ bool renderer::render(text &txt, int dx, int dy)
 		} else {
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
+		}
+	}
+
+	if(!txt.m_gl_buffer) {
+		glGenBuffers(1, &txt.m_gl_buffer);
+		if (m_use_EXT_direct_state_access) {
+			if (m_use_ARB_buffer_storage) {
+				glNamedBufferStorageEXT(txt.m_gl_buffer,
+						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+						txt.m_instance_buffer.data(),
+						0);
+			} else {
+				glNamedBufferDataEXT(txt.m_gl_buffer,
+						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+						txt.m_instance_buffer.data(),
+						0);
+			}
+		} else {
+			glBindBuffer(GL_ARRAY_BUFFER, txt.m_gl_buffer);
+			if (m_use_ARB_buffer_storage) {
+				glBufferStorage(GL_ARRAY_BUFFER,
+						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+						txt.m_instance_buffer.data(),
+						0);
+			} else {
+				glBufferData(GL_ARRAY_BUFFER,
+						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+						txt.m_instance_buffer.data(),
+						GL_STATIC_DRAW);
+			}
 		}
 	}
 

@@ -29,15 +29,11 @@ THE SOFTWARE.
 #define GLTEXT_USE_GLEW 1
 #endif
 
-#if GLTEXT_USE_GLBINDIFY
-
+#if GLTEXT_USE_GLEW
+#include "GL/glew.h"
+#elif GLTEXT_USE_GLBINDIFY
 #include "gl_3_3.hpp"
 using namespace glbindify;
-
-#elif GLTEXT_USE_GLEW
-
-#include <GL/glew.h>
-
 #endif
 
 #include <vector>
@@ -139,8 +135,8 @@ public:
 
 	struct glyph_instance {
 		gl_bounding_box v_bounds; /* Position of glyph within the text */
-		GLint uvw[4];            /* position of glyph in texture*/
-		GLfloat color[4];         /* RGBA color */
+		GLint uvw[4];						/* position of glyph in texture*/
+		GLfloat color[4];				 /* RGBA color */
 	};
 
 	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str);
@@ -205,8 +201,6 @@ class renderer
 	bool m_use_EXT_direct_state_access;
 
 	bool init_program();
-	GLuint m_gl_buffer;
-	GLuint m_gl_index_buffer;
 	GLuint m_gl_vertex_array;
 
 	enum vertex_attrib_locations {
