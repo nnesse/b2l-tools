@@ -32,7 +32,7 @@ gl_3_3.cpp gl_3_3.hpp:
 		-e ARB_vertex_attrib_binding \
 		-e ARB_buffer_storage \
 		-e ARB_texture_storage
-gltext.o: gl_3_3.cpp gl_3_3.hpp
+gltext.o: gl_3_3.cpp gl_3_3.hpp gltext.hpp
 EXT_OBJS += gl_3_3.o
 endif
 endif
@@ -40,7 +40,7 @@ endif
 #
 # Build examples using implicit rules to build gltext and bindings
 #
-simple: simple.cpp $(EXT_OBJS) gltext.o
+simple: simple.cpp $(EXT_OBJS) gltext.o gltext.hpp
 	g++ -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< gltext.o $(EXT_OBJS) $(LIBS) -o $@
 
 clean:

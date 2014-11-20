@@ -41,10 +41,19 @@ using namespace glbindify;
 
 #include <vector>
 #include <memory>
+#include <sstream>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
 typedef FT_Face typeface_t;
+
+namespace gl_text {
+	class text_builder;
+};
+
+namespace std {
+	gl_text::text_builder &endl(gl_text::text_builder &t);
+};
 
 namespace gl_text {
 
@@ -98,15 +107,16 @@ class font {
 	int m_height;
 	typeface_t m_typeface;
 	std::vector<glyph> m_glyphs;
-	friend class text;
 	friend class renderer;
+	friend class text;
 
 	font() { }
 
 	const glyph &get_glyph(char c) const {
 		return m_glyphs[c];
 	}
-
+public:
+	void select() const;
 	class atlas{
 		GLuint m_id;
 	public:
@@ -118,29 +128,42 @@ class font {
 	};
 	typedef std::shared_ptr<atlas> atlas_ptr;
 	atlas_ptr m_atlas;
-
 	atlas_ptr get_atlas() const {
 		return m_atlas;
 	}
-public:
 	~font() { }
 };
 typedef std::shared_ptr<const font> font_const_ptr;
 
+struct color {
+	float r;
+	float g;
+	float b;
+	float a;
+	color(float r_, float g_, float b_, float a_) :
+		r(r_),
+		g(g_),
+		b(b_),
+		a(a_) { }
+	color() { }
+};
+
+class text_builder;
+
 class text
 {
 public:
-	friend class window;
 	friend class renderer;
+	friend class text_builder;
 
 	struct glyph_instance {
 		gl_bounding_box v_bounds; /* Position of glyph within the text */
-		GLint uvw[4];						/* position of glyph in texture*/
-		GLfloat color[4];				 /* RGBA color */
+		GLint uvw[4]; /* position of glyph in texture*/
+		gl_text::color color; /* RGBA color */
 	};
 
 	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str);
-	~text() { }
+	~text();
 
 	int get_x_cursor() {
 		return m_x_cursor;
@@ -157,15 +180,49 @@ public:
 	int get_height() {
 		return m_y_max - m_y_min;
 	}
+	friend text_builder &std::endl(gl_text::text_builder &t);
 private:
-	font::atlas_ptr m_atlas;
 	std::vector<glyph_instance> m_instance_buffer;
+	std::vector<int> m_line_breaks;
+	void append(const font_const_ptr &font, const color &color, char c);
+	font::atlas_ptr m_atlas;
 	int m_x_cursor;
 	int m_y_min;
 	int m_y_max;
 	int m_width;
 	GLuint m_gl_buffer;
 };
+class text;
+typedef std::shared_ptr<text> text_ptr;
+
+class text_builder : public std::stringstream {
+	text *m_text;
+	std::vector<font_const_ptr> m_font_stack;
+	std::vector<color> m_color_stack;
+	void gen_glyphs();
+public:
+	text_builder(const font_const_ptr &font, color color);
+	text *get_text();
+
+	friend text_builder &std::endl(text_builder &t);
+	friend text_builder &pop_font(text_builder &t);
+	friend text_builder &pop_color(text_builder &t);
+	text_builder &operator<<(font_const_ptr font);
+	text_builder &operator<<(const color &color);
+};
+
+template <typename T>
+text_builder &operator<<(text_builder &b, T val) {
+	return static_cast<text_builder&>(static_cast<std::stringstream&>(b) << val);
+}
+
+inline text_builder &operator<<(text_builder &b, text_builder& (*pf)(text_builder &))
+{
+	return pf(b);
+}
+
+text_builder &pop_font(text_builder &t);
+text_builder &pop_color(text_builder &t);
 
 //
 // font desc

@@ -39,49 +39,61 @@ static const int texture_size = 1024;
 // text
 //
 
+
+void text::append(const font_const_ptr &font, const color &color, char c)
+{
+	int i = m_instance_buffer.size();
+	int prev_glyph_index;
+	m_instance_buffer.resize(m_instance_buffer.size() + 1);
+	const glyph &glyph = font->get_glyph(c);
+
+	if (i > 0) {
+		FT_Vector delta;
+		if (!FT_Get_Kerning(font->m_typeface,
+			prev_glyph_index,
+			glyph.index,
+			FT_KERNING_DEFAULT,
+			&delta)) {
+			m_x_cursor += delta.x/64.0;
+		}
+	}
+	prev_glyph_index = glyph.index;
+
+	glyph_instance &inst = m_instance_buffer[i];
+	inst.uvw[0] = glyph.u;
+	inst.uvw[1] = glyph.v;
+	inst.uvw[2] = glyph.w;
+	inst.v_bounds.upper_left[0] = m_x_cursor + glyph.left;
+	inst.v_bounds.upper_left[1] = -glyph.top;
+	inst.v_bounds.lower_right[0] = glyph.width;
+	inst.v_bounds.lower_right[1] = glyph.height;
+	inst.color = color;
+	m_x_cursor += glyph.advance_x / 64.0;
+	m_width = inst.v_bounds.lower_right[0];
+	m_y_min = std::min(-glyph.top, m_y_min);
+	m_y_max = std::max(-glyph.top + glyph.height, m_y_max);
+}
+
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str) :
 	m_atlas(font->get_atlas()), m_gl_buffer(0)
 {
-	m_instance_buffer.resize(str.size());
+	m_instance_buffer.reserve(str.size());
 
 	m_x_cursor = 0;
 	m_y_min = 0;
 	m_y_max = 0;
 	m_width = 0;
 
-	int prev_glyph_index;
+	font->select();
 	for (int i = 0; i < str.size(); i++) {
-		const glyph &glyph = font->get_glyph(str[i]);
-
-		if (i > 0) {
-			FT_Vector delta;
-			if (!FT_Get_Kerning(font->m_typeface,
-				prev_glyph_index,
-				glyph.index,
-				FT_KERNING_DEFAULT,
-				&delta)) {
-				m_x_cursor += delta.x/64.0;
-			}
-		}
-		prev_glyph_index = glyph.index;
-
-		glyph_instance &inst = m_instance_buffer[i];
-		inst.uvw[0] = glyph.u;
-		inst.uvw[1] = glyph.v;
-		inst.uvw[2] = glyph.w;
-		inst.v_bounds.upper_left[0] = m_x_cursor + glyph.left;
-		inst.v_bounds.upper_left[1] = -glyph.top;
-		inst.v_bounds.lower_right[0] = glyph.width;
-		inst.v_bounds.lower_right[1] = glyph.height;
-		inst.color[0] = r;
-		inst.color[1] = g;
-		inst.color[2] = b;
-		inst.color[3] = a;
-		m_x_cursor += glyph.advance_x / 64.0;
-		m_width = inst.v_bounds.lower_right[0];
-		m_y_min = std::min(-glyph.top, m_y_min);
-		m_y_max = std::max(-glyph.top + glyph.height, m_y_max);
+		append(font, color(r, g, b, a), (int)str[i]);
 	}
+}
+
+text::~text()
+{
+	if (m_gl_buffer)
+		glDeleteBuffers(1, &m_gl_buffer);
 }
 
 //
@@ -113,6 +125,11 @@ renderer::renderer(std::string typeface_path) :
 
 font::atlas::~atlas() {
 	glDeleteTextures(1, &m_id);
+}
+
+void font::select() const
+{
+	FT_Set_Pixel_Sizes(m_typeface, m_width, m_height);
 }
 
 renderer::~renderer()
@@ -513,8 +530,6 @@ bool renderer::init_program()
 	return true;
 }
 
-int first_go = 1;
-
 //
 // Render text 'txt' at position (dx, dy) wrapping text to fit in clip rect
 //	 (clip_x, clip_y) -> (clip_x + clip_w, clip_y + clip_h).
@@ -525,20 +540,21 @@ bool renderer::render(text &txt, int dx, int dy)
 	if (!m_glsl_program) {
 		if (!init_program())
 			return false;
-		glUseProgram(m_glsl_program);
-		glBindVertexArray(m_gl_vertex_array);
-		GLint viewport[4];
-		glGetIntegerv(GL_VIEWPORT, viewport);
-		float size_x = viewport[2];
-		float size_y = viewport[3];
-		glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
-		GLuint tex_name = txt.m_atlas->get_name();
-		if (m_use_ARB_multi_bind) {
-			glBindTextures(0 /* tex unit */, 1, &tex_name);
-		} else {
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
-		}
+	}
+
+	glUseProgram(m_glsl_program);
+	glBindVertexArray(m_gl_vertex_array);
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	float size_x = viewport[2];
+	float size_y = viewport[3];
+	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
+	GLuint tex_name = txt.m_atlas->get_name();
+	if (m_use_ARB_multi_bind) {
+		glBindTextures(0 /* tex unit */, 1, &tex_name);
+	} else {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
 	}
 
 	if(!txt.m_gl_buffer) {
@@ -604,4 +620,78 @@ bool renderer::render(text &txt, int dx, int dy)
 	glDrawArrays(GL_POINTS, 0, num_chars);
 }
 
+text_builder::text_builder(const font_const_ptr &font, color color)
+{
+	m_color_stack.push_back(color);
+	m_font_stack.push_back(font);
+	m_text = new text(m_font_stack.back(),
+		m_color_stack.back().r,
+		m_color_stack.back().g,
+		m_color_stack.back().b,
+		m_color_stack.back().a, "");
 }
+
+text *text_builder::get_text()
+{
+	gen_glyphs();
+	text *ret = m_text;
+	m_text = new text(m_font_stack.back(),
+		m_color_stack.back().r,
+		m_color_stack.back().g,
+		m_color_stack.back().b,
+		m_color_stack.back().a, "");
+	return ret;
+}
+
+text_builder &text_builder::operator<<(font_const_ptr font)
+{
+	gen_glyphs();
+	m_font_stack.push_back(font);
+	return *this;
+}
+
+text_builder &text_builder::operator<<(const color &color)
+{
+	gen_glyphs();
+	m_color_stack.push_back(color);
+	return *this;
+}
+
+text_builder &pop_font(text_builder &t)
+{
+	t.gen_glyphs();
+	if (t.m_font_stack.size() > 1)
+		t.m_font_stack.pop_back();
+	return t;
+}
+
+text_builder &pop_color(text_builder &t)
+{
+	t.gen_glyphs();
+	if (t.m_color_stack.size() > 1)
+		t.m_color_stack.pop_back();
+	return t;
+}
+
+void text_builder::gen_glyphs()
+{
+	int c;
+	m_font_stack.back()->select();
+	while ((c = get()) != EOF) {
+		m_text->append(m_font_stack.back(), m_color_stack.back(), c);
+	}
+	clear();
+}
+
+}
+
+namespace std {
+
+gl_text::text_builder &endl(gl_text::text_builder &t)
+{
+	t.gen_glyphs();
+	t.m_text->m_line_breaks.push_back(t.m_text->m_instance_buffer.size());
+	return t;
+}
+
+};
