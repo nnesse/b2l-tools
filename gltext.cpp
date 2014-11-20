@@ -40,24 +40,23 @@ static const int texture_size = 1024;
 //
 
 
-void text::append(const font_const_ptr &font, const color &color, char c)
+void text::append(const font_const_ptr &font, const color &color, char c, int &prev_index)
 {
 	int i = m_instance_buffer.size();
-	int prev_glyph_index;
 	m_instance_buffer.resize(m_instance_buffer.size() + 1);
 	const glyph &glyph = font->get_glyph(c);
 
-	if (i > 0) {
+	if (prev_index >= 0) {
 		FT_Vector delta;
 		if (!FT_Get_Kerning(font->m_typeface,
-			prev_glyph_index,
-			glyph.index,
-			FT_KERNING_DEFAULT,
-			&delta)) {
+				prev_index,
+				glyph.index,
+				FT_KERNING_DEFAULT,
+				&delta)) {
 			m_x_cursor += delta.x/64.0;
 		}
 	}
-	prev_glyph_index = glyph.index;
+	prev_index = glyph.index;
 
 	glyph_instance &inst = m_instance_buffer[i];
 	inst.uvw[0] = glyph.u;
@@ -85,8 +84,9 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 	m_width = 0;
 
 	font->select();
+	int prev_index = -1;
 	for (int i = 0; i < str.size(); i++) {
-		append(font, color(r, g, b, a), (int)str[i]);
+		append(font, color(r, g, b, a), (int)str[i], prev_index);
 	}
 }
 
@@ -620,7 +620,8 @@ bool renderer::render(text &txt, int dx, int dy)
 	glDrawArrays(GL_POINTS, 0, num_chars);
 }
 
-text_builder::text_builder(const font_const_ptr &font, color color)
+text_builder::text_builder(const font_const_ptr &font, color color) :
+	m_prev_index(-1)
 {
 	m_color_stack.push_back(color);
 	m_font_stack.push_back(font);
@@ -647,6 +648,7 @@ text_builder &text_builder::operator<<(font_const_ptr font)
 {
 	gen_glyphs();
 	m_font_stack.push_back(font);
+	m_prev_index = -1;
 	return *this;
 }
 
@@ -660,8 +662,10 @@ text_builder &text_builder::operator<<(const color &color)
 text_builder &pop_font(text_builder &t)
 {
 	t.gen_glyphs();
-	if (t.m_font_stack.size() > 1)
+	if (t.m_font_stack.size() > 1) {
 		t.m_font_stack.pop_back();
+		t.m_prev_index = -1;
+	}
 	return t;
 }
 
@@ -678,7 +682,7 @@ void text_builder::gen_glyphs()
 	int c;
 	m_font_stack.back()->select();
 	while ((c = get()) != EOF) {
-		m_text->append(m_font_stack.back(), m_color_stack.back(), c);
+		m_text->append(m_font_stack.back(), m_color_stack.back(), c, m_prev_index);
 	}
 	clear();
 }

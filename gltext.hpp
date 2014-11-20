@@ -184,7 +184,7 @@ public:
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<int> m_line_breaks;
-	void append(const font_const_ptr &font, const color &color, char c);
+	void append(const font_const_ptr &font, const color &color, char c, int &index);
 	font::atlas_ptr m_atlas;
 	int m_x_cursor;
 	int m_y_min;
@@ -200,6 +200,7 @@ class text_builder : public std::stringstream {
 	std::vector<font_const_ptr> m_font_stack;
 	std::vector<color> m_color_stack;
 	void gen_glyphs();
+	int m_prev_index;
 public:
 	text_builder(const font_const_ptr &font, color color);
 	text *get_text();
