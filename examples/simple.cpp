@@ -90,10 +90,10 @@ int main(void)
 
 #if GLTEXT_USE_GLEW
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #else
 	glbindify::glEnable(GL_BLEND);
-	glbindify::glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	glbindify::glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
 
 	glfwSwapInterval(0);
