@@ -53,7 +53,7 @@ void text::append(const font_const_ptr &font, const color &color, char c, int &p
 				glyph.index,
 				FT_KERNING_DEFAULT,
 				&delta)) {
-			m_x_cursor += delta.x/64.0;
+			m_x_cursor += ((delta.x + 32)/64.0);
 		}
 	}
 	prev_index = glyph.index;
@@ -74,7 +74,7 @@ void text::append(const font_const_ptr &font, const color &color, char c, int &p
 }
 
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str) :
-	m_atlas(font->get_atlas()), m_gl_buffer(0)
+	m_gl_buffer(0)
 {
 	m_instance_buffer.reserve(str.size());
 
@@ -105,26 +105,17 @@ renderer::renderer(std::string typeface_path) :
 	m_glsl_program(0),
 	m_vertex_shader(0),
 	m_fragment_shader(0),
-	m_geometry_shader(0)
+	m_geometry_shader(0),
+	m_use_ARB_buffer_storage(false),
+	m_use_ARB_texture_storage(false),
+	m_use_ARB_multi_bind(false),
+	m_use_ARB_vertex_attrib_binding(false),
+	m_use_EXT_direct_state_access(false),
+	m_ft_library(NULL),
+	m_initialized(false),
+	m_atlas_texture_name(0)
 {
-#if GLTEXT_USE_GLEW
-	m_use_ARB_buffer_storage = GLEW_ARB_buffer_storage;
-	m_use_ARB_texture_storage = GLEW_ARB_texture_storage;
-	m_use_ARB_multi_bind = GLEW_ARB_multi_bind;
-	m_use_ARB_vertex_attrib_binding = GLEW_ARB_vertex_attrib_binding;
-	m_use_EXT_direct_state_access = GLEW_EXT_direct_state_access;
-#elif GLTEXT_USE_GLBINDIFY
-	m_use_ARB_buffer_storage = gl::ARB_buffer_storage;
-	m_use_ARB_texture_storage = gl::ARB_texture_storage;
-	m_use_ARB_multi_bind = gl::ARB_multi_bind;
-	m_use_ARB_vertex_attrib_binding = gl::ARB_vertex_attrib_binding;
-	m_use_EXT_direct_state_access = gl::EXT_direct_state_access;
-#endif
 	FT_Init_FreeType(&m_ft_library);
-}
-
-font::atlas::~atlas() {
-	glDeleteTextures(1, &m_id);
 }
 
 void font::select() const
@@ -142,7 +133,10 @@ renderer::~renderer()
 		glDeleteShader(m_vertex_shader);
 	if (m_glsl_program)
 		glDeleteProgram(m_glsl_program);
-	FT_Done_FreeType(m_ft_library);
+	if (m_ft_library)
+		FT_Done_FreeType(m_ft_library);
+	if (m_atlas_texture_name)
+		glDeleteTextures(1, &m_atlas_texture_name);
 }
 
 typeface_t renderer::get_typeface(const std::string &path)
@@ -165,8 +159,33 @@ typeface_t renderer::get_typeface(const std::string &path)
 	return face;
 }
 
-bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts)
+bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts)
 {
+	if (m_initialized)
+		return false; //You can't reinitialize the renderer
+
+	if (!m_ft_library)
+		return false;
+
+	//Query OpenGL extension support
+#if GLTEXT_USE_GLEW
+	m_use_ARB_buffer_storage = GLEW_ARB_buffer_storage;
+	m_use_ARB_texture_storage = GLEW_ARB_texture_storage;
+	m_use_ARB_multi_bind = GLEW_ARB_multi_bind;
+	m_use_ARB_vertex_attrib_binding = GLEW_ARB_vertex_attrib_binding;
+	m_use_EXT_direct_state_access = GLEW_EXT_direct_state_access;
+#elif GLTEXT_USE_GLBINDIFY
+	m_use_ARB_buffer_storage = gl::ARB_buffer_storage;
+	m_use_ARB_texture_storage = gl::ARB_texture_storage;
+	m_use_ARB_multi_bind = gl::ARB_multi_bind;
+	m_use_ARB_vertex_attrib_binding = gl::ARB_vertex_attrib_binding;
+	m_use_EXT_direct_state_access = gl::EXT_direct_state_access;
+#endif
+
+	//Create GLSL program
+	if (!init_program())
+		return false;
+
 	//
 	// Rasterize all the glyphs for this atlas and insert them into priority queue
 	// primarily sorted by height and secondarily sorted by width.
@@ -274,26 +293,25 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 		}
 	}
 
-	GLuint m_tex;
 	//
 	// Upload the altas texture to the GPU
 	//
-	glGenTextures(1, &m_tex);
+	glGenTextures(1, &m_atlas_texture_name);
 	if (m_use_EXT_direct_state_access) {
 		if (m_use_ARB_texture_storage) {
-			glTextureStorage3DEXT(m_tex,
+			glTextureStorage3DEXT(m_atlas_texture_name,
 				GL_TEXTURE_2D_ARRAY,
 				1, /* layers */
 				GL_R8,
 				texture_size, texture_size, tex_array_size /* uvw size */);
-			glTextureSubImage3DEXT(m_tex,
+			glTextureSubImage3DEXT(m_atlas_texture_name,
 				GL_TEXTURE_2D_ARRAY,
 				0, /* layer */
 				0, 0, 0, /* uvw offset */
 				texture_size, texture_size, tex_array_size, /* uvw size */
 				GL_RED, GL_UNSIGNED_BYTE, atlas_buffer.data());
 		} else {
-			glTextureImage3DEXT(m_tex,
+			glTextureImage3DEXT(m_atlas_texture_name,
 				GL_TEXTURE_2D_ARRAY,
 				0, /* layers */
 				GL_R8,
@@ -303,12 +321,12 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 				GL_UNSIGNED_BYTE,
 				atlas_buffer.data());
 		}
-		glTextureParameteriEXT(m_tex, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteriEXT(m_tex, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTextureParameteriEXT(m_tex, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteriEXT(m_tex, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	} else {
-		glBindTexture(GL_TEXTURE_2D_ARRAY, m_tex);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
 		if (m_use_ARB_texture_storage) {
 			glTexStorage3D(
 				GL_TEXTURE_2D_ARRAY,
@@ -337,16 +355,8 @@ bool renderer::generate_fonts(const std::vector<font_desc> &font_descriptions, s
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
-
-	font::atlas_ptr atlas(new font::atlas(m_tex));
-
-	//
-	// Associate the generated texture with the fonts
-	//
-	for (auto f: fonts) {
-		(const_cast<font&>(*f)).m_atlas = atlas;
-	}
-	return true;
+	m_initialized = true;
+	return m_initialized;
 }
 
 bool renderer::init_program()
@@ -536,11 +546,10 @@ bool renderer::init_program()
 //
 bool renderer::render(text &txt, int dx, int dy)
 {
+	if (!m_initialized)
+		return false;
+
 	size_t num_chars = txt.m_instance_buffer.size();
-	if (!m_glsl_program) {
-		if (!init_program())
-			return false;
-	}
 
 	glUseProgram(m_glsl_program);
 	glBindVertexArray(m_gl_vertex_array);
@@ -549,12 +558,11 @@ bool renderer::render(text &txt, int dx, int dy)
 	float size_x = viewport[2];
 	float size_y = viewport[3];
 	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
-	GLuint tex_name = txt.m_atlas->get_name();
 	if (m_use_ARB_multi_bind) {
-		glBindTextures(0 /* tex unit */, 1, &tex_name);
+		glBindTextures(0 /* tex unit */, 1, &m_atlas_texture_name);
 	} else {
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, tex_name);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
 	}
 
 	if(!txt.m_gl_buffer) {

@@ -99,6 +99,9 @@ struct glyph {
 	std::vector<uint8_t> buffer;
 };
 
+class renderer;
+typedef std::shared_ptr<renderer> renderer_ptr;
+
 //
 // font
 //
@@ -117,20 +120,6 @@ class font {
 	}
 public:
 	void select() const;
-	class atlas{
-		GLuint m_id;
-	public:
-		atlas(GLuint id) : m_id(id) { }
-		GLuint get_name() {
-			return m_id;
-		}
-		~atlas();
-	};
-	typedef std::shared_ptr<atlas> atlas_ptr;
-	atlas_ptr m_atlas;
-	atlas_ptr get_atlas() const {
-		return m_atlas;
-	}
 	~font() { }
 };
 typedef std::shared_ptr<const font> font_const_ptr;
@@ -185,7 +174,6 @@ private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<int> m_line_breaks;
 	void append(const font_const_ptr &font, const color &color, char c, int &index);
-	font::atlas_ptr m_atlas;
 	int m_x_cursor;
 	int m_y_min;
 	int m_y_max;
@@ -249,6 +237,7 @@ class renderer
 
 	GLuint m_vertex_passthrough_shader;
 	GLuint m_geometry_shader;
+	GLuint m_atlas_texture_name;
 
 	std::string m_typeface_path;
 
@@ -270,15 +259,15 @@ class renderer
 	int m_scale_loc;
 	int m_disp_loc;
 	int m_sampler_loc;
+	bool m_initialized;
 public:
 	renderer(std::string typeface_path = "");
 	~renderer();
 	bool render(text &txt, int dx, int dy);
 	typeface_t get_typeface(const std::string &path);
-	bool generate_fonts(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);
+	bool initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);
 };
 
-typedef std::shared_ptr<renderer> renderer_ptr;
 
 };
 

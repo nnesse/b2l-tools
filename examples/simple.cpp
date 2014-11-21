@@ -73,26 +73,29 @@ int main(void)
 #endif
 
 	gl_text::renderer renderer;
-
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ(),.!0123456789";
-
-	std::vector<gl_text::font_desc> font_desc;
 	std::vector<gl_text::font_const_ptr> fonts;
-	font_desc.push_back({
-		.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
-		.width = 25,
-		.height = 25,
-		.charset = charset
-	});
-	font_desc.push_back({
-		.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
-		.width = 40,
-		.height = 40,
-		.charset = charset
-	});
-	renderer.generate_fonts(font_desc, fonts);
-	const char *test_string = "The quick brown fox jumps over the lazy dog (). 0123456789";
-	gl_text::text test_line(fonts[0], 1, 0, 0, 1, test_string);
+	std::vector<gl_text::font_desc> font_desc = {
+		{
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
+			.width = 20,
+			.height = 20,
+			.charset = charset
+		}, {
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
+			.width = 40,
+			.height = 40,
+			.charset = charset
+		}
+	};
+	if (!renderer.initialize(font_desc, fonts)) {
+		glfwTerminate();
+		exit(-1);
+	}
+
+
+	const char *test_string = "The quick brown fox jumps over the lazy dog ().0123456789";
+	gl_text::text test_line(fonts[0], 1, 1, 1, 1, test_string);
 
 	gl_text::text_builder builder(fonts[0], gl_text::color(1,1,1,1));
 
