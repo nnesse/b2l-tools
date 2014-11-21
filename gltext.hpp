@@ -48,11 +48,11 @@ using namespace glbindify;
 typedef FT_Face typeface_t;
 
 namespace gl_text {
-	class text_builder;
+	class renderer;
 };
 
 namespace std {
-	gl_text::text_builder &endl(gl_text::text_builder &t);
+	gl_text::renderer &endl(gl_text::renderer &t);
 };
 
 namespace gl_text {
@@ -137,13 +137,10 @@ struct color {
 	color() { }
 };
 
-class text_builder;
-
 class text
 {
 public:
 	friend class renderer;
-	friend class text_builder;
 
 	struct glyph_instance {
 		gl_bounding_box v_bounds; /* Position of glyph within the text */
@@ -169,7 +166,7 @@ public:
 	int get_height() {
 		return m_y_max - m_y_min;
 	}
-	friend text_builder &std::endl(gl_text::text_builder &t);
+	friend renderer &std::endl(gl_text::renderer &t);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<int> m_line_breaks;
@@ -182,36 +179,6 @@ private:
 };
 class text;
 typedef std::shared_ptr<text> text_ptr;
-
-class text_builder : public std::stringstream {
-	text *m_text;
-	std::vector<font_const_ptr> m_font_stack;
-	std::vector<color> m_color_stack;
-	void gen_glyphs();
-	int m_prev_index;
-public:
-	text_builder(const font_const_ptr &font, color color);
-	text *get_text();
-
-	friend text_builder &std::endl(text_builder &t);
-	friend text_builder &pop_font(text_builder &t);
-	friend text_builder &pop_color(text_builder &t);
-	text_builder &operator<<(font_const_ptr font);
-	text_builder &operator<<(const color &color);
-};
-
-template <typename T>
-text_builder &operator<<(text_builder &b, T val) {
-	return static_cast<text_builder&>(static_cast<std::stringstream&>(b) << val);
-}
-
-inline text_builder &operator<<(text_builder &b, text_builder& (*pf)(text_builder &))
-{
-	return pf(b);
-}
-
-text_builder &pop_font(text_builder &t);
-text_builder &pop_color(text_builder &t);
 
 //
 // font desc
@@ -226,29 +193,43 @@ struct font_desc {
 //
 // renderer
 //
-class renderer
+class renderer : public std::stringstream
 {
+	//
+	// For stream based text object building
+	//
+	text *m_text;
+	std::vector<font_const_ptr> m_font_stack;
+	std::vector<color> m_color_stack;
+	void gen_glyphs();
+	int m_prev_index;
+
+	//
+	// Freetype state
+	//
+	std::string m_typeface_path;
 	FT_Library m_ft_library;
 	std::unordered_map<std::string, FT_Face> m_typeface_cache;
+
+	//
+	// OpenGL state
+	//
 	GLuint m_glsl_program;
-
-	GLuint m_vertex_shader;
 	GLuint m_fragment_shader;
-
 	GLuint m_vertex_passthrough_shader;
 	GLuint m_geometry_shader;
 	GLuint m_atlas_texture_name;
-
-	std::string m_typeface_path;
-
+	GLuint m_gl_vertex_array;
 	bool m_use_ARB_buffer_storage;
 	bool m_use_ARB_texture_storage;
 	bool m_use_ARB_multi_bind;
 	bool m_use_ARB_vertex_attrib_binding;
 	bool m_use_EXT_direct_state_access;
+	int m_scale_loc;
+	int m_disp_loc;
+	int m_sampler_loc;
 
 	bool init_program();
-	GLuint m_gl_vertex_array;
 
 	enum vertex_attrib_locations {
 		VBOX_LOC = 0,
@@ -256,17 +237,36 @@ class renderer
 		COLOR_LOC = 2,
 	};
 
-	int m_scale_loc;
-	int m_disp_loc;
-	int m_sampler_loc;
 	bool m_initialized;
 public:
+	renderer(const font_const_ptr &font, color color);
+	text *get_text();
+
+	friend renderer &std::endl(renderer &t);
+	friend renderer &pop_font(renderer &t);
+	friend renderer &pop_color(renderer &t);
+	renderer &operator<<(font_const_ptr font);
+	renderer &operator<<(const color &color);
+
 	renderer(std::string typeface_path = "");
 	~renderer();
 	bool render(text &txt, int dx, int dy);
 	typeface_t get_typeface(const std::string &path);
 	bool initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);
 };
+
+template <typename T>
+renderer &operator<<(renderer &b, T val) {
+	return static_cast<renderer&>(static_cast<std::stringstream&>(b) << val);
+}
+
+inline renderer &operator<<(renderer &b, renderer& (*pf)(renderer &))
+{
+	return pf(b);
+}
+
+renderer &pop_font(renderer &t);
+renderer &pop_color(renderer &t);
 
 
 };

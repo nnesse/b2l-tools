@@ -97,16 +97,14 @@ int main(void)
 	const char *test_string = "The quick brown fox jumps over the lazy dog ().0123456789";
 	gl_text::text test_line(fonts[0], 1, 1, 1, 1, test_string);
 
-	gl_text::text_builder builder(fonts[0], gl_text::color(1,1,1,1));
-
-	builder << "Test string with numbers ("
+	renderer << "Test string with numbers ("
 		<< 3.14159 << ", " << 11 << ", ...), "
 		<< gl_text::color(0,1,0,1) << "different colors" << gl_text::pop_color
 		<< ", and multiple font "
 		<< fonts[1] << gl_text::color(1,0,0,1) << "sizes" << gl_text::pop_color << gl_text::pop_font << "."
 		<< std::endl;
 
-	gl_text::text *built_text = builder.get_text();
+	gl_text::text *built_text = renderer.get_text();
 
 	glfwSetKeyCallback(window, key_callback);
 

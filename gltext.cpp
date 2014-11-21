@@ -103,7 +103,7 @@ text::~text()
 renderer::renderer(std::string typeface_path) :
 	m_typeface_path(typeface_path),
 	m_glsl_program(0),
-	m_vertex_shader(0),
+	m_vertex_passthrough_shader(0),
 	m_fragment_shader(0),
 	m_geometry_shader(0),
 	m_use_ARB_buffer_storage(false),
@@ -127,10 +127,10 @@ renderer::~renderer()
 {
 	if (m_fragment_shader)
 		glDeleteShader(m_fragment_shader);
-	if (m_vertex_shader)
-		glDeleteShader(m_vertex_shader);
 	if (m_geometry_shader)
-		glDeleteShader(m_vertex_shader);
+		glDeleteShader(m_geometry_shader);
+	if (m_vertex_passthrough_shader)
+		glDeleteShader(m_vertex_passthrough_shader);
 	if (m_glsl_program)
 		glDeleteProgram(m_glsl_program);
 	if (m_ft_library)
@@ -355,6 +355,16 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
+
+	m_color_stack.push_back(color(1,1,1,1));
+	m_font_stack.push_back(fonts[0]);
+	m_text = new text(m_font_stack.back(),
+		m_color_stack.back().r,
+		m_color_stack.back().g,
+		m_color_stack.back().b,
+		m_color_stack.back().a, "");
+	m_prev_index = -1;
+
 	m_initialized = true;
 	return m_initialized;
 }
@@ -628,19 +638,7 @@ bool renderer::render(text &txt, int dx, int dy)
 	glDrawArrays(GL_POINTS, 0, num_chars);
 }
 
-text_builder::text_builder(const font_const_ptr &font, color color) :
-	m_prev_index(-1)
-{
-	m_color_stack.push_back(color);
-	m_font_stack.push_back(font);
-	m_text = new text(m_font_stack.back(),
-		m_color_stack.back().r,
-		m_color_stack.back().g,
-		m_color_stack.back().b,
-		m_color_stack.back().a, "");
-}
-
-text *text_builder::get_text()
+text *renderer::get_text()
 {
 	gen_glyphs();
 	text *ret = m_text;
@@ -652,7 +650,7 @@ text *text_builder::get_text()
 	return ret;
 }
 
-text_builder &text_builder::operator<<(font_const_ptr font)
+renderer &renderer::operator<<(font_const_ptr font)
 {
 	gen_glyphs();
 	m_font_stack.push_back(font);
@@ -660,14 +658,14 @@ text_builder &text_builder::operator<<(font_const_ptr font)
 	return *this;
 }
 
-text_builder &text_builder::operator<<(const color &color)
+renderer &renderer::operator<<(const color &color)
 {
 	gen_glyphs();
 	m_color_stack.push_back(color);
 	return *this;
 }
 
-text_builder &pop_font(text_builder &t)
+renderer &pop_font(renderer &t)
 {
 	t.gen_glyphs();
 	if (t.m_font_stack.size() > 1) {
@@ -677,7 +675,7 @@ text_builder &pop_font(text_builder &t)
 	return t;
 }
 
-text_builder &pop_color(text_builder &t)
+renderer &pop_color(renderer &t)
 {
 	t.gen_glyphs();
 	if (t.m_color_stack.size() > 1)
@@ -685,7 +683,7 @@ text_builder &pop_color(text_builder &t)
 	return t;
 }
 
-void text_builder::gen_glyphs()
+void renderer::gen_glyphs()
 {
 	int c;
 	m_font_stack.back()->select();
@@ -699,7 +697,7 @@ void text_builder::gen_glyphs()
 
 namespace std {
 
-gl_text::text_builder &endl(gl_text::text_builder &t)
+gl_text::renderer &endl(gl_text::renderer &t)
 {
 	t.gen_glyphs();
 	t.m_text->m_line_breaks.push_back(t.m_text->m_instance_buffer.size());
