@@ -40,6 +40,8 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
+#include <iostream>
+
 int main(void)
 {
 	GLFWwindow* window;
@@ -83,8 +85,8 @@ int main(void)
 			.charset = charset
 		}, {
 			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
-			.width = 40,
-			.height = 40,
+			.width = 50,
+			.height = 50,
 			.charset = charset
 		}
 	};
@@ -94,16 +96,15 @@ int main(void)
 	}
 
 
-	const char *test_string = "The quick brown fox jumps over the lazy dog ().0123456789";
-	gl_text::text test_line(fonts[0], 1, 1, 1, 1, test_string);
-
-	renderer << "Test string with numbers ("
+	renderer << "The quick brown fox jumps over the lazy dog 0123456789 ()." << std::endl
+		<< "Testing numbers ("
 		<< 3.14159 << ", " << 11 << ", ...), "
 		<< gl_text::color(0,1,0,1) << "different colors" << gl_text::pop_color
 		<< ", and multiple font "
-		<< fonts[1] << gl_text::color(1,0,0,1) << "sizes" << gl_text::pop_color << gl_text::pop_font << "."
+		<< fonts[1] << gl_text::color(1,0,0,1)
+		<< "sizes"
+		<< gl_text::pop_color << gl_text::pop_font << "."
 		<< std::endl;
-
 	gl_text::text *built_text = renderer.get_text();
 
 	glfwSetKeyCallback(window, key_callback);
@@ -128,8 +129,9 @@ int main(void)
 		glbindify::glViewport(0, 0, width, height);
 		glbindify::glClear(GL_COLOR_BUFFER_BIT);
 #endif
-		renderer.render(test_line, 0, 128);
-		renderer.render(*built_text, 0, 168);
+
+		built_text->layout(width, height, 0, 0);
+		renderer.render(*built_text, 0, 0);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}

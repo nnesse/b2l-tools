@@ -64,11 +64,15 @@ void text::append(const font_const_ptr &font, const color &color, char c, int &p
 	inst.uvw[2] = glyph.w;
 	inst.v_bounds.upper_left[0] = m_x_cursor + glyph.left;
 	inst.v_bounds.upper_left[1] = -glyph.top;
-	inst.v_bounds.lower_right[0] = glyph.width;
-	inst.v_bounds.lower_right[1] = glyph.height;
+	inst.v_bounds.size[0] = glyph.width;
+	inst.v_bounds.size[1] = glyph.height;
+	inst.x = inst.v_bounds.upper_left[0];
+	inst.y = inst.v_bounds.upper_left[1];
 	inst.color = color;
+	inst.c = c;
+	inst.height = font->m_height;
 	m_x_cursor += glyph.advance_x / 64.0;
-	m_width = inst.v_bounds.lower_right[0];
+	m_width = inst.v_bounds.size[0];
 	m_y_min = std::min(-glyph.top, m_y_min);
 	m_y_max = std::max(-glyph.top + glyph.height, m_y_max);
 }
@@ -94,6 +98,135 @@ text::~text()
 {
 	if (m_gl_buffer)
 		glDeleteBuffers(1, &m_gl_buffer);
+}
+
+void text::layout(int width, int height, int halign, int valign)
+{
+	float x_adjust = 0;
+
+	m_lines.clear();
+
+	//
+	//Find line positions first
+	//
+	iterator iter;
+	line cur;
+	cur.first_char = 0;
+	cur.num_chars = 0;
+	cur.height = 0;
+	iterator break_candidate_iter = end();
+	int break_candidate_height;
+
+	auto user_break_iter = m_line_breaks.begin();
+
+	for (iter = begin(); iter != end(); iter++) {
+		glyph_instance *g = &(*iter);
+
+		if (user_break_iter != m_line_breaks.end() && *user_break_iter == (iter - begin())) {
+			user_break_iter++;
+			break_candidate_iter = end();
+			cur.num_chars = iter - (begin() + cur.first_char);
+			m_lines.push_back(cur);
+			x_adjust = -(*iter).x;
+			cur.first_char = iter - begin();
+			cur.num_chars = 0;
+			cur.height = 0;
+		} else if ((g->x + g->v_bounds.size[0] + x_adjust) > width && g->c != ' ') {
+			//
+			// We've exceeded the line width. If we found a line break candidate earlier
+			// move to it's position, otherwise just break the line right here.
+			//
+			if (break_candidate_iter != end()) {
+				iter = break_candidate_iter;
+				cur.height = break_candidate_height;
+			}
+			g = &(*iter);
+			break_candidate_iter = end();
+			cur.num_chars = iter - (begin() + cur.first_char);
+			m_lines.push_back(cur);
+			x_adjust = -(*iter).x;
+			cur.first_char = iter - begin();
+			cur.num_chars = 0;
+			cur.height = 0;
+		} else if ((iter + 2) < end() && (*(iter+1)).c == ' ') {
+			break_candidate_iter = iter + 2;
+			break_candidate_height = cur.height;
+		}
+		g->v_bounds.upper_left[0] = g->x + x_adjust;
+		cur.height = std::max(cur.height, g->height);
+		cur.num_chars++;
+	}
+	if (cur.num_chars) {
+		m_lines.push_back(cur);
+	}
+
+	//
+	// Compute horizonal alignment and relative vertical line positions
+	// TODO: Handle case when text exceeds vertical bounds
+	//
+	int y_adjust = 0;
+	for (line &line : m_lines) {
+		y_adjust += line.height;
+		glyph_instance *first = &m_instance_buffer[line.first_char];
+		glyph_instance *last = &m_instance_buffer[line.first_char + line.num_chars - 1];
+		while(last->c == ' ' && last > first) {
+			last--;
+		}
+		while(first->c == ' ' && last > first) {
+			first++;
+		}
+		int x_adjust;
+		int left = first->v_bounds.upper_left[0];
+		int right = last->v_bounds.upper_left[0] + last->v_bounds.size[0];
+		switch(halign) {
+		case -1:
+			x_adjust = 0 - left;
+			break;
+		case 0:
+			x_adjust = (width/2) - ((left + right)/2);
+			break;
+		case 1:
+			x_adjust = width - right;
+			break;
+		}
+		int top = +INT_MAX;
+		int bottom = -INT_MAX;
+		for (int i = 0; i < line.num_chars; i++) {
+			glyph_instance &g = m_instance_buffer[line.first_char + i];
+			g.v_bounds.upper_left[1] = g.y + y_adjust;
+			g.v_bounds.upper_left[0] += x_adjust;
+			top = std::min(top, (int)g.v_bounds.upper_left[1]);
+			bottom = std::max(bottom, (int)(g.v_bounds.upper_left[1] + g.v_bounds.size[1]));
+		}
+		line.top = top;
+		line.bottom = bottom;
+	}
+
+	//
+	// Do vertical alignment
+	//
+	int top = m_lines.front().top;
+	int bottom = m_lines.back().bottom;
+	switch(valign) {
+	case -1:
+		y_adjust = 0 - top;
+		break;
+	case 0:
+		y_adjust = (height/2) - ((top + bottom)/2);
+		break;
+	case 1:
+		y_adjust = height - bottom;
+		break;
+	}
+	for (auto line : m_lines) {
+		for (int i = 0; i < line.num_chars; i++) {
+			glyph_instance &g = m_instance_buffer[line.first_char + i];
+			g.v_bounds.upper_left[1] += y_adjust;
+		}
+	}
+
+	m_buffer_dirty = true;
+	return;
 }
 
 //
@@ -575,8 +708,14 @@ bool renderer::render(text &txt, int dx, int dy)
 		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
 	}
 
-	if(!txt.m_gl_buffer) {
-		glGenBuffers(1, &txt.m_gl_buffer);
+	if(!txt.m_gl_buffer || txt.m_buffer_dirty) {
+		if (!txt.m_gl_buffer) {
+			glGenBuffers(1, &txt.m_gl_buffer);
+		} else if (m_use_ARB_buffer_storage) {
+			glDeleteBuffers(1, &txt.m_gl_buffer);
+			glGenBuffers(1, &txt.m_gl_buffer);
+		}
+		txt.m_buffer_dirty = false;
 		if (m_use_EXT_direct_state_access) {
 			if (m_use_ARB_buffer_storage) {
 				glNamedBufferStorageEXT(txt.m_gl_buffer,

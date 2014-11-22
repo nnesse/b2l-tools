@@ -57,9 +57,9 @@ namespace std {
 
 namespace gl_text {
 
-struct gl_bounding_box {
-	GLfloat upper_left[2];
-	GLfloat lower_right[2];
+struct bounding_box {
+	float upper_left[2];
+	float size[2];
 };
 
 //
@@ -143,9 +143,13 @@ public:
 	friend class renderer;
 
 	struct glyph_instance {
-		gl_bounding_box v_bounds; /* Position of glyph within the text */
+		bounding_box v_bounds; /* Position of glyph within the text */
 		GLint uvw[4]; /* position of glyph in texture*/
 		gl_text::color color; /* RGBA color */
+		float x;
+		float y;
+		int height;
+		char c;
 	};
 
 	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str);
@@ -166,16 +170,41 @@ public:
 	int get_height() {
 		return m_y_max - m_y_min;
 	}
+
+	typedef std::vector<glyph_instance>::iterator iterator;
+
+	iterator begin() {
+		return m_instance_buffer.begin();
+	};
+
+	iterator end() {
+		return m_instance_buffer.end();
+	};
+
+	void layout(int width, int height, int halign, int valign);
+
 	friend renderer &std::endl(gl_text::renderer &t);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<int> m_line_breaks;
+
+	struct line {
+		int first_char;
+		int num_chars;
+		int height;
+		int width;
+		int top;
+		int bottom;
+	};
+
+	std::vector<line> m_lines;
 	void append(const font_const_ptr &font, const color &color, char c, int &index);
 	int m_x_cursor;
 	int m_y_min;
 	int m_y_max;
 	int m_width;
 	GLuint m_gl_buffer;
+	bool m_buffer_dirty;
 };
 class text;
 typedef std::shared_ptr<text> text_ptr;
