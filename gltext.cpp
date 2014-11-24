@@ -44,6 +44,7 @@ void text::append(const font_const_ptr &font, const color &color, char c, int &p
 {
 	int i = m_instance_buffer.size();
 	m_instance_buffer.resize(m_instance_buffer.size() + 1);
+	m_string.resize(m_string.size() + 1);
 	const glyph &glyph = font->get_glyph(c);
 
 	if (prev_index >= 0) {
@@ -59,6 +60,7 @@ void text::append(const font_const_ptr &font, const color &color, char c, int &p
 	prev_index = glyph.index;
 
 	glyph_instance &inst = m_instance_buffer[i];
+	character &character = m_string[i];
 	inst.uvw[0] = glyph.u;
 	inst.uvw[1] = glyph.v;
 	inst.uvw[2] = glyph.w;
@@ -66,11 +68,10 @@ void text::append(const font_const_ptr &font, const color &color, char c, int &p
 	inst.v_bounds.upper_left[1] = -glyph.top;
 	inst.v_bounds.size[0] = glyph.width;
 	inst.v_bounds.size[1] = glyph.height;
-	inst.x = inst.v_bounds.upper_left[0];
-	inst.y = inst.v_bounds.upper_left[1];
 	inst.color = color;
-	inst.c = c;
-	inst.height = font->m_height;
+	character.c = c;
+	character.font = font;
+	character.x = inst.v_bounds.upper_left[0];
 	m_x_cursor += glyph.advance_x / 64.0;
 	m_width = inst.v_bounds.size[0];
 	m_y_min = std::min(-glyph.top, m_y_min);
@@ -81,6 +82,7 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 	m_gl_buffer(0)
 {
 	m_instance_buffer.reserve(str.size());
+	m_string.reserve(str.size());
 
 	m_x_cursor = 0;
 	m_y_min = 0;
@@ -120,7 +122,8 @@ void text::layout(int width, int height, int halign, int valign)
 	auto user_break_iter = m_line_breaks.begin();
 
 	for (iter = begin(); iter != end(); iter++) {
-		glyph_instance *g = &(*iter);
+		character *character = &(*iter);
+		const glyph &g = character->get_glyph();
 
 		if (user_break_iter != m_line_breaks.end() && *user_break_iter == (iter - begin())) {
 			user_break_iter++;
@@ -131,7 +134,7 @@ void text::layout(int width, int height, int halign, int valign)
 			cur.first_char = iter - begin();
 			cur.num_chars = 0;
 			cur.height = 0;
-		} else if ((g->x + g->v_bounds.size[0] + x_adjust) > width && g->c != ' ') {
+		} else if ((character->x + g.width + x_adjust) > width && character->c != ' ') {
 			//
 			// We've exceeded the line width. If we found a line break candidate earlier
 			// move to it's position, otherwise just break the line right here.
@@ -140,7 +143,7 @@ void text::layout(int width, int height, int halign, int valign)
 				iter = break_candidate_iter;
 				cur.height = break_candidate_height;
 			}
-			g = &(*iter);
+			character = &(*iter);
 			break_candidate_iter = end();
 			cur.num_chars = iter - (begin() + cur.first_char);
 			m_lines.push_back(cur);
@@ -152,8 +155,7 @@ void text::layout(int width, int height, int halign, int valign)
 			break_candidate_iter = iter + 2;
 			break_candidate_height = cur.height;
 		}
-		g->v_bounds.upper_left[0] = g->x + x_adjust;
-		cur.height = std::max(cur.height, g->height);
+		cur.height = std::max(cur.height, character->font->get_height());
 		cur.num_chars++;
 	}
 	if (cur.num_chars) {
@@ -164,20 +166,20 @@ void text::layout(int width, int height, int halign, int valign)
 	// Compute horizonal alignment and relative vertical line positions
 	// TODO: Handle case when text exceeds vertical bounds
 	//
-	int y_adjust = 0;
+	int y_pos = 0;
 	for (line &line : m_lines) {
-		y_adjust += line.height;
-		glyph_instance *first = &m_instance_buffer[line.first_char];
-		glyph_instance *last = &m_instance_buffer[line.first_char + line.num_chars - 1];
-		while(last->c == ' ' && last > first) {
-			last--;
+		y_pos += line.height;
+		character *first_char = &m_string[line.first_char];
+		character *last_char = &m_string[line.first_char + line.num_chars - 1];
+		while(last_char->c == ' ' && last_char > first_char) {
+			last_char--;
 		}
-		while(first->c == ' ' && last > first) {
-			first++;
+		while(first_char->c == ' ' && last_char > first_char) {
+			first_char++;
 		}
 		int x_adjust;
-		int left = first->v_bounds.upper_left[0];
-		int right = last->v_bounds.upper_left[0] + last->v_bounds.size[0];
+		int left = first_char->x;
+		int right = last_char->x + last_char->get_glyph().width;
 		switch(halign) {
 		case -1:
 			x_adjust = 0 - left;
@@ -192,11 +194,13 @@ void text::layout(int width, int height, int halign, int valign)
 		int top = +INT_MAX;
 		int bottom = -INT_MAX;
 		for (int i = 0; i < line.num_chars; i++) {
-			glyph_instance &g = m_instance_buffer[line.first_char + i];
-			g.v_bounds.upper_left[1] = g.y + y_adjust;
-			g.v_bounds.upper_left[0] += x_adjust;
-			top = std::min(top, (int)g.v_bounds.upper_left[1]);
-			bottom = std::max(bottom, (int)(g.v_bounds.upper_left[1] + g.v_bounds.size[1]));
+			character &character = m_string[line.first_char + i];
+			glyph_instance &g_inst = m_instance_buffer[line.first_char + i];
+			const glyph &g = character.get_glyph();
+			int char_top = -g.top + y_pos;
+			g_inst.v_bounds.upper_left[0] = character.x + x_adjust;
+			top = std::min(top, (int)char_top);
+			bottom = std::max(bottom, (int)(char_top + g.height));
 		}
 		line.top = top;
 		line.bottom = bottom;
@@ -207,6 +211,7 @@ void text::layout(int width, int height, int halign, int valign)
 	//
 	int top = m_lines.front().top;
 	int bottom = m_lines.back().bottom;
+	int y_adjust;
 	switch(valign) {
 	case -1:
 		y_adjust = 0 - top;
@@ -219,9 +224,11 @@ void text::layout(int width, int height, int halign, int valign)
 		break;
 	}
 	for (auto line : m_lines) {
+		y_adjust += line.height;
 		for (int i = 0; i < line.num_chars; i++) {
 			glyph_instance &g = m_instance_buffer[line.first_char + i];
-			g.v_bounds.upper_left[1] += y_adjust;
+			character &character = m_string[line.first_char + i];
+			g.v_bounds.upper_left[1] = -character.get_glyph().top + y_adjust;
 		}
 	}
 
@@ -363,7 +370,6 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 			g.pitch = typeface->glyph->bitmap.pitch;
 			g.width = typeface->glyph->bitmap.width;
 			g.height = typeface->glyph->bitmap.rows;
-
 			size_t image_size = g.pitch * g.height;
 			g.buffer.resize(image_size);
 			memcpy(g.buffer.data(), typeface->glyph->bitmap.buffer, image_size);

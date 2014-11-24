@@ -62,6 +62,8 @@ struct bounding_box {
 	float size[2];
 };
 
+class font;
+
 //
 // glyph
 //
@@ -120,6 +122,12 @@ class font {
 	}
 public:
 	void select() const;
+	int get_height() const {
+		return m_height;
+	}
+	int get_width() const {
+		return m_width;
+	}
 	~font() { }
 };
 typedef std::shared_ptr<const font> font_const_ptr;
@@ -146,10 +154,15 @@ public:
 		bounding_box v_bounds; /* Position of glyph within the text */
 		GLint uvw[4]; /* position of glyph in texture*/
 		gl_text::color color; /* RGBA color */
+	};
+
+	struct character {
 		float x;
-		float y;
-		int height;
 		char c;
+		font_const_ptr font;
+		const glyph &get_glyph() const {
+			return font->get_glyph(c);
+		}
 	};
 
 	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str);
@@ -171,14 +184,14 @@ public:
 		return m_y_max - m_y_min;
 	}
 
-	typedef std::vector<glyph_instance>::iterator iterator;
+	typedef std::vector<character>::iterator iterator;
 
 	iterator begin() {
-		return m_instance_buffer.begin();
+		return m_string.begin();
 	};
 
 	iterator end() {
-		return m_instance_buffer.end();
+		return m_string.end();
 	};
 
 	void layout(int width, int height, int halign, int valign);
@@ -186,6 +199,7 @@ public:
 	friend renderer &std::endl(gl_text::renderer &t);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
+	std::vector<character> m_string;
 	std::vector<int> m_line_breaks;
 
 	struct line {
