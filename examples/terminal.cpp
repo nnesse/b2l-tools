@@ -68,7 +68,7 @@ int main(void)
 	glbindify::gl::init();
 #endif
 
-	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()'\"0123456789`~!@#$%^&*()_+;/?.>,<";
+	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	std::vector<gl_text::font_const_ptr> fonts;
 	std::vector<gl_text::font_desc> font_desc = {
 		{
