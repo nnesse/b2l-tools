@@ -1,27 +1,3 @@
-/*
-
-Copyright (c) 2014 Neils Nesse
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-
-*/
-
 #include "gltext.hpp"
 
 #include <GLFW/glfw3.h>
@@ -29,22 +5,35 @@ THE SOFTWARE.
 #include <stdlib.h>
 #include <stdio.h>
 
-
 #include <iostream>
-
-
-gl_text::text test_text;
-gl_text::renderer renderer;
 
 static void error_callback(int error, const char* description)
 {
 	fputs(description, stderr);
 }
 
+gl_text::renderer renderer;
+gl_text::text test_text;
+
+static void char_callback(GLFWwindow* window, unsigned int key)
+{
+	renderer << &test_text << (char)key;
+	renderer.flush();
+}
+
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, GL_TRUE);
+	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+		if (key == GLFW_KEY_BACKSPACE) {
+			test_text.pop();
+		} else if (key == GLFW_KEY_ENTER) {
+			renderer << &test_text << std::endl << gl_text::color(1,0,0,1) << "> " << gl_text::pop_color;
+			renderer.flush();
+		}
+	}
+	
 }
 
 int main(void)
@@ -65,7 +54,7 @@ int main(void)
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #endif
 
-	window = glfwCreateWindow(1024, 256, "Simple text output example", NULL, NULL);
+	window = glfwCreateWindow(1024, 256, "Terminal example", NULL, NULL);
 	if (!window) {
 		glfwTerminate();
 		exit(-1);
@@ -87,11 +76,6 @@ int main(void)
 			.width = 20,
 			.height = 20,
 			.charset = charset
-		}, {
-			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
-			.width = 35,
-			.height = 35,
-			.charset = charset
 		}
 	};
 	if (!renderer.initialize(font_desc, fonts)) {
@@ -99,21 +83,12 @@ int main(void)
 		exit(-1);
 	}
 
+	renderer << &test_text << fonts[0] << gl_text::color(1,1,1,1)
+		<< gl_text::color(1,0,0,1) << "> " << gl_text::pop_color;
+	renderer.flush();
 
-	renderer << &test_text
-		<< fonts[0] << gl_text::color(1,1,1,1)
-		<< "The quick brown fox jumps over the lazy dog 0123456789 ()." << std::endl
-		<< "Testing numbers ("
-		<< 3.14159 << ", " << 11 << ", ...), "
-		<< gl_text::color(0,1,0,1) << "different colors" << gl_text::pop_color
-		<< ", and multiple font "
-		<< fonts[1] << gl_text::color(1,0,0,1)
-		<< "sizes"
-		<< gl_text::pop_color << gl_text::pop_font << "."
-		<< gl_text::pop_color << gl_text::pop_font
-		<< std::endl;
-	renderer.set_text(NULL);
 	glfwSetKeyCallback(window, key_callback);
+	glfwSetCharCallback(window, char_callback);
 
 #if GLTEXT_USE_GLEW
 	glEnable(GL_BLEND);
@@ -135,8 +110,13 @@ int main(void)
 		glbindify::glViewport(0, 0, width, height);
 		glbindify::glClear(GL_COLOR_BUFFER_BIT);
 #endif
-		test_text.set_layout(width, height, 0, 0);
-		renderer.render(test_text, 0, 0);
+		test_text.set_layout(width, -1, -1, -1);
+		int last_line_pos = test_text.get_line_pos(test_text.num_lines() - 1);
+		if (last_line_pos > (height - 10)) {
+			renderer.render(test_text, 0, (height - 10) - last_line_pos);
+		} else {
+			renderer.render(test_text, 0, 0);
+		}
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}

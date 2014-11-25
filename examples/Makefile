@@ -2,7 +2,7 @@
 # Link with freetype2 and glfw staticly and enable GLBINDIFY support with gltext
 #
 
-all: simple
+all: simple terminal
 
 GLLOADER?=glew
 
@@ -14,6 +14,9 @@ CXXFLAGS = -g -std=c++11 $(shell pkg-config glfw3 --static --cflags)
 CXXFLAGS += $(shell pkg-config freetype2 --static --cflags)
 LIBS = $(shell pkg-config glfw3 --static --libs)
 LIBS += $(shell pkg-config freetype2 --static --libs)
+
+
+OBJS = gltext.o
 
 ifeq ($(GLLOADER),glew)
 CPPFLAGS+= -DGLTEXT_USE_GLEW=1
@@ -33,15 +36,20 @@ gl_3_3.cpp gl_3_3.hpp:
 		-e ARB_buffer_storage \
 		-e ARB_texture_storage
 gltext.o: gl_3_3.cpp gl_3_3.hpp gltext.hpp
-EXT_OBJS += gl_3_3.o
+OBJS += gl_3_3.o
 endif
 endif
+
+gltext.o: gltext.cpp gltext.hpp
 
 #
 # Build examples using implicit rules to build gltext and bindings
 #
-simple: simple.cpp $(EXT_OBJS) gltext.o gltext.hpp
-	g++ -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< gltext.o $(EXT_OBJS) $(LIBS) -o $@
+simple: simple.cpp $(OBJS) gltext.hpp
+	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -o $@
+
+terminal: terminal.cpp $(OBJS) gltext.hpp
+	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -o $@
 
 clean:
 	@rm -f *.o gl_3_3.* simple

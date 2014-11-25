@@ -98,6 +98,9 @@ struct glyph {
 	int width;
 	int height;
 	int pitch;
+
+	glyph() : index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
+
 	std::vector<uint8_t> buffer;
 };
 
@@ -115,7 +118,9 @@ class font {
 	friend class renderer;
 	friend class text;
 
-	font() { }
+	font() {
+		m_glyphs.resize(256);
+	}
 
 	const glyph &get_glyph(char c) const {
 		return m_glyphs[c];
@@ -165,24 +170,9 @@ public:
 		}
 	};
 
-	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string &str);
+	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str = NULL);
+	text();
 	~text();
-
-	int get_x_cursor() {
-		return m_x_cursor;
-	}
-	int get_y_min() {
-		return m_y_min;
-	}
-	int get_y_max() {
-		return m_y_max;
-	}
-	int get_width() {
-		return m_width;
-	}
-	int get_height() {
-		return m_y_max - m_y_min;
-	}
 
 	typedef std::vector<character>::iterator iterator;
 
@@ -194,13 +184,38 @@ public:
 		return m_string.end();
 	};
 
-	void layout(int width, int height, int halign, int valign);
+	void set_layout(int width, int height, int halign, int valign);
+
+	void pop();
+
+	int get_line_bottom(int i) {
+		layout();
+		return m_lines[i].bottom;
+	}
+
+	int get_line_pos(int i) {
+		layout();
+		return m_lines[i].y_pos;
+	}
+
+	int get_line_top(int i) {
+		layout();
+		return m_lines[i].top;
+	}
+
+	int num_lines() {
+		layout();
+		return m_lines.size();
+	}
 
 	friend renderer &std::endl(gl_text::renderer &t);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<character> m_string;
-	std::vector<int> m_line_breaks;
+	int m_layout_width;
+	int m_layout_height;
+	int m_layout_halign;
+	int m_layout_valign;
 
 	struct line {
 		int first_char;
@@ -208,16 +223,17 @@ private:
 		int height;
 		int width;
 		int top;
+		int y_pos;
 		int bottom;
 	};
-
 	std::vector<line> m_lines;
-	void append(const font_const_ptr &font, const color &color, char c, int &index);
-	int m_x_cursor;
-	int m_y_min;
-	int m_y_max;
-	int m_width;
+
+	void layout();
+	void append(const font_const_ptr &font, const color &color, char c);
+	int m_y_delta;
 	GLuint m_gl_buffer;
+	bool m_needs_layout;
+	bool m_needs_vert_alignment;
 	bool m_buffer_dirty;
 };
 class text;
@@ -245,7 +261,6 @@ class renderer : public std::stringstream
 	std::vector<font_const_ptr> m_font_stack;
 	std::vector<color> m_color_stack;
 	void gen_glyphs();
-	int m_prev_index;
 
 	//
 	// Freetype state
@@ -282,13 +297,17 @@ class renderer : public std::stringstream
 
 	bool m_initialized;
 public:
-	renderer(const font_const_ptr &font, color color);
-	text *get_text();
+	text *set_text(text *);
+
+	void flush() {
+		gen_glyphs();
+	}
 
 	friend renderer &std::endl(renderer &t);
 	friend renderer &pop_font(renderer &t);
 	friend renderer &pop_color(renderer &t);
 	renderer &operator<<(font_const_ptr font);
+	renderer &operator<<(text *text);
 	renderer &operator<<(const color &color);
 
 	renderer(std::string typeface_path = "");
