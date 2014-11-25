@@ -214,9 +214,6 @@ void text::layout()
 				cur->first_char = iter - begin();
 				cur->num_chars = 0;
 				cur->height = 0;
-			} else if ((iter + 2) < end() && (*(iter+1)).c == ' ') {
-				break_candidate_iter = iter + 2;
-				break_candidate_height = cur->height;
 			}
 			cur->height = std::max(cur->height, character->font->get_height());
 			cur->num_chars++;
@@ -229,6 +226,10 @@ void text::layout()
 				cur->first_char = iter - begin() + 1;
 				cur->num_chars = 0;
 				cur->height = 0;
+			}
+			if ((iter + 2) < end() && (*(iter+1)).c == ' ') {
+				break_candidate_iter = iter + 2;
+				break_candidate_height = cur->height;
 			}
 		}
 		if (!cur->num_chars) {
