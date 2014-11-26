@@ -115,11 +115,29 @@ class font {
 	int m_height;
 	typeface_t m_typeface;
 	std::vector<glyph> m_glyphs;
+	std::string m_family;
+	int m_style;
 	friend class renderer;
 	friend class text;
 
 	font() {
 		m_glyphs.resize(256);
+	}
+
+	int width() const {
+		return m_width;
+	}
+
+	int height() const {
+		return m_height;
+	}
+
+	const std::string &family() const {
+		return m_family;
+	}
+
+	int style() const {
+		return m_style;
 	}
 
 	const glyph &get_glyph(char c) const {
@@ -239,11 +257,19 @@ private:
 class text;
 typedef std::shared_ptr<text> text_ptr;
 
+enum font_style {
+	STYLE_REGULAR = 0,
+	STYLE_ITALIC = 1,
+	STYLE_BOLD = 2,
+};
+
 //
 // font desc
 //
 struct font_desc {
-	typeface_t typeface;
+	std::string path;
+	std::string family;
+	int style;
 	int width;
 	int height;
 	std::string charset;

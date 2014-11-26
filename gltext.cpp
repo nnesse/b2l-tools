@@ -164,7 +164,6 @@ void text::layout()
 		return;
 	if (m_needs_layout) {
 		float x_adjust;
-		m_lines.clear();
 		if (!m_lines.size()) {
 			m_lines.push_back( {
 				.first_char = 0,
@@ -400,6 +399,10 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	m_use_EXT_direct_state_access = gl::EXT_direct_state_access;
 #endif
 
+	//Need at least one font
+	if (font_descriptions.empty())
+		return false;
+
 	//Create GLSL program
 	if (!init_program())
 		return false;
@@ -423,7 +426,7 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	std::priority_queue<glyph *, std::vector<glyph *>, glyph_comp> glyph_heap;
 	for (auto font_desc : font_descriptions) {
 		font *f = new font();
-		typeface_t typeface = font_desc.typeface;
+		typeface_t typeface = get_typeface(font_desc.path);
 		int width = font_desc.width;
 		int height = font_desc.height;
 
@@ -438,6 +441,8 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		f->m_width = width;
 		f->m_height = height;
 		f->m_typeface = typeface;
+		f->m_family = font_desc.family;
+		f->m_style = font_desc.style;
 		FT_Set_Pixel_Sizes(typeface, width, height);
 
 		for (auto c : font_desc.charset) {

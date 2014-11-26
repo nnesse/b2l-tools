@@ -83,12 +83,30 @@ int main(void)
 	std::vector<gl_text::font_const_ptr> fonts;
 	std::vector<gl_text::font_desc> font_desc = {
 		{
-			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
-			.width = 20,
-			.height = 20,
+			.path = "ttf/LiberationSans-Regular.ttf",
+			.family = "LiberationSans",
+			.style = gl_text::STYLE_REGULAR,
+			.width = 35,
+			.height = 35,
 			.charset = charset
 		}, {
-			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
+			.path = "ttf/LiberationSans-Italic.ttf",
+			.family = "LiberationSans",
+			.style = gl_text::STYLE_ITALIC,
+			.width = 35,
+			.height = 35,
+			.charset = charset
+		}, {
+			.path = "ttf/LiberationSans-Bold.ttf",
+			.family = "LiberationSans",
+			.style = gl_text::STYLE_BOLD,
+			.width = 35,
+			.height = 35,
+			.charset = charset
+		}, {
+			.path = "ttf/LiberationSans-BoldItalic.ttf",
+			.family = "LiberationSans",
+			.style = (gl_text::STYLE_BOLD | gl_text::STYLE_ITALIC),
 			.width = 35,
 			.height = 35,
 			.charset = charset
@@ -99,17 +117,19 @@ int main(void)
 		exit(-1);
 	}
 
-
 	renderer << &test_text
 		<< fonts[0] << gl_text::color(1,1,1,1)
 		<< "The quick brown fox jumps over the lazy dog 0123456789 ()." << std::endl
 		<< "Testing numbers ("
 		<< 3.14159 << ", " << 11 << ", ...), "
 		<< gl_text::color(0,1,0,1) << "different colors" << gl_text::pop_color
-		<< ", and multiple font "
-		<< fonts[1] << gl_text::color(1,0,0,1)
-		<< "sizes"
-		<< gl_text::pop_color << gl_text::pop_font << "."
+		<< ", and "
+		<< gl_text::color(1,0,0,1)
+		<< fonts[1] << "multiple " << gl_text::pop_font
+		<< gl_text::color(0.5,0,1,1) << fonts[2] << "font " << gl_text::pop_font << gl_text::pop_color
+		<< fonts[3] << "styles" << gl_text::pop_font
+		<< gl_text::pop_color
+		<< "."
 		<< gl_text::pop_color << gl_text::pop_font
 		<< std::endl;
 	renderer.set_text(NULL);
@@ -123,7 +143,7 @@ int main(void)
 	glbindify::glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
 
-	glfwSwapInterval(0);
+	glfwSwapInterval(1);
 
 	while (!glfwWindowShouldClose(window)) {
 		int width, height;

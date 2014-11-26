@@ -72,7 +72,9 @@ int main(void)
 	std::vector<gl_text::font_const_ptr> fonts;
 	std::vector<gl_text::font_desc> font_desc = {
 		{
-			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
+			.path = "ttf/LiberationSans-Regular.ttf",
+			.family = "LiberationSans",
+			.style = gl_text::STYLE_REGULAR,
 			.width = 20,
 			.height = 20,
 			.charset = charset
@@ -98,7 +100,7 @@ int main(void)
 	glbindify::glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
 
-	glfwSwapInterval(0);
+	glfwSwapInterval(1);
 
 	while (!glfwWindowShouldClose(window)) {
 		int width, height;
