@@ -39,7 +39,6 @@ static const int texture_size = 1024;
 // text
 //
 
-
 void text::append(const font_const_ptr &font, const color &color, char c)
 {
 	const glyph *prev_glyph;
@@ -329,8 +328,7 @@ renderer::renderer(std::string typeface_path) :
 	m_use_EXT_direct_state_access(false),
 	m_ft_library(NULL),
 	m_initialized(false),
-	m_atlas_texture_name(0),
-	m_text(NULL)
+	m_atlas_texture_name(0)
 {
 	FT_Init_FreeType(&m_ft_library);
 }
@@ -578,8 +576,6 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 
-	m_color_stack.push_back(color(1,1,1,1));
-	m_font_stack.push_back(fonts[0]);
 	m_initialized = true;
 	return m_initialized;
 }
@@ -861,75 +857,62 @@ bool renderer::render(text &txt, int dx, int dy)
 	glDrawArrays(GL_POINTS, 0, num_chars);
 }
 
-text *renderer::set_text(text *text_)
+text_stream &text_stream::operator<<(font_const_ptr font)
 {
-	text *ret = m_text;
-	if (m_text) {
-		gen_glyphs();
-	}
-	m_text = text_;
-	return ret;
-}
-
-renderer &renderer::operator<<(font_const_ptr font)
-{
-	gen_glyphs();
+	flush();
 	m_font_stack.push_back(font);
 	return *this;
 }
 
-renderer &renderer::operator<<(const color &color)
+text_stream &text_stream::operator<<(const color &color)
 {
-	gen_glyphs();
+	flush();
 	m_color_stack.push_back(color);
 	return *this;
 }
 
-renderer &renderer::operator<<(text *text)
+text_stream &pop_font(text_stream &t)
 {
-	set_text(text);
-	return *this;
-}
-
-renderer &pop_font(renderer &t)
-{
-	t.gen_glyphs();
+	t.flush();
 	if (t.m_font_stack.size() > 1) {
 		t.m_font_stack.pop_back();
 	}
 	return t;
 }
 
-renderer &pop_color(renderer &t)
+text_stream &pop_color(text_stream &t)
 {
-	t.gen_glyphs();
+	t.flush();
 	if (t.m_color_stack.size() > 1)
 		t.m_color_stack.pop_back();
 	return t;
 }
 
-void renderer::gen_glyphs()
+void text_stream::flush()
 {
 	int c;
 	m_font_stack.back()->select();
-	while ((c = get()) != EOF) {
-		if (m_text) {
-			m_text->append(m_font_stack.back(), m_color_stack.back(), c);
-		}
+	while ((c = std::stringstream::get()) != EOF) {
+		m_out.append(m_font_stack.back(), m_color_stack.back(), c);
 	}
 	clear();
+}
+
+text_stream::text_stream(text &out, font_const_ptr &default_font, color default_color)
+	: m_out(out)
+{
+	m_font_stack.push_back(default_font);
+	m_color_stack.push_back(default_color);
 }
 
 }
 
 namespace std {
 
-gl_text::renderer &endl(gl_text::renderer &t)
+gl_text::text_stream &endl(gl_text::text_stream &t)
 {
 	t.flush();
-	if (t.m_text) {
-		t.m_text->append(t.m_font_stack.back(), t.m_color_stack.back(), '\n');
-	}
+	t.m_out.append(t.m_font_stack.back(), t.m_color_stack.back(), '\n');
 	return t;
 }
 

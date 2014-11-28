@@ -12,13 +12,15 @@ static void error_callback(int error, const char* description)
 	fputs(description, stderr);
 }
 
-gl_text::renderer renderer;
-gl_text::text test_text;
+gl_text::text_stream *g_text_stream = NULL;
+gl_text::text g_test_text;
 
 static void char_callback(GLFWwindow* window, unsigned int key)
 {
-	renderer << &test_text << (char)key;
-	renderer.flush();
+	if (g_text_stream) {
+		*g_text_stream << (char)key;
+		g_text_stream->flush();
+	}
 }
 
 static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -27,10 +29,10 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		glfwSetWindowShouldClose(window, GL_TRUE);
 	if (action == GLFW_PRESS || action == GLFW_REPEAT) {
 		if (key == GLFW_KEY_BACKSPACE) {
-			test_text.pop();
-		} else if (key == GLFW_KEY_ENTER) {
-			renderer << &test_text << std::endl << gl_text::color(1,0,0,1) << "> " << gl_text::pop_color;
-			renderer.flush();
+			g_test_text.pop();
+		} else if (key == GLFW_KEY_ENTER && g_text_stream) {
+			*g_text_stream << std::endl << gl_text::color(1,0,0,1) << "> " << gl_text::pop_color;
+			g_text_stream->flush();
 		}
 	}
 	
@@ -80,14 +82,15 @@ int main(void)
 			.charset = charset
 		}
 	};
+	gl_text::renderer renderer;
 	if (!renderer.initialize(font_desc, fonts)) {
 		glfwTerminate();
 		exit(-1);
 	}
 
-	renderer << &test_text << fonts[0] << gl_text::color(1,1,1,1)
-		<< gl_text::color(1,0,0,1) << "> " << gl_text::pop_color;
-	renderer.flush();
+	g_text_stream = new gl_text::text_stream(g_test_text, fonts[0], gl_text::color(1,1,1,1));
+	*g_text_stream << gl_text::color(1,0,0,1) << "> " << gl_text::pop_color;
+	g_text_stream->flush();
 
 	glfwSetKeyCallback(window, key_callback);
 	glfwSetCharCallback(window, char_callback);
@@ -112,12 +115,12 @@ int main(void)
 		glbindify::glViewport(0, 0, width, height);
 		glbindify::glClear(GL_COLOR_BUFFER_BIT);
 #endif
-		test_text.set_layout(width, -1, -1, -1);
-		int last_line_pos = test_text.get_line_pos(test_text.num_lines() - 1);
+		g_test_text.set_layout(width, -1, -1, -1);
+		int last_line_pos = g_test_text.get_line_pos(g_test_text.num_lines() - 1);
 		if (last_line_pos > (height - 10)) {
-			renderer.render(test_text, 0, (height - 10) - last_line_pos);
+			renderer.render(g_test_text, 0, (height - 10) - last_line_pos);
 		} else {
-			renderer.render(test_text, 0, 0);
+			renderer.render(g_test_text, 0, 0);
 		}
 		glfwSwapBuffers(window);
 		glfwPollEvents();

@@ -117,9 +117,9 @@ int main(void)
 		exit(-1);
 	}
 
-	renderer << &test_text
-		<< fonts[0] << gl_text::color(1,1,1,1)
-		<< "The quick brown fox jumps over the lazy dog 0123456789 ()." << std::endl
+	gl_text::text_stream out(test_text, fonts[0], gl_text::color(1,1,1,1));
+
+	out << "The quick brown fox jumps over the lazy dog 0123456789 ()." << std::endl
 		<< "Testing numbers ("
 		<< 3.14159 << ", " << 11 << ", ...), "
 		<< gl_text::color(0,1,0,1) << "different colors" << gl_text::pop_color
@@ -130,9 +130,7 @@ int main(void)
 		<< fonts[3] << "styles" << gl_text::pop_font
 		<< gl_text::pop_color
 		<< "."
-		<< gl_text::pop_color << gl_text::pop_font
 		<< std::endl;
-	renderer.set_text(NULL);
 	glfwSetKeyCallback(window, key_callback);
 
 #if GLTEXT_USE_GLEW

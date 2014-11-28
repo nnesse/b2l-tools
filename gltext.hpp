@@ -48,11 +48,11 @@ using namespace glbindify;
 typedef FT_Face typeface_t;
 
 namespace gl_text {
-	class renderer;
+	class text_stream;
 };
 
 namespace std {
-	gl_text::renderer &endl(gl_text::renderer &t);
+	gl_text::text_stream &endl(gl_text::text_stream &t);
 };
 
 namespace gl_text {
@@ -119,6 +119,7 @@ class font {
 	int m_style;
 	friend class renderer;
 	friend class text;
+	friend class text_stream;
 
 	font() {
 		m_glyphs.resize(256);
@@ -139,10 +140,10 @@ class font {
 	int style() const {
 		return m_style;
 	}
-
 	const glyph &get_glyph(char c) const {
 		return m_glyphs[c];
 	}
+
 public:
 	void select() const;
 	int get_height() const {
@@ -173,12 +174,6 @@ class text
 public:
 	friend class renderer;
 
-	struct glyph_instance {
-		bounding_box v_bounds; /* Position of glyph within the text */
-		GLint uvw[4]; /* position of glyph in texture*/
-		gl_text::color color; /* RGBA color */
-	};
-
 	struct character {
 		float x;
 		char c;
@@ -186,6 +181,12 @@ public:
 		const glyph &get_glyph() const {
 			return font->get_glyph(c);
 		}
+	};
+
+	struct glyph_instance {
+		bounding_box v_bounds; /* Position of glyph within the text */
+		GLint uvw[4]; /* position of glyph in texture*/
+		gl_text::color color; /* RGBA color */
 	};
 
 	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str = NULL);
@@ -226,7 +227,8 @@ public:
 		return m_lines.size();
 	}
 
-	friend renderer &std::endl(gl_text::renderer &t);
+	friend text_stream &std::endl(gl_text::text_stream &t);
+	void append(const font_const_ptr &font, const color &color, char c);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<character> m_string;
@@ -247,7 +249,6 @@ private:
 	std::vector<line> m_lines;
 
 	void layout();
-	void append(const font_const_ptr &font, const color &color, char c);
 	int m_y_delta;
 	GLuint m_gl_buffer;
 	bool m_needs_layout;
@@ -276,17 +277,30 @@ struct font_desc {
 };
 
 //
-// renderer
+// text stream
 //
-class renderer : public std::stringstream
+class text_stream : public std::stringstream
 {
-	//
-	// For stream based text object building
-	//
-	text *m_text;
 	std::vector<font_const_ptr> m_font_stack;
 	std::vector<color> m_color_stack;
-	void gen_glyphs();
+	text &m_out;
+public:
+	friend text_stream &std::endl(text_stream &t);
+	friend text_stream &pop_font(text_stream &t);
+	friend text_stream &pop_color(text_stream &t);
+	text_stream &operator<<(font_const_ptr font);
+	text_stream &operator<<(const color &color);
+
+	void flush();
+
+	text_stream(text& out, font_const_ptr &default_font, color default_color);
+};
+
+//
+// renderer
+//
+class renderer
+{
 
 	//
 	// Freetype state
@@ -323,19 +337,6 @@ class renderer : public std::stringstream
 
 	bool m_initialized;
 public:
-	text *set_text(text *);
-
-	void flush() {
-		gen_glyphs();
-	}
-
-	friend renderer &std::endl(renderer &t);
-	friend renderer &pop_font(renderer &t);
-	friend renderer &pop_color(renderer &t);
-	renderer &operator<<(font_const_ptr font);
-	renderer &operator<<(text *text);
-	renderer &operator<<(const color &color);
-
 	renderer(std::string typeface_path = "");
 	~renderer();
 	bool render(text &txt, int dx, int dy);
@@ -344,17 +345,17 @@ public:
 };
 
 template <typename T>
-renderer &operator<<(renderer &b, T val) {
-	return static_cast<renderer&>(static_cast<std::stringstream&>(b) << val);
+text_stream &operator<<(text_stream &b, T val) {
+	return static_cast<text_stream&>(static_cast<std::stringstream&>(b) << val);
 }
 
-inline renderer &operator<<(renderer &b, renderer& (*pf)(renderer &))
+inline text_stream &operator<<(text_stream &b, text_stream& (*pf)(text_stream &))
 {
 	return pf(b);
 }
 
-renderer &pop_font(renderer &t);
-renderer &pop_color(renderer &t);
+text_stream &pop_font(text_stream &t);
+text_stream &pop_color(text_stream &t);
 
 
 };
