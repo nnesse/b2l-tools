@@ -45,7 +45,7 @@ gltext.o: gltext.cpp gltext.hpp
 #
 # Build examples using implicit rules to build gltext and bindings
 #
-simple: simple.cpp $(OBJS) gltext.hpp
+text_stream: text_stream.cpp $(OBJS) gltext.hpp
 	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -o $@
 
 terminal: terminal.cpp $(OBJS) gltext.hpp
