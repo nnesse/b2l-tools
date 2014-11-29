@@ -2,18 +2,18 @@
 # Link with freetype2 and glfw staticly and enable GLBINDIFY support with gltext
 #
 
-all: simple terminal
+all: simple text_stream terminal
 
-GLLOADER?=glew
+GLLOADER?=glbindify
 
 VPATH = ..
 CPPFLAGS = -I../ -I.
 EXT_OBJS =
 
-CXXFLAGS = -g -std=c++11 $(shell pkg-config glfw3 --static --cflags)
-CXXFLAGS += $(shell pkg-config freetype2 --static --cflags)
-LIBS = $(shell pkg-config glfw3 --static --libs)
-LIBS += $(shell pkg-config freetype2 --static --libs)
+CXXFLAGS = -std=c++11 $(shell pkg-config glfw3 --cflags)
+CXXFLAGS += $(shell pkg-config freetype2 --cflags)
+LIBS = $(shell pkg-config glfw3 --libs)
+LIBS += $(shell pkg-config freetype2 --libs)
 
 
 OBJS = gltext.o
@@ -45,6 +45,9 @@ gltext.o: gltext.cpp gltext.hpp
 #
 # Build examples using implicit rules to build gltext and bindings
 #
+simple: simple.cpp $(OBJS) gltext.hpp
+	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -o $@
+
 text_stream: text_stream.cpp $(OBJS) gltext.hpp
 	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -o $@
 

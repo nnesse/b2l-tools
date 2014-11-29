@@ -190,6 +190,7 @@ public:
 	};
 
 	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str = NULL);
+	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str = NULL);
 	text();
 	~text();
 

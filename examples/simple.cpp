@@ -32,7 +32,6 @@ THE SOFTWARE.
 
 #include <iostream>
 
-
 static void error_callback(int error, const char* description)
 {
 	fputs(description, stderr);
@@ -48,7 +47,6 @@ int main(void)
 {
 	GLFWwindow* window;
 
-	gl_text::text test_text;
 	gl_text::renderer renderer;
 
 	glfwSetErrorCallback(error_callback);
@@ -89,27 +87,6 @@ int main(void)
 			.width = 35,
 			.height = 35,
 			.charset = charset
-		}, {
-			.path = "ttf/LiberationSans-Italic.ttf",
-			.family = "LiberationSans",
-			.style = gl_text::STYLE_ITALIC,
-			.width = 35,
-			.height = 35,
-			.charset = charset
-		}, {
-			.path = "ttf/LiberationSans-Bold.ttf",
-			.family = "LiberationSans",
-			.style = gl_text::STYLE_BOLD,
-			.width = 35,
-			.height = 35,
-			.charset = charset
-		}, {
-			.path = "ttf/LiberationSans-BoldItalic.ttf",
-			.family = "LiberationSans",
-			.style = (gl_text::STYLE_BOLD | gl_text::STYLE_ITALIC),
-			.width = 35,
-			.height = 35,
-			.charset = charset
 		}
 	};
 	if (!renderer.initialize(font_desc, fonts)) {
@@ -117,20 +94,7 @@ int main(void)
 		exit(-1);
 	}
 
-	gl_text::text_stream out(test_text, fonts[0], gl_text::color(1,1,1,1));
-
-	out << "The quick brown fox jumps over the lazy dog 0123456789 ()." << std::endl
-		<< "Testing numbers ("
-		<< 3.14159 << ", " << 11 << ", ...), "
-		<< gl_text::color(0,1,0,1) << "different colors" << gl_text::pop_color
-		<< ", and "
-		<< gl_text::color(1,0,0,1)
-		<< fonts[1] << "multiple " << gl_text::pop_font
-		<< gl_text::color(0.5,0,1,1) << fonts[2] << "font " << gl_text::pop_font << gl_text::pop_color
-		<< fonts[3] << "styles" << gl_text::pop_font
-		<< gl_text::pop_color
-		<< "."
-		<< std::endl;
+	gl_text::text test_text(fonts[0], 1, 1, 1, 1, "The quick brown fox jumps over the lazy dog 0123456789 ().");
 	glfwSetKeyCallback(window, key_callback);
 
 #if GLTEXT_USE_GLEW

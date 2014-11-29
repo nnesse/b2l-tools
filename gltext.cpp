@@ -107,6 +107,24 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 	}
 }
 
+text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
+	m_gl_buffer(0),
+	m_needs_layout(false),
+	m_needs_vert_alignment(false),
+	m_layout_width(-1),
+	m_layout_height(-1),
+	m_layout_halign(-1),
+	m_layout_valign(-1)
+{
+	font->select();
+	if (str) {
+		while (*str) {
+			append(font, color(r, g, b, a), *str);
+			str++;
+		}
+	}
+}
+
 text::text() :
 	m_gl_buffer(0),
 	m_needs_layout(false),
