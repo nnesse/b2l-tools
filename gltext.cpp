@@ -191,14 +191,14 @@ void text::layout()
 				.y_pos = 0});
 		}
 		line *cur = &m_lines.back();
-		x_adjust = -((begin() + cur->first_char)->x);
+		x_adjust = -((m_string.begin() + cur->first_char)->x);
 
 		int first_line = m_lines.size() - 1;
 
 		//
 		//Find line positions first
 		//
-		iterator break_candidate_iter = end();
+		auto break_candidate_iter = m_string.end();
 		int break_candidate_height;
 
 		cur->num_chars = 0;
@@ -206,7 +206,7 @@ void text::layout()
 		cur->width = 0;
 		cur->top = 0;
 
-		for (iterator iter = (begin() + cur->first_char); iter != end(); iter++) {
+		for (auto iter = (m_string.begin() + cur->first_char); iter != m_string.end(); iter++) {
 			character *character = &(*iter);
 			const glyph &g = character->get_glyph();
 
@@ -215,35 +215,35 @@ void text::layout()
 				// We've exceeded the line width. If we found a line break candidate earlier
 				// move to it's position, otherwise just break the line right here.
 				//
-				if (break_candidate_iter != end()) {
+				if (break_candidate_iter != m_string.end()) {
 					iter = break_candidate_iter;
 					cur->height = break_candidate_height;
 				}
 				character = &(*iter);
-				break_candidate_iter = end();
-				cur->num_chars = iter - (begin() + cur->first_char);
+				break_candidate_iter = m_string.end();
+				cur->num_chars = iter - (m_string.begin() + cur->first_char);
 				if (cur->num_chars) {
 					m_lines.resize(m_lines.size() + 1);
 				}
 				cur = &m_lines.back();
 				x_adjust = -(*iter).x;
-				cur->first_char = iter - begin();
+				cur->first_char = iter - m_string.begin();
 				cur->num_chars = 0;
 				cur->height = 0;
 			}
 			cur->height = std::max(cur->height, character->font->get_height());
 			cur->num_chars++;
 			if (character->c == '\n') {
-				break_candidate_iter = end();
-				cur->num_chars = iter - (begin() + cur->first_char) + 1;
+				break_candidate_iter = m_string.end();
+				cur->num_chars = iter - (m_string.begin() + cur->first_char) + 1;
 				m_lines.resize(m_lines.size() + 1);
 				cur = &m_lines.back();
 				x_adjust = -(*iter).x;
-				cur->first_char = iter - begin() + 1;
+				cur->first_char = iter - m_string.begin() + 1;
 				cur->num_chars = 0;
 				cur->height = 0;
 			}
-			if ((iter + 2) < end() && (*(iter+1)).c == ' ') {
+			if ((iter + 2) < m_string.end() && (*(iter+1)).c == ' ') {
 				break_candidate_iter = iter + 2;
 				break_candidate_height = cur->height;
 			}
@@ -628,9 +628,6 @@ bool renderer::init_program()
 		"\n"
 		"out vec3 texcoord_f;\n"
 		"out vec4 color_f;\n"
-		"\n"
-		"uniform usampler1D uvw_sampler;\n"
-		"uniform usampler1D uvsize_sampler;\n"
 		"\n"
 		"void genVertex(vec2 corner)\n"
 		"{\n"

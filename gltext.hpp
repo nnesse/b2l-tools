@@ -189,22 +189,19 @@ public:
 		gl_text::color color; /* RGBA color */
 	};
 
-	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str = NULL);
-	text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str = NULL);
+	text(const font_const_ptr &font, float r, float g, float b, float a, const std::string *str = NULL);
+	text(const font_const_ptr &font, float r, float g, float b, float a, const char *str = NULL);
 	text();
 	~text();
 
-	typedef std::vector<character>::iterator iterator;
-
-	iterator begin() {
-		return m_string.begin();
-	};
-
-	iterator end() {
-		return m_string.end();
-	};
-
 	void set_layout(int width, int height, int halign, int valign);
+
+	void set_background(float r, float g, float b, float a) {
+		m_background_color.r = r;
+		m_background_color.g = g;
+		m_background_color.b = b;
+		m_background_color.a = a;
+	}
 
 	void pop();
 
@@ -237,6 +234,7 @@ private:
 	int m_layout_height;
 	int m_layout_halign;
 	int m_layout_valign;
+	color m_background_color;
 
 	struct line {
 		int first_char;
@@ -250,11 +248,11 @@ private:
 	std::vector<line> m_lines;
 
 	void layout();
-	int m_y_delta;
-	GLuint m_gl_buffer;
-	bool m_needs_layout;
-	bool m_needs_vert_alignment;
-	bool m_buffer_dirty;
+	int m_y_delta; // Offset to apply to y displacment to vertically center text
+	GLuint m_gl_buffer; // GL buffer containing the contents of m_instance_buffer
+	bool m_needs_layout; // Set to true if text content or layout information has changed
+	bool m_needs_vert_alignment; //Set to true if vertical alignment paramaters have changed i.e. m_y_delta may not be correct
+	bool m_buffer_dirty; //Set to true if m_instance_buffer has changed
 };
 class text;
 typedef std::shared_ptr<text> text_ptr;
