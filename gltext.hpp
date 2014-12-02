@@ -249,7 +249,6 @@ private:
 
 	void layout();
 	int m_y_delta; // Offset to apply to y displacment to vertically center text
-	GLuint m_gl_buffer; // GL buffer containing the contents of m_instance_buffer
 	bool m_needs_layout; // Set to true if text content or layout information has changed
 	bool m_needs_vert_alignment; //Set to true if vertical alignment paramaters have changed i.e. m_y_delta may not be correct
 	bool m_buffer_dirty; //Set to true if m_instance_buffer has changed
@@ -317,6 +316,8 @@ class renderer
 	GLuint m_geometry_shader;
 	GLuint m_atlas_texture_name;
 	GLuint m_gl_vertex_array;
+	GLuint m_stream_vbo;
+	text::glyph_instance *m_stream_vbo_data;
 	bool m_use_ARB_buffer_storage;
 	bool m_use_ARB_texture_storage;
 	bool m_use_ARB_multi_bind;

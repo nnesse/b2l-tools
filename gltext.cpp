@@ -89,7 +89,6 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 }
 
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
-	m_gl_buffer(0),
 	m_needs_layout(false),
 	m_needs_vert_alignment(false),
 	m_layout_width(-1),
@@ -108,7 +107,6 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 }
 
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
-	m_gl_buffer(0),
 	m_needs_layout(false),
 	m_needs_vert_alignment(false),
 	m_layout_width(-1),
@@ -126,7 +124,6 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 }
 
 text::text() :
-	m_gl_buffer(0),
 	m_needs_layout(false),
 	m_needs_vert_alignment(false),
 	m_layout_width(-1),
@@ -138,8 +135,6 @@ text::text() :
 
 text::~text()
 {
-	if (m_gl_buffer)
-		glDeleteBuffers(1, &m_gl_buffer);
 }
 
 void text::set_layout(int width, int height, int halign, int valign)
@@ -302,7 +297,6 @@ void text::layout()
 			line.bottom = bottom;
 			line.y_pos = y_pos;
 		}
-		m_buffer_dirty = true;
 		m_needs_vert_alignment = true;
 	}
 
@@ -763,6 +757,36 @@ bool renderer::init_program()
 		glVertexAttribBinding(UVW_LOC, 1);
 	}
 
+	glGenBuffers(1, &m_stream_vbo);
+	if (m_use_ARB_vertex_attrib_binding) {
+		glBindVertexBuffer(1, /*binding point */
+			m_stream_vbo,
+			0, /* offset */
+			sizeof(text::glyph_instance) /* stride */);
+	} else {
+		glBindBuffer(GL_ARRAY_BUFFER, m_stream_vbo);
+
+		glVertexAttribPointer(VBOX_LOC,
+			4,
+			GL_FLOAT,
+			GL_FALSE,
+			sizeof(text::glyph_instance),
+			(void *)offsetof(text::glyph_instance, v_bounds));
+
+		glVertexAttribPointer(COLOR_LOC,
+			4,
+			GL_FLOAT,
+			GL_FALSE,
+			sizeof(text::glyph_instance),
+			(void *)offsetof(text::glyph_instance, color));
+
+		glVertexAttribIPointer(UVW_LOC,
+			3,
+			GL_UNSIGNED_INT,
+			sizeof(text::glyph_instance),
+			(void *)offsetof(text::glyph_instance, uvw));
+	}
+
 	//Cache uniform locations
 	m_scale_loc = glGetUniformLocation(m_glsl_program, "scale");
 	m_disp_loc = glGetUniformLocation(m_glsl_program, "disp");
@@ -802,70 +826,33 @@ bool renderer::render(text &txt, int dx, int dy)
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
 	}
-
-	if(!txt.m_gl_buffer || txt.m_buffer_dirty) {
-		if (!txt.m_gl_buffer) {
-			glGenBuffers(1, &txt.m_gl_buffer);
-		} else if (m_use_ARB_buffer_storage) {
-			glDeleteBuffers(1, &txt.m_gl_buffer);
-			glGenBuffers(1, &txt.m_gl_buffer);
-		}
-		txt.m_buffer_dirty = false;
-		if (m_use_EXT_direct_state_access) {
-			if (m_use_ARB_buffer_storage) {
-				glNamedBufferStorageEXT(txt.m_gl_buffer,
-						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-						txt.m_instance_buffer.data(),
-						0);
-			} else {
-				glNamedBufferDataEXT(txt.m_gl_buffer,
-						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-						txt.m_instance_buffer.data(),
-						0);
-			}
-		} else {
-			glBindBuffer(GL_ARRAY_BUFFER, txt.m_gl_buffer);
-			if (m_use_ARB_buffer_storage) {
-				glBufferStorage(GL_ARRAY_BUFFER,
-						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-						txt.m_instance_buffer.data(),
-						0);
-			} else {
-				glBufferData(GL_ARRAY_BUFFER,
-						sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-						txt.m_instance_buffer.data(),
-						GL_STATIC_DRAW);
-			}
-		}
-	}
-
-	if (m_use_ARB_vertex_attrib_binding) {
-		glBindVertexBuffer(1, /*binding point */
-			txt.m_gl_buffer,
-			0, /* offset */
-			sizeof(text::glyph_instance) /* stride */);
+	if (m_use_EXT_direct_state_access) {
+		glNamedBufferDataEXT(m_stream_vbo,
+				sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+				NULL,
+				GL_STREAM_DRAW);
+		m_stream_vbo_data = (text::glyph_instance *)glMapNamedBufferRangeEXT(
+			m_stream_vbo,
+			0, sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+			GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 	} else {
-		glBindBuffer(GL_ARRAY_BUFFER, txt.m_gl_buffer);
-
-		glVertexAttribPointer(VBOX_LOC,
-			4,
-			GL_FLOAT,
-			GL_FALSE,
-			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, v_bounds));
-
-		glVertexAttribPointer(COLOR_LOC,
-			4,
-			GL_FLOAT,
-			GL_FALSE,
-			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, color));
-
-		glVertexAttribIPointer(UVW_LOC,
-			3,
-			GL_UNSIGNED_INT,
-			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, uvw));
+		glBindBuffer(GL_ARRAY_BUFFER, m_stream_vbo);
+		glBufferData(GL_ARRAY_BUFFER,
+				sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+				NULL,
+				GL_STREAM_DRAW);
+		m_stream_vbo_data = (text::glyph_instance *)glMapBufferRange(
+			GL_ARRAY_BUFFER,
+			0, sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+			GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+	}
+	if (m_stream_vbo_data != NULL) {
+		memcpy(m_stream_vbo_data, txt.m_instance_buffer.data(), sizeof(text::glyph_instance) * txt.m_instance_buffer.size());
+		if (m_use_EXT_direct_state_access) {
+			glUnmapNamedBufferEXT(m_stream_vbo);
+		} else {
+			glUnmapBuffer(GL_ARRAY_BUFFER);
+		}
 	}
 	glUniform2f(m_disp_loc, dx, dy + txt.m_y_delta);
 

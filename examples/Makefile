@@ -4,7 +4,7 @@
 
 all: simple text_stream terminal
 
-GLLOADER?=glbindify
+GLLOADER?=glew
 
 VPATH = ..
 CPPFLAGS = -I../ -I.
