@@ -66,8 +66,8 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 	if (prev_glyph && prev_character->font == font) {
 		FT_Vector delta;
 		if (!FT_Get_Kerning(font->m_typeface,
-				prev_glyph->index,
-				glyph.index,
+				prev_glyph->typeface_index,
+				glyph.typeface_index,
 				FT_KERNING_DEFAULT,
 				&delta)) {
 			x_pos += ((delta.x + 32)/64);
@@ -76,11 +76,7 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 
 	glyph_instance &inst = m_instance_buffer[i];
 	character &character = m_string[i];
-	inst.uvw[0] = glyph.u;
-	inst.uvw[1] = glyph.v;
-	inst.uvw[2] = glyph.w;
-	inst.v_bounds.size[0] = glyph.width;
-	inst.v_bounds.size[1] = glyph.height;
+	inst.glyph_index = glyph.atlas_index;
 	inst.color = color;
 	character.c = c;
 	character.x = x_pos;
@@ -288,8 +284,8 @@ void text::layout()
 				glyph_instance &g_inst = m_instance_buffer[line.first_char + i];
 				const glyph &g = character.get_glyph();
 				int char_top = -g.top + y_pos;
-				g_inst.v_bounds.upper_left[0] = character.x + g.left + x_adjust;
-				g_inst.v_bounds.upper_left[1] = char_top;
+				g_inst.pos[0] = character.x + g.left + x_adjust;
+				g_inst.pos[1] = char_top;
 				top = std::min(top, (int)char_top);
 				bottom = std::max(bottom, (int)(char_top + g.height));
 			}
@@ -470,7 +466,7 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 			g.top = typeface->glyph->bitmap_top;
 			g.advance_x = typeface->glyph->advance.x;
 			g.advance_y = typeface->glyph->advance.y;
-			g.index = index;
+			g.typeface_index = index;
 			glyph_heap.push(&g);
 		}
 		fonts.push_back(font_const_ptr(f));
@@ -515,6 +511,15 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	//Blit the glyph bitmaps into a CPU texture
 	//
 	std::vector<uint8_t> atlas_buffer(tex_array_size * texture_size * texture_size);
+	struct texcoord {
+		int16_t u;
+		int16_t v;
+		int16_t w;
+		int16_t padding;
+	};
+
+	std::vector<int16_t> texcoord_array;
+	std::vector<int16_t> glyph_size_array;
 	for (glyph *g : glyphs) {
 		uint8_t *dest = atlas_buffer.data() + g->u + (g->v * texture_size) + (g->w * texture_size * texture_size);
 		uint8_t *source = g->buffer.data();
@@ -523,7 +528,30 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 			dest += texture_size;
 			source += g->pitch;
 		}
+		g->atlas_index = texcoord_array.size()/4;
+		texcoord_array.push_back((int16_t)g->u);
+		texcoord_array.push_back((int16_t)g->v);
+		texcoord_array.push_back((int16_t)g->w);
+		texcoord_array.push_back(0);
+		glyph_size_array.push_back((int16_t)g->width);
+		glyph_size_array.push_back((int16_t)g->height);
 	}
+
+	//Setup texcoord texture buffer
+	glGenBuffers(1, &m_texcoord_texture_buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, m_texcoord_texture_buffer);
+	glBufferData(GL_TEXTURE_BUFFER, texcoord_array.size() * 2, texcoord_array.data(), GL_STATIC_DRAW);
+	glGenTextures(1, &m_texcoord_texture);
+	glBindTexture(GL_TEXTURE_BUFFER, m_texcoord_texture);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA16I, m_texcoord_texture_buffer);
+
+	//Setup glyph size texture buffer
+	glGenBuffers(1, &m_glyph_size_texture_buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, m_glyph_size_texture_buffer);
+	glBufferData(GL_TEXTURE_BUFFER, glyph_size_array.size() * 2, glyph_size_array.data(), GL_STATIC_DRAW);
+	glGenTextures(1, &m_glyph_size_texture);
+	glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RG16I, m_glyph_size_texture_buffer);
 
 	//
 	// Upload the altas texture to the GPU
@@ -596,17 +624,17 @@ bool renderer::init_program()
 {
 	const char *vertex_passthrough_shader_text =
 		"#version 330\n"
-		"layout (location = 0) in vec4 vbox_v;\n"
-		"layout (location = 1) in uvec3 uvw_v;\n"
+		"layout (location = 0) in vec2 pos_v;\n"
+		"layout (location = 1) in int glyph_index_v;\n"
 		"layout (location = 2) in vec4 color_v;\n"
-		"out vec4 vbox;\n"
-		"out uvec3 uvw;\n"
+		"out vec2 pos;\n"
+		"out int glyph_index;\n"
 		"out vec4 color;\n"
 		"void main()\n"
 		"{\n"
-				"vbox = vbox_v;\n"
-				"uvw = uvw_v;\n"
+				"pos = pos_v;\n"
 				"color = color_v;\n"
+				"glyph_index = glyph_index_v;\n"
 				"gl_Position = vec4(0, 0, 1, 1);\n"
 		"}\n";
 
@@ -614,19 +642,23 @@ bool renderer::init_program()
 		"#version 330\n"
 		"layout(points) in;\n"
 		"layout(triangle_strip, max_vertices=4) out;\n"
-		"in vec4 vbox[1];\n"
-		"in uvec3 uvw[1];\n"
+		"in vec2 pos[1];\n"
 		"in vec4 color[1];\n"
+		"in int glyph_index[1];\n"
 		"uniform vec2 scale;\n"
 		"uniform vec2 disp;\n"
+		"uniform usamplerBuffer glyph_size_sampler;\n"
+		"uniform usamplerBuffer uvw_sampler;\n"
 		"\n"
 		"out vec3 texcoord_f;\n"
 		"out vec4 color_f;\n"
 		"\n"
 		"void genVertex(vec2 corner)\n"
 		"{\n"
-			"gl_Position = vec4((vbox[0].xy + disp + (corner * vbox[0].zw)) * scale + vec2(-1, 1), 1, 1);\n"
-			"texcoord_f = vec3(uvw[0]) + vec3(corner * vbox[0].zw, 0);\n"
+			"vec2 size = vec2(texelFetch(glyph_size_sampler, glyph_index[0]).rg);\n"
+			"vec3 texcoord = vec3(texelFetch(uvw_sampler, glyph_index[0]).rgb);\n"
+			"gl_Position = vec4((pos[0] + disp + (corner * size)) * scale + vec2(-1, 1), 1, 1);\n"
+			"texcoord_f = texcoord + vec3(corner * size, 0);\n"
 			"color_f = color[0];\n"
 			"EmitVertex();\n"
 		"}\n"
@@ -728,20 +760,20 @@ bool renderer::init_program()
 	//
 	// Common setup for GL 3.x and GL 4.x
 	//
-	glEnableVertexAttribArray(UVW_LOC);
-	glEnableVertexAttribArray(VBOX_LOC);
+	glEnableVertexAttribArray(GLYPH_INDEX_LOC);
+	glEnableVertexAttribArray(POS_LOC);
 	glEnableVertexAttribArray(COLOR_LOC);
 
 	if (m_use_ARB_vertex_attrib_binding) {
 		//
 		// Glyph instance array setup
 		//
-		glVertexAttribFormat(VBOX_LOC,
-			4,
+		glVertexAttribFormat(POS_LOC,
+			2,
 			GL_FLOAT,
 			GL_FALSE,
-			offsetof(text::glyph_instance, v_bounds));
-		glVertexAttribBinding(VBOX_LOC, 1);
+			offsetof(text::glyph_instance, pos));
+		glVertexAttribBinding(POS_LOC, 1);
 
 		glVertexAttribFormat(COLOR_LOC,
 			4,
@@ -750,11 +782,11 @@ bool renderer::init_program()
 			offsetof(text::glyph_instance, color));
 		glVertexAttribBinding(COLOR_LOC, 1);
 
-		glVertexAttribIFormat(UVW_LOC,
-			3,
+		glVertexAttribIFormat(GLYPH_INDEX_LOC,
+			1,
 			GL_UNSIGNED_INT,
-			offsetof(text::glyph_instance, uvw));
-		glVertexAttribBinding(UVW_LOC, 1);
+			offsetof(text::glyph_instance, glyph_index));
+		glVertexAttribBinding(GLYPH_INDEX_LOC, 1);
 	}
 
 	glGenBuffers(1, &m_stream_vbo);
@@ -766,12 +798,12 @@ bool renderer::init_program()
 	} else {
 		glBindBuffer(GL_ARRAY_BUFFER, m_stream_vbo);
 
-		glVertexAttribPointer(VBOX_LOC,
-			4,
+		glVertexAttribPointer(POS_LOC,
+			2,
 			GL_FLOAT,
 			GL_FALSE,
 			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, v_bounds));
+			(void *)offsetof(text::glyph_instance, pos));
 
 		glVertexAttribPointer(COLOR_LOC,
 			4,
@@ -780,22 +812,28 @@ bool renderer::init_program()
 			sizeof(text::glyph_instance),
 			(void *)offsetof(text::glyph_instance, color));
 
-		glVertexAttribIPointer(UVW_LOC,
-			3,
+		glVertexAttribIPointer(GLYPH_INDEX_LOC,
+			1,
 			GL_UNSIGNED_INT,
 			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, uvw));
+			(void *)offsetof(text::glyph_instance, glyph_index));
 	}
 
 	//Cache uniform locations
 	m_scale_loc = glGetUniformLocation(m_glsl_program, "scale");
 	m_disp_loc = glGetUniformLocation(m_glsl_program, "disp");
 	m_sampler_loc = glGetUniformLocation(m_glsl_program, "sampler");
+	m_uvw_sampler_loc = glGetUniformLocation(m_glsl_program, "uvw_sampler");
+	m_glyph_size_sampler_loc = glGetUniformLocation(m_glsl_program, "glyph_size_sampler");
 	if (m_use_EXT_direct_state_access) {
 		glProgramUniform1iEXT(m_glsl_program, m_sampler_loc, 0);
+		glProgramUniform1iEXT(m_glsl_program, m_uvw_sampler_loc, 1);
+		glProgramUniform1iEXT(m_glsl_program, m_glyph_size_sampler_loc, 2);
 	} else {
 		glUseProgram(m_glsl_program);
 		glUniform1i(m_sampler_loc, 0);
+		glUniform1i(m_uvw_sampler_loc, 1);
+		glUniform1i(m_glyph_size_sampler_loc, 2);
 	}
 	return true;
 }
@@ -820,11 +858,16 @@ bool renderer::render(text &txt, int dx, int dy)
 	float size_x = viewport[2];
 	float size_y = viewport[3];
 	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
-	if (m_use_ARB_multi_bind) {
-		glBindTextures(0 /* tex unit */, 1, &m_atlas_texture_name);
+	if (m_use_ARB_multi_bind && 0) {
+		GLuint textures[] = {m_atlas_texture_name, m_texcoord_texture, m_glyph_size_texture};
+		glBindTextures(0 /* tex unit */, 3, textures);
 	} else {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_BUFFER, m_texcoord_texture);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
 	}
 	if (m_use_EXT_direct_state_access) {
 		glNamedBufferDataEXT(m_stream_vbo,

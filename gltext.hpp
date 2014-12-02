@@ -69,7 +69,10 @@ class font;
 //
 struct glyph {
 	/* index into typeface */
-	int index;
+	int typeface_index;
+
+	/* index into atlas */
+	int atlas_index;
 
 	/* Position of left edge of glyph */
 	int left;
@@ -99,7 +102,7 @@ struct glyph {
 	int height;
 	int pitch;
 
-	glyph() : index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
+	glyph() : typeface_index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
 
 	std::vector<uint8_t> buffer;
 };
@@ -184,9 +187,9 @@ public:
 	};
 
 	struct glyph_instance {
-		bounding_box v_bounds; /* Position of glyph within the text */
-		GLint uvw[4]; /* position of glyph in texture*/
-		gl_text::color color; /* RGBA color */
+		float pos[2];
+		int glyph_index;
+		gl_text::color color;
 	};
 
 	text(const font_const_ptr &font, float r, float g, float b, float a, const std::string *str = NULL);
@@ -317,6 +320,10 @@ class renderer
 	GLuint m_atlas_texture_name;
 	GLuint m_gl_vertex_array;
 	GLuint m_stream_vbo;
+	GLuint m_texcoord_texture;
+	GLuint m_texcoord_texture_buffer;
+	GLuint m_glyph_size_texture;
+	GLuint m_glyph_size_texture_buffer;
 	text::glyph_instance *m_stream_vbo_data;
 	bool m_use_ARB_buffer_storage;
 	bool m_use_ARB_texture_storage;
@@ -326,12 +333,14 @@ class renderer
 	int m_scale_loc;
 	int m_disp_loc;
 	int m_sampler_loc;
+	int m_uvw_sampler_loc;
+	int m_glyph_size_sampler_loc;
 
 	bool init_program();
 
 	enum vertex_attrib_locations {
-		VBOX_LOC = 0,
-		UVW_LOC = 1,
+		POS_LOC = 0,
+		GLYPH_INDEX_LOC = 1,
 		COLOR_LOC = 2,
 	};
 
