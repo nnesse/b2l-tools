@@ -102,7 +102,7 @@ struct glyph {
 	int height;
 	int pitch;
 
-	glyph() : typeface_index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
+	glyph() : typeface_index(-1), atlas_index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
 
 	std::vector<uint8_t> buffer;
 };

@@ -15,7 +15,6 @@ CXXFLAGS += $(shell pkg-config freetype2 --cflags)
 LIBS = $(shell pkg-config glfw3 --libs)
 LIBS += $(shell pkg-config freetype2 --libs)
 
-
 OBJS = gltext.o
 
 ifeq ($(GLLOADER),glew)

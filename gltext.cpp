@@ -470,8 +470,6 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	m_use_ARB_vertex_attrib_binding = gl::ARB_vertex_attrib_binding;
 	m_use_EXT_direct_state_access = gl::EXT_direct_state_access;
 #endif
-	m_use_EXT_direct_state_access = false;
-
 	if (!m_use_EXT_direct_state_access) {
 		glBindBuffer_org = glBindBuffer;
 		glUseProgram_org = glUseProgram;
@@ -739,10 +737,8 @@ bool renderer::init_program()
 		"out vec3 texcoord_f;\n"
 		"out vec4 color_f;\n"
 		"\n"
-		"void genVertex(vec2 corner)\n"
+		"void genVertex(vec2 corner, vec2 size, vec3 texcoord)\n"
 		"{\n"
-			"vec2 size = vec2(texelFetch(glyph_size_sampler, glyph_index[0]).rg);\n"
-			"vec3 texcoord = vec3(texelFetch(uvw_sampler, glyph_index[0]).rgb);\n"
 			"gl_Position = vec4((pos[0] + disp + (corner * size)) * scale + vec2(-1, 1), 1, 1);\n"
 			"texcoord_f = texcoord + vec3(corner * size, 0);\n"
 			"color_f = color[0];\n"
@@ -751,11 +747,15 @@ bool renderer::init_program()
 		"\n"
 		"void main()\n"
 		"{\n"
-			"genVertex(vec2(0,0));\n"
-			"genVertex(vec2(1,0));\n"
-			"genVertex(vec2(0,1));\n"
-			"genVertex(vec2(1,1));\n"
-			"EndPrimitive();\n"
+			"if (glyph_index[0] >= 0) {\n"
+				"vec2 size = vec2(texelFetch(glyph_size_sampler, glyph_index[0]).rg);\n"
+				"vec3 texcoord = vec3(texelFetch(uvw_sampler, glyph_index[0]).rgb);\n"
+				"genVertex(vec2(0,0), size, texcoord);\n"
+				"genVertex(vec2(1,0), size ,texcoord);\n"
+				"genVertex(vec2(0,1), size, texcoord);\n"
+				"genVertex(vec2(1,1), size, texcoord);\n"
+				"EndPrimitive();\n"
+			"}\n"
 		"}\n";
 
 	const char *fragment_shader_text =
@@ -948,17 +948,20 @@ bool renderer::render(text &txt, int dx, int dy)
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
 	}
+
+	//Orphan previous buffer
+	int buffer_size = sizeof(text::glyph_instance) * txt.m_instance_buffer.size();
 	glNamedBufferDataEXT(m_stream_vbo,
-			sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+			buffer_size,
 			NULL,
 			GL_STREAM_DRAW);
-	m_stream_vbo_data = (text::glyph_instance *)glMapNamedBufferRangeEXT(
+	//Copy in new data
+	m_stream_vbo_data = (text::glyph_instance *) glMapNamedBufferRangeEXT(
 		m_stream_vbo,
-		0, sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+		0, buffer_size,
 		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-
 	if (m_stream_vbo_data != NULL) {
-		memcpy(m_stream_vbo_data, txt.m_instance_buffer.data(), sizeof(text::glyph_instance) * txt.m_instance_buffer.size());
+		memcpy(m_stream_vbo_data, txt.m_instance_buffer.data(), buffer_size);
 		glUnmapNamedBufferEXT(m_stream_vbo);
 	}
 	glUniform2f(m_disp_loc, dx, dy + txt.m_y_delta);
