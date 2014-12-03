@@ -35,6 +35,72 @@ namespace gl_text {
 
 static const int texture_size = 1024;
 
+static GLuint buffer_bindings[0x10000];
+
+static GLuint get_bound_buffer(GLenum binding_point)
+{
+	return buffer_bindings[binding_point];
+}
+
+static void (*glBindBuffer_org)(GLenum binding_point, GLuint vbo);
+
+static void glBindBuffer_trap(GLenum binding_point, GLuint vbo)
+{
+	if (buffer_bindings[binding_point] != vbo) {
+		glBindBuffer_org(binding_point, vbo);
+		buffer_bindings[binding_point] = vbo;
+	}
+}
+
+static void glNamedBufferDataEXT_emulation(GLuint vbo, GLsizeiptr offset, const void *data, GLenum access)
+{
+	GLuint prev = get_bound_buffer(GL_ARRAY_BUFFER);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferData(GL_ARRAY_BUFFER,
+		offset,
+		data,
+		access);
+	glBindBuffer(GL_ARRAY_BUFFER, prev);
+}
+
+static void *glMapNamedBufferRangeEXT_emulation(GLuint vbo, GLintptr offset, GLsizeiptr size, GLbitfield flags)
+{
+	GLuint prev = get_bound_buffer(GL_ARRAY_BUFFER);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	void * ret = glMapBufferRange(GL_ARRAY_BUFFER, offset, size, flags);
+	glBindBuffer(GL_ARRAY_BUFFER, prev);
+	return ret;
+}
+
+static GLboolean glUnmapNamedBufferEXT_emulation(GLuint vbo)
+{
+	GLuint prev = get_bound_buffer(GL_ARRAY_BUFFER);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	GLboolean ret = glUnmapBuffer(GL_ARRAY_BUFFER);
+	glBindBuffer(GL_ARRAY_BUFFER, prev);
+	return ret;
+}
+
+static GLuint bound_program;
+
+static void (*glUseProgram_org)(GLuint program);
+
+static void glUseProgram_trap(GLuint program)
+{
+	if (bound_program != program) {
+		bound_program = program;
+		glUseProgram_org(program);
+	}
+}
+
+void glProgramUniform1iEXT_emulation(GLuint program, GLint uniform, GLint value)
+{
+	GLuint prev = bound_program;
+	glUseProgram(program);
+	glUniform1i(uniform, value);
+	glUseProgram(prev);
+}
+
 //
 // text
 //
@@ -404,6 +470,26 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	m_use_ARB_vertex_attrib_binding = gl::ARB_vertex_attrib_binding;
 	m_use_EXT_direct_state_access = gl::EXT_direct_state_access;
 #endif
+	m_use_EXT_direct_state_access = false;
+
+	if (!m_use_EXT_direct_state_access) {
+		glBindBuffer_org = glBindBuffer;
+		glUseProgram_org = glUseProgram;
+		glBindBuffer = glBindBuffer_trap;
+		glUseProgram = glUseProgram_trap;
+		glNamedBufferDataEXT = glNamedBufferDataEXT_emulation;
+		glMapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
+		glUnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
+		glProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
+#if GLTEXT_USE_GLBINDIFY
+		glbindify::gl::BindBuffer = glBindBuffer_trap;
+		glbindify::gl::UseProgram = glUseProgram_org;
+		glbindify::gl::NamedBufferDataEXT = glNamedBufferDataEXT_emulation;
+		glbindify::gl::MapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
+		glbindify::gl::UnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
+		glbindify::gl::ProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
+#endif
+	}
 
 	//Need at least one font
 	if (font_descriptions.empty())
@@ -825,16 +911,9 @@ bool renderer::init_program()
 	m_sampler_loc = glGetUniformLocation(m_glsl_program, "sampler");
 	m_uvw_sampler_loc = glGetUniformLocation(m_glsl_program, "uvw_sampler");
 	m_glyph_size_sampler_loc = glGetUniformLocation(m_glsl_program, "glyph_size_sampler");
-	if (m_use_EXT_direct_state_access) {
-		glProgramUniform1iEXT(m_glsl_program, m_sampler_loc, 0);
-		glProgramUniform1iEXT(m_glsl_program, m_uvw_sampler_loc, 1);
-		glProgramUniform1iEXT(m_glsl_program, m_glyph_size_sampler_loc, 2);
-	} else {
-		glUseProgram(m_glsl_program);
-		glUniform1i(m_sampler_loc, 0);
-		glUniform1i(m_uvw_sampler_loc, 1);
-		glUniform1i(m_glyph_size_sampler_loc, 2);
-	}
+	glProgramUniform1iEXT(m_glsl_program, m_sampler_loc, 0);
+	glProgramUniform1iEXT(m_glsl_program, m_uvw_sampler_loc, 1);
+	glProgramUniform1iEXT(m_glsl_program, m_glyph_size_sampler_loc, 2);
 	return true;
 }
 
@@ -869,36 +948,20 @@ bool renderer::render(text &txt, int dx, int dy)
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
 	}
-	if (m_use_EXT_direct_state_access) {
-		glNamedBufferDataEXT(m_stream_vbo,
-				sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-				NULL,
-				GL_STREAM_DRAW);
-		m_stream_vbo_data = (text::glyph_instance *)glMapNamedBufferRangeEXT(
-			m_stream_vbo,
-			0, sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-			GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-	} else {
-		glBindBuffer(GL_ARRAY_BUFFER, m_stream_vbo);
-		glBufferData(GL_ARRAY_BUFFER,
-				sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-				NULL,
-				GL_STREAM_DRAW);
-		m_stream_vbo_data = (text::glyph_instance *)glMapBufferRange(
-			GL_ARRAY_BUFFER,
-			0, sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
-			GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-	}
+	glNamedBufferDataEXT(m_stream_vbo,
+			sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+			NULL,
+			GL_STREAM_DRAW);
+	m_stream_vbo_data = (text::glyph_instance *)glMapNamedBufferRangeEXT(
+		m_stream_vbo,
+		0, sizeof(text::glyph_instance) * txt.m_instance_buffer.size(),
+		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+
 	if (m_stream_vbo_data != NULL) {
 		memcpy(m_stream_vbo_data, txt.m_instance_buffer.data(), sizeof(text::glyph_instance) * txt.m_instance_buffer.size());
-		if (m_use_EXT_direct_state_access) {
-			glUnmapNamedBufferEXT(m_stream_vbo);
-		} else {
-			glUnmapBuffer(GL_ARRAY_BUFFER);
-		}
+		glUnmapNamedBufferEXT(m_stream_vbo);
 	}
 	glUniform2f(m_disp_loc, dx, dy + txt.m_y_delta);
-
 	glDrawArrays(GL_POINTS, 0, num_chars);
 }
 
