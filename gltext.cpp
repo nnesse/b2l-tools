@@ -858,7 +858,7 @@ bool renderer::render(text &txt, int dx, int dy)
 	float size_x = viewport[2];
 	float size_y = viewport[3];
 	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
-	if (m_use_ARB_multi_bind && 0) {
+	if (m_use_ARB_multi_bind) {
 		GLuint textures[] = {m_atlas_texture_name, m_texcoord_texture, m_glyph_size_texture};
 		glBindTextures(0 /* tex unit */, 3, textures);
 	} else {
