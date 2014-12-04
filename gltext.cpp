@@ -458,11 +458,13 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 
 	//Query OpenGL extension support
 #if GLTEXT_USE_GLEW
-	m_use_ARB_buffer_storage = GLEW_ARB_buffer_storage;
-	m_use_ARB_texture_storage = GLEW_ARB_texture_storage;
-	m_use_ARB_multi_bind = GLEW_ARB_multi_bind;
-	m_use_ARB_vertex_attrib_binding = GLEW_ARB_vertex_attrib_binding;
-	m_use_EXT_direct_state_access = GLEW_EXT_direct_state_access;
+	if (!glewExperimental) {
+		m_use_ARB_buffer_storage = GLEW_ARB_buffer_storage;
+		m_use_ARB_texture_storage = GLEW_ARB_texture_storage;
+		m_use_ARB_multi_bind = GLEW_ARB_multi_bind;
+		m_use_ARB_vertex_attrib_binding = GLEW_ARB_vertex_attrib_binding;
+		m_use_EXT_direct_state_access = GLEW_EXT_direct_state_access;
+	}
 #elif GLTEXT_USE_GLBINDIFY
 	m_use_ARB_buffer_storage = gl::ARB_buffer_storage;
 	m_use_ARB_texture_storage = gl::ARB_texture_storage;
