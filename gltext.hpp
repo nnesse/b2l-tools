@@ -348,6 +348,9 @@ class renderer
 public:
 	renderer(std::string typeface_path = "");
 	~renderer();
+	bool render(font_const_ptr font, const color &color, const char *text,
+		int x, int y, int width, int height, int halign, int valign);
+
 	bool render(text &txt, int dx, int dy);
 	typeface_t get_typeface(const std::string &path);
 	bool initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);

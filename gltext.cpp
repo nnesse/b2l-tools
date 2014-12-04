@@ -917,6 +917,142 @@ bool renderer::init_program()
 	return true;
 }
 
+bool renderer::render(font_const_ptr font, const color &color, const char *text, int x, int y, int width, int height, int halign, int valign)
+{
+	if (!m_initialized)
+		return false;
+
+	size_t num_chars = strlen(text);
+
+	glUseProgram(m_glsl_program);
+	glBindVertexArray(m_gl_vertex_array);
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	float size_x = viewport[2];
+	float size_y = viewport[3];
+	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
+	if (m_use_ARB_multi_bind) {
+		GLuint textures[] = {m_atlas_texture_name, m_texcoord_texture, m_glyph_size_texture};
+		glBindTextures(0 /* tex unit */, 3, textures);
+	} else {
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_BUFFER, m_texcoord_texture);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
+	}
+
+	//Orphan previous buffer
+	int buffer_size = sizeof(text::glyph_instance) * num_chars;
+	glNamedBufferDataEXT(m_stream_vbo,
+			buffer_size,
+			NULL,
+			GL_STREAM_DRAW);
+	//Copy in new data
+	m_stream_vbo_data = (text::glyph_instance *) glMapNamedBufferRangeEXT(
+		m_stream_vbo,
+		0, buffer_size,
+		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+	if (m_stream_vbo_data == NULL) {
+		return false;
+	}
+
+	int prev_glyph_index = -1;
+	font->select();
+
+	int x_pos = 0;
+	int y_pos = font->get_height();
+	int i = 0;
+	int break_pos = -1;
+	int break_line_width = 0;
+	int line_start = 0;
+
+
+	int line_top = y_pos;
+	int line_bottom = y_pos;
+	int break_line_top = -1;
+	int break_line_bottom = -1;
+	int top = line_top;
+	int bottom = line_bottom;
+	while(text[i]) {
+		const glyph &g = font->get_glyph(text[i]);
+		if (text[i] == ' ') {
+			break_pos = i;
+			break_line_width = x_pos;
+			break_line_top = line_top;
+			break_line_bottom = line_bottom;
+		}
+		int x_pos_prev = x_pos;
+		if ((x_pos + g.left + g.width > width && width > 0 && x_pos > 0) || text[i] == '\n') {
+			int line_width;
+			int line_end;
+			if (break_pos != -1 && text[i] != '\n') {
+				line_width = break_line_width;
+				line_end = break_pos + 1;
+				line_top = break_line_top;
+				line_bottom = break_line_bottom;
+			} else if (text[i] == '\n') {
+				line_end = i + 1;
+				line_width = x_pos;
+			} else {
+				line_end = i;
+				line_width = x_pos;
+			}
+			if (width > 0 && (halign == 0 || halign == 1)) {
+				int adjust = (width - line_width);
+				if (halign == 0) {
+					adjust /= 2;
+				}
+				for (int j = line_start; j < num_chars; j++) {
+					m_stream_vbo_data[j].pos[0] += adjust;
+				}
+			}
+			line_start = line_end;
+			i = line_start;
+			x_pos = 0;
+			y_pos += font->get_height();
+			break_pos = -1;
+			top = std::min(top, line_top);
+			bottom = std::max(bottom, line_bottom);
+			line_top = y_pos;
+			line_bottom = y_pos;
+			continue;
+		}
+		m_stream_vbo_data[i].glyph_index = g.atlas_index;
+		m_stream_vbo_data[i].color = color;
+		m_stream_vbo_data[i].pos[0] = x_pos + g.left;
+		m_stream_vbo_data[i].pos[1] = y_pos - g.top;
+		line_top = std::min(line_top, (int)(y_pos - g.top));
+		line_bottom = std::max(line_bottom, (int)(y_pos - g.top + g.height));
+		x_pos += g.advance_x/64;
+		i++;
+	}
+	if (line_start != num_chars) {
+		top = std::min(top, line_top);
+		bottom = std::max(bottom, line_bottom);
+	}
+	if (width > 0 && (halign == 0 || halign == 1)) {
+		int adjust = (width - x_pos);
+		if (halign == 0) {
+			adjust /= 2;
+		}
+		for (int j = line_start; j < num_chars; j++) {
+			m_stream_vbo_data[j].pos[0] += adjust;
+		}
+	}
+	int y_delta;
+	if (height > 0 && valign == 0)
+		y_delta = (height/2) - ((top + bottom)/2);
+	else if (height > 0 && valign == 1)
+		y_delta = height - bottom;
+	else
+		y_delta = 0;
+	glUnmapNamedBufferEXT(m_stream_vbo);
+	glUniform2f(m_disp_loc, x, y + y_delta);
+	glDrawArrays(GL_POINTS, 0, num_chars);
+}
+
 //
 // Render text 'txt' at position (dx, dy) wrapping text to fit in clip rect
 //	 (clip_x, clip_y) -> (clip_x + clip_w, clip_y + clip_h).

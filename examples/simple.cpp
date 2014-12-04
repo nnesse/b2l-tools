@@ -94,7 +94,6 @@ int main(void)
 		exit(-1);
 	}
 
-	gl_text::text test_text(fonts[0], 1, 1, 1, 1, "The quick brown fox jumps over the lazy dog 0123456789 ().");
 	glfwSetKeyCallback(window, key_callback);
 
 #if GLTEXT_USE_GLEW
@@ -117,8 +116,11 @@ int main(void)
 		glbindify::glViewport(0, 0, width, height);
 		glbindify::glClear(GL_COLOR_BUFFER_BIT);
 #endif
-		test_text.set_layout(width, height, 0, 0);
-		renderer.render(test_text, 0, 0);
+		renderer.render(fonts[0],
+			gl_text::color(1,1,1,1),
+			"The quick brown fox jumps over\n the lazy dog 0123456789 ().\n",
+			0, 0, width, height, /* Occupy whole viewport */
+			0, 0 /* horizontally and vertically center text */);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
