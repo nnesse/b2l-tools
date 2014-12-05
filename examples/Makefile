@@ -10,7 +10,8 @@ VPATH = ..
 CPPFLAGS = -I../ -I.
 EXT_OBJS =
 
-CXXFLAGS = -std=c++11 $(shell pkg-config glfw3 --cflags)
+CXXFLAGS = -std=c++11 -Wall -Werror
+CXXFLAGS += $(shell pkg-config glfw3 --cflags)
 CXXFLAGS += $(shell pkg-config freetype2 --cflags)
 LIBS = $(shell pkg-config glfw3 --libs)
 LIBS += $(shell pkg-config freetype2 --libs)

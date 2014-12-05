@@ -159,12 +159,12 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 }
 
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
-	m_needs_layout(false),
-	m_needs_vert_alignment(false),
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
-	m_layout_valign(-1)
+	m_layout_valign(-1),
+	m_needs_layout(false),
+	m_needs_vert_alignment(false)
 {
 	font->select();
 	if (str) {
@@ -177,12 +177,12 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 }
 
 text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
-	m_needs_layout(false),
-	m_needs_vert_alignment(false),
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
-	m_layout_valign(-1)
+	m_layout_valign(-1),
+	m_needs_layout(false),
+	m_needs_vert_alignment(false)
 {
 	font->select();
 	if (str) {
@@ -194,12 +194,12 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 }
 
 text::text() :
-	m_needs_layout(false),
-	m_needs_vert_alignment(false),
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
-	m_layout_valign(-1)
+	m_layout_valign(-1),
+	m_needs_layout(false),
+	m_needs_vert_alignment(false)
 {
 }
 
@@ -399,19 +399,19 @@ void text::layout()
 
 renderer::renderer(std::string typeface_path) :
 	m_typeface_path(typeface_path),
+	m_ft_library(NULL),
 	m_glsl_program(0),
-	m_vertex_passthrough_shader(0),
 	m_fragment_shader(0),
+	m_vertex_passthrough_shader(0),
 	m_geometry_shader(0),
+	m_atlas_texture_name(0),
 	m_use_ARB_buffer_storage(false),
 	m_use_ARB_texture_storage(false),
 	m_use_ARB_multi_bind(false),
 	m_use_ARB_vertex_attrib_binding(false),
 	m_use_EXT_direct_state_access(false),
-	m_ft_library(NULL),
-	m_initialized(false),
-	m_atlas_texture_name(0),
-	m_ambient_color(1, 1, 1, 1)
+	m_ambient_color(1, 1, 1, 1),
+	m_initialized(false)
 {
 	FT_Init_FreeType(&m_ft_library);
 }
@@ -945,7 +945,7 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 	if (!m_initialized)
 		return false;
 
-	size_t num_chars = strlen(text);
+	int num_chars = strlen(text);
 
 	glUseProgram(m_glsl_program);
 	glBindVertexArray(m_gl_vertex_array);
@@ -981,7 +981,6 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 		return false;
 	}
 
-	int prev_glyph_index = -1;
 	font->select();
 
 	int x_pos = 0;
@@ -1006,7 +1005,6 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 			break_line_top = line_top;
 			break_line_bottom = line_bottom;
 		}
-		int x_pos_prev = x_pos;
 		if ((x_pos + g.left + g.width > width && width > 0 && x_pos > 0) || text[i] == '\n') {
 			int line_width;
 			int line_end;
@@ -1074,6 +1072,7 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 	glUnmapNamedBufferEXT(m_stream_vbo);
 	glUniform2f(m_disp_loc, x, y + y_delta);
 	glDrawArrays(GL_POINTS, 0, num_chars);
+	return true;
 }
 
 //
@@ -1125,6 +1124,7 @@ bool renderer::render(text &txt, int dx, int dy)
 	}
 	glUniform2f(m_disp_loc, dx, dy + txt.m_y_delta);
 	glDrawArrays(GL_POINTS, 0, num_chars);
+	return true;
 }
 
 text_stream &text_stream::operator<<(font_const_ptr font)
