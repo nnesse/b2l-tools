@@ -101,6 +101,14 @@ void glProgramUniform1iEXT_emulation(GLuint program, GLint uniform, GLint value)
 	glUseProgram(prev);
 }
 
+void glProgramUniform4fvEXT_emulation(GLuint program, GLint uniform, int count, const GLfloat *value)
+{
+	GLuint prev = bound_program;
+	glUseProgram(program);
+	glUniform4fv(uniform, count, value);
+	glUseProgram(prev);
+}
+
 //
 // text
 //
@@ -402,7 +410,8 @@ renderer::renderer(std::string typeface_path) :
 	m_use_EXT_direct_state_access(false),
 	m_ft_library(NULL),
 	m_initialized(false),
-	m_atlas_texture_name(0)
+	m_atlas_texture_name(0),
+	m_ambient_color(1, 1, 1, 1)
 {
 	FT_Init_FreeType(&m_ft_library);
 }
@@ -481,6 +490,7 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		glMapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
 		glUnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
 		glProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
+		glProgramUniform4fvEXT = glProgramUniform4fvEXT_emulation;
 #if GLTEXT_USE_GLBINDIFY
 		glbindify::gl::BindBuffer = glBindBuffer_trap;
 		glbindify::gl::UseProgram = glUseProgram_org;
@@ -488,6 +498,7 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		glbindify::gl::MapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
 		glbindify::gl::UnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
 		glbindify::gl::ProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
+		glbindify::gl::ProgramUniform4fvEXT = glProgramUniform4fvEXT_emulation;
 #endif
 	}
 
@@ -763,12 +774,13 @@ bool renderer::init_program()
 	const char *fragment_shader_text =
 		"#version 330\n"
 		"uniform sampler2DArray sampler;\n"
+		"uniform vec4 ambient_color;\n"
 		"in vec3 texcoord_f;\n"
 		"in vec4 color_f;\n"
 		"out vec4 frag_color;\n"
 		"void main()\n"
 		"{\n"
-			"frag_color = color_f * vec4(texelFetch(sampler, ivec3(texcoord_f), 0).r);\n"
+			"frag_color = ambient_color * color_f * vec4(texelFetch(sampler, ivec3(texcoord_f), 0).r);\n"
 		"}\n";
 
 	//std::cout << m_use_ARB_buffer_storage << ":" << m_use_ARB_multi_bind << ":" << m_use_ARB_vertex_attrib_binding << ":" << m_use_EXT_direct_state_access << std::endl;
@@ -912,11 +924,20 @@ bool renderer::init_program()
 	m_disp_loc = glGetUniformLocation(m_glsl_program, "disp");
 	m_sampler_loc = glGetUniformLocation(m_glsl_program, "sampler");
 	m_uvw_sampler_loc = glGetUniformLocation(m_glsl_program, "uvw_sampler");
+	m_ambient_color_loc = glGetUniformLocation(m_glsl_program, "ambient_color");
 	m_glyph_size_sampler_loc = glGetUniformLocation(m_glsl_program, "glyph_size_sampler");
+
 	glProgramUniform1iEXT(m_glsl_program, m_sampler_loc, 0);
 	glProgramUniform1iEXT(m_glsl_program, m_uvw_sampler_loc, 1);
 	glProgramUniform1iEXT(m_glsl_program, m_glyph_size_sampler_loc, 2);
+	glProgramUniform4fvEXT(m_glsl_program, m_ambient_color_loc, 1, (GLfloat *)&m_ambient_color);
 	return true;
+}
+
+void renderer::set_ambient_color(const color &color)
+{
+	m_ambient_color = color;
+	glProgramUniform4fvEXT(m_glsl_program, m_ambient_color_loc, 1, (GLfloat *)&m_ambient_color);
 }
 
 bool renderer::render(font_const_ptr font, const color &color, const char *text, int x, int y, int width, int height, int halign, int valign)
@@ -1147,7 +1168,7 @@ void text_stream::flush()
 	clear();
 }
 
-text_stream::text_stream(text &out, font_const_ptr &default_font, color default_color)
+text_stream::text_stream(text &out, font_const_ptr &default_font, const color &default_color)
 	: m_out(out)
 {
 	m_font_stack.push_back(default_font);

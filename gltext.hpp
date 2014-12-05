@@ -294,8 +294,9 @@ public:
 
 	void flush();
 
-	text_stream(text& out, font_const_ptr &default_font, color default_color);
+	text_stream(text& out, font_const_ptr &default_font, const color &default_color);
 };
+typedef std::shared_ptr<text_stream> text_stream_ptr;
 
 //
 // renderer
@@ -333,9 +334,10 @@ class renderer
 	int m_scale_loc;
 	int m_disp_loc;
 	int m_sampler_loc;
+	int m_ambient_color_loc;
 	int m_uvw_sampler_loc;
 	int m_glyph_size_sampler_loc;
-
+	color m_ambient_color;
 	bool init_program();
 
 	enum vertex_attrib_locations {
@@ -354,6 +356,7 @@ public:
 	bool render(text &txt, int dx, int dy);
 	typeface_t get_typeface(const std::string &path);
 	bool initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);
+	void set_ambient_color(const color &color);
 };
 
 template <typename T>
