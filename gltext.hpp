@@ -325,35 +325,50 @@ class renderer
 	GLuint m_texcoord_texture_buffer;
 	GLuint m_glyph_size_texture;
 	GLuint m_glyph_size_texture_buffer;
-	text::glyph_instance *m_stream_vbo_data;
 	bool m_use_ARB_buffer_storage;
 	bool m_use_ARB_texture_storage;
 	bool m_use_ARB_multi_bind;
 	bool m_use_ARB_vertex_attrib_binding;
 	bool m_use_EXT_direct_state_access;
-	int m_scale_loc;
-	int m_disp_loc;
 	int m_sampler_loc;
 	int m_ambient_color_loc;
 	int m_uvw_sampler_loc;
 	int m_glyph_size_sampler_loc;
+	int m_mvp_loc;
 	color m_ambient_color;
 	bool init_program();
-
+	int m_num_chars;
 	enum vertex_attrib_locations {
 		POS_LOC = 0,
 		GLYPH_INDEX_LOC = 1,
 		COLOR_LOC = 2,
 	};
+	text::glyph_instance *prepare_render(int num_chars);
+	void submit_render(const float *mvp);
+	void layout_text(text::glyph_instance *out, font_const_ptr font, const color &color,
+		const char *text, int num_chars,
+		int width, int height,
+		int halign, int valign,
+		int &y_delta);
+	void grid_fit_mvp_transform(const float *mvp_transform,
+		float size_x, float size_y,
+		float *mvp_transform_fitted);
 
 	bool m_initialized;
 public:
 	renderer(std::string typeface_path = "");
 	~renderer();
 	bool render(font_const_ptr font, const color &color, const char *text,
-		int x, int y, int width, int height, int halign, int valign);
+		const float *mvp_transform,
+		int width, int height,
+		int halign, int valign);
+	bool render(font_const_ptr font, const color &color, const char *text,
+		int x, int y,
+		int width, int height,
+		int halign, int valign);
 
 	bool render(text &txt, int dx, int dy);
+	bool render(text &txt, const float *mvp_transform);
 	typeface_t get_typeface(const std::string &path);
 	bool initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);
 	void set_ambient_color(const color &color);

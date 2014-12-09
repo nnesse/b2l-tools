@@ -777,8 +777,7 @@ bool renderer::init_program()
 		"in vec2 pos[1];\n"
 		"in vec4 color[1];\n"
 		"in int glyph_index[1];\n"
-		"uniform vec2 scale;\n"
-		"uniform vec2 disp;\n"
+		"uniform mat4 mvp;\n"
 		"uniform usamplerBuffer glyph_size_sampler;\n"
 		"uniform usamplerBuffer uvw_sampler;\n"
 		"out vec3 texcoord_f;\n"
@@ -786,8 +785,7 @@ bool renderer::init_program()
 		"\n"
 		"void genVertex(vec2 corner, vec2 size, vec3 texcoord)\n"
 		"{\n"
-			"vec4 pos = vec4((pos[0] + disp + (corner * size)) * scale + vec2(-1, 1), 1, 1);\n"
-			"gl_Position = pos;\n"
+			"gl_Position = mvp * vec4((pos[0] + (corner * size)), 0, 1);\n"
 			"texcoord_f = texcoord + vec3(corner * size, 0);\n"
 			"color_f = color[0];\n"
 			"EmitVertex();\n"
@@ -819,7 +817,7 @@ bool renderer::init_program()
 		"{\n"
 			"ivec3 tex_size = textureSize(sampler, 0);\n"
 			"float D = texture(sampler, vec3(vec2(texcoord_f.xy) / tex_size.xy, texcoord_f.z)).r;\n"
-			"D = (D - 0.48) * 16.0;\n"
+			"D = (D - 0.49) * 16.0;\n"
 			"float aastep = length(vec2(dFdx(D), dFdy(D)));\n"
 			"float texel = smoothstep(-aastep, aastep, D);\n"
 			"frag_color = ambient_color * color_f * vec4(texel);\n"
@@ -962,8 +960,9 @@ bool renderer::init_program()
 	}
 
 	//Cache uniform locations
-	m_scale_loc = glGetUniformLocation(m_glsl_program, "scale");
-	m_disp_loc = glGetUniformLocation(m_glsl_program, "disp");
+
+	m_mvp_loc = glGetUniformLocation(m_glsl_program, "mvp");
+
 	m_sampler_loc = glGetUniformLocation(m_glsl_program, "sampler");
 	m_uvw_sampler_loc = glGetUniformLocation(m_glsl_program, "uvw_sampler");
 	m_ambient_color_loc = glGetUniformLocation(m_glsl_program, "ambient_color");
@@ -982,47 +981,8 @@ void renderer::set_ambient_color(const color &color)
 	glProgramUniform4fvEXT(m_glsl_program, m_ambient_color_loc, 1, (GLfloat *)&m_ambient_color);
 }
 
-bool renderer::render(font_const_ptr font, const color &color, const char *text, int x, int y, int width, int height, int halign, int valign)
+void renderer::layout_text(text::glyph_instance *out, font_const_ptr font, const color &color, const char *text, int num_chars, int width, int height, int halign, int valign, int &y_delta)
 {
-	if (!m_initialized)
-		return false;
-
-	int num_chars = strlen(text);
-
-	glUseProgram(m_glsl_program);
-	glBindVertexArray(m_gl_vertex_array);
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	float size_x = viewport[2];
-	float size_y = viewport[3];
-	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
-	if (m_use_ARB_multi_bind) {
-		GLuint textures[] = {m_atlas_texture_name, m_texcoord_texture, m_glyph_size_texture};
-		glBindTextures(0 /* tex unit */, 3, textures);
-	} else {
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture_name);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_BUFFER, m_texcoord_texture);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
-	}
-
-	//Orphan previous buffer
-	int buffer_size = sizeof(text::glyph_instance) * num_chars;
-	glNamedBufferDataEXT(m_stream_vbo,
-			buffer_size,
-			NULL,
-			GL_STREAM_DRAW);
-	//Copy in new data
-	m_stream_vbo_data = (text::glyph_instance *) glMapNamedBufferRangeEXT(
-		m_stream_vbo,
-		0, buffer_size,
-		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-	if (m_stream_vbo_data == NULL) {
-		return false;
-	}
-
 	font->select();
 
 	int x_pos = 0;
@@ -1031,7 +991,6 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 	int break_pos = -1;
 	int break_line_width = 0;
 	int line_start = 0;
-
 
 	int line_top = y_pos;
 	int line_bottom = y_pos;
@@ -1068,7 +1027,7 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 					adjust /= 2;
 				}
 				for (int j = line_start; j < num_chars; j++) {
-					m_stream_vbo_data[j].pos[0] += adjust;
+					out[j].pos[0] += adjust;
 				}
 			}
 			line_start = line_end;
@@ -1082,10 +1041,10 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 			line_bottom = y_pos;
 			continue;
 		}
-		m_stream_vbo_data[i].glyph_index = g.atlas_index;
-		m_stream_vbo_data[i].color = color;
-		m_stream_vbo_data[i].pos[0] = x_pos + g.left;
-		m_stream_vbo_data[i].pos[1] = y_pos - g.top;
+		out[i].glyph_index = g.atlas_index;
+		out[i].color = color;
+		out[i].pos[0] = x_pos + g.left;
+		out[i].pos[1] = y_pos - g.top;
 		line_top = std::min(line_top, (int)(y_pos - g.top));
 		line_bottom = std::max(line_bottom, (int)(y_pos - g.top + g.height));
 		x_pos += g.advance_x/64;
@@ -1101,42 +1060,44 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 			adjust /= 2;
 		}
 		for (int j = line_start; j < num_chars; j++) {
-			m_stream_vbo_data[j].pos[0] += adjust;
+			out[j].pos[0] += adjust;
 		}
 	}
-	int y_delta;
 	if (height > 0 && valign == 0)
 		y_delta = (height/2) - ((top + bottom)/2);
 	else if (height > 0 && valign == 1)
 		y_delta = height - bottom;
 	else
 		y_delta = 0;
-	glUnmapNamedBufferEXT(m_stream_vbo);
-	glUniform2f(m_disp_loc, x, y + y_delta);
-	glDrawArrays(GL_POINTS, 0, num_chars);
-	return true;
 }
 
-//
-// Render text 'txt' at position (dx, dy) wrapping text to fit in clip rect
-//	 (clip_x, clip_y) -> (clip_x + clip_w, clip_y + clip_h).
-//
-bool renderer::render(text &txt, int dx, int dy)
+text::glyph_instance *renderer::prepare_render(int num_chars)
 {
 	if (!m_initialized)
-		return false;
+		return NULL;
 
-	txt.layout();
+	//Orphan previous buffer
+	int buffer_size = sizeof(text::glyph_instance) * num_chars;
+	glNamedBufferDataEXT(m_stream_vbo,
+			buffer_size,
+			NULL,
+			GL_STREAM_DRAW);
+	//Copy in new data
+	text::glyph_instance * ret = (text::glyph_instance *) glMapNamedBufferRangeEXT(
+		m_stream_vbo,
+		0, buffer_size,
+		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+	m_num_chars = num_chars;
+	return ret;
+}
 
-	size_t num_chars = txt.m_instance_buffer.size();
-
+void renderer::submit_render(const float *mvp)
+{
+	glUnmapNamedBufferEXT(m_stream_vbo);
 	glUseProgram(m_glsl_program);
 	glBindVertexArray(m_gl_vertex_array);
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	float size_x = viewport[2];
-	float size_y = viewport[3];
-	glUniform2f(m_scale_loc, 2.0/size_x, -2.0/size_y);
+
+	glUniformMatrix4fv(m_mvp_loc, 1, GL_FALSE, mvp);
 	if (m_use_ARB_multi_bind) {
 		GLuint textures[] = {m_atlas_texture_name, m_texcoord_texture, m_glyph_size_texture};
 		glBindTextures(0 /* tex unit */, 3, textures);
@@ -1148,24 +1109,116 @@ bool renderer::render(text &txt, int dx, int dy)
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_BUFFER, m_glyph_size_texture);
 	}
+	glDrawArrays(GL_POINTS, 0, m_num_chars);
+}
 
-	//Orphan previous buffer
-	int buffer_size = sizeof(text::glyph_instance) * txt.m_instance_buffer.size();
-	glNamedBufferDataEXT(m_stream_vbo,
-			buffer_size,
-			NULL,
-			GL_STREAM_DRAW);
-	//Copy in new data
-	m_stream_vbo_data = (text::glyph_instance *) glMapNamedBufferRangeEXT(
-		m_stream_vbo,
-		0, buffer_size,
-		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
-	if (m_stream_vbo_data != NULL) {
-		memcpy(m_stream_vbo_data, txt.m_instance_buffer.data(), buffer_size);
-		glUnmapNamedBufferEXT(m_stream_vbo);
-	}
-	glUniform2f(m_disp_loc, dx, dy + txt.m_y_delta);
-	glDrawArrays(GL_POINTS, 0, num_chars);
+bool renderer::render(font_const_ptr font, const color &color, const char *text,
+	int x, int y,
+	int width, int height,
+	int halign, int valign)
+{
+	int num_chars = strlen(text);
+	text::glyph_instance *out = prepare_render(num_chars);
+
+	if (!out)
+		return false;
+
+	int y_delta;
+	layout_text(out, font, color, text, num_chars, width, height, halign, valign, y_delta);
+
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	float size_x = viewport[2];
+	float size_y = viewport[3];
+	float mvp[] = {
+		2.0f/size_x, 0, 0, 0,
+		0, -2.0f/size_y, 0, 0,
+		0, 0, 1, 0,
+		-1 + ((x * 2.0f) / size_x), 1 - (((y + y_delta) * 2.0f) / size_y), 0, 1,
+	};
+	submit_render(mvp);
+	return true;
+}
+
+void renderer::grid_fit_mvp_transform(const float *mvp_transform, float size_x, float size_y, float *mvp_transform_fitted)
+{
+
+	for (int i = 0; i < 16; i++)
+		mvp_transform_fitted[i] = mvp_transform[i];
+	mvp_transform_fitted[12] = ((floorf(((mvp_transform[12]/mvp_transform[15]) + 1) * (size_x / 2.0f)) / (size_x / 2.0f)) - 1) * mvp_transform[15];
+	mvp_transform_fitted[13] = ((floorf(((mvp_transform[13]/mvp_transform[15]) + 1) * (size_y / 2.0f)) / (size_y / 2.0f)) - 1) * mvp_transform[15];
+}
+
+bool renderer::render(font_const_ptr font, const color &color, const char *text,
+	const float *mvp_transform,
+	int width, int height,
+	int halign, int valign)
+{
+	int num_chars = strlen(text);
+	text::glyph_instance *out = prepare_render(num_chars);
+
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	float size_x = viewport[2];
+	float size_y = viewport[3];
+	float mvp_transform_fitted[16];
+	grid_fit_mvp_transform(mvp_transform, size_x, size_y, mvp_transform_fitted);
+
+	if (!out)
+		return false;
+
+	int y_delta;
+	layout_text(out, font, color, text, num_chars, width, height, halign, valign, y_delta);
+
+	submit_render(mvp_transform_fitted);
+	return true;
+}
+
+//
+// Render text 'txt' at position (dx, dy) wrapping text to fit in clip rect
+//	 (clip_x, clip_y) -> (clip_x + clip_w, clip_y + clip_h).
+//
+bool renderer::render(text &txt, int dx, int dy)
+{
+	txt.layout();
+
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	float size_x = viewport[2];
+	float size_y = viewport[3];
+
+	float mvp[] = {
+		2.0f/size_x, 0, 0, 0,
+		0, -2.0f/size_y, 0, 0,
+		0, 0, 1, 0,
+		-1 + ((dx * 2.0f) / size_x), 1 - (((dy + txt.m_y_delta) * 2.0f) / size_y), 0, 1,
+	};
+
+	size_t num_chars = txt.m_instance_buffer.size();
+	text::glyph_instance *out = prepare_render(num_chars);
+	if (!out)
+		return false;
+	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(text::glyph_instance));
+	submit_render(mvp);
+	return true;
+}
+
+bool renderer::render(text &txt, const float *mvp_transform)
+{
+	size_t num_chars = txt.m_instance_buffer.size();
+	text::glyph_instance *out = prepare_render(num_chars);
+	if (!out)
+		return false;
+
+	GLint viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	float size_x = viewport[2];
+	float size_y = viewport[3];
+	float mvp_transform_fitted[16];
+	grid_fit_mvp_transform(mvp_transform, size_x, size_y, mvp_transform_fitted);
+
+	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(text::glyph_instance));
+	submit_render(mvp_transform_fitted);
 	return true;
 }
 
