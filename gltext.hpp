@@ -40,7 +40,6 @@ using namespace glbindify;
 #include <unordered_map>
 
 #include <vector>
-#include <memory>
 #include <sstream>
 
 #include <ft2build.h>
@@ -108,7 +107,6 @@ struct glyph {
 };
 
 class renderer;
-typedef std::shared_ptr<renderer> renderer_ptr;
 
 //
 // font
@@ -157,7 +155,6 @@ public:
 	}
 	~font() { }
 };
-typedef std::shared_ptr<const font> font_const_ptr;
 
 struct color {
 	float r;
@@ -180,9 +177,9 @@ public:
 	struct character {
 		float x;
 		char c;
-		font_const_ptr font;
+		const font *font_;
 		const glyph &get_glyph() const {
-			return font->get_glyph(c);
+			return font_->get_glyph(c);
 		}
 	};
 
@@ -192,8 +189,8 @@ public:
 		gl_text::color color;
 	};
 
-	text(const font_const_ptr &font, float r, float g, float b, float a, const std::string *str = NULL);
-	text(const font_const_ptr &font, float r, float g, float b, float a, const char *str = NULL);
+	text(const font &font, float r, float g, float b, float a, const std::string *str = NULL);
+	text(const font &font, float r, float g, float b, float a, const char *str = NULL);
 	text();
 	~text();
 
@@ -229,7 +226,7 @@ public:
 	}
 
 	friend text_stream &std::endl(gl_text::text_stream &t);
-	void append(const font_const_ptr &font, const color &color, char c);
+	void append(const font &font, const color &color, char c);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<character> m_string;
@@ -257,7 +254,6 @@ private:
 	bool m_buffer_dirty; //Set to true if m_instance_buffer has changed
 };
 class text;
-typedef std::shared_ptr<text> text_ptr;
 
 enum font_style {
 	STYLE_REGULAR = 0,
@@ -269,12 +265,12 @@ enum font_style {
 // font desc
 //
 struct font_desc {
-	std::string path;
-	std::string family;
+	const char *path;
+	const char *family;
 	int style;
 	int width;
 	int height;
-	std::string charset;
+	const char *charset;
 };
 
 //
@@ -282,21 +278,20 @@ struct font_desc {
 //
 class text_stream : public std::stringstream
 {
-	std::vector<font_const_ptr> m_font_stack;
+	std::vector<const font *> m_font_stack;
 	std::vector<color> m_color_stack;
 	text &m_out;
 public:
 	friend text_stream &std::endl(text_stream &t);
 	friend text_stream &pop_font(text_stream &t);
 	friend text_stream &pop_color(text_stream &t);
-	text_stream &operator<<(font_const_ptr font);
+	text_stream &operator<<(const font *font);
 	text_stream &operator<<(const color &color);
 
 	void flush();
 
-	text_stream(text& out, font_const_ptr &default_font, const color &default_color);
+	text_stream(text& out, const font *default_font, const color &default_color);
 };
-typedef std::shared_ptr<text_stream> text_stream_ptr;
 
 //
 // renderer
@@ -345,7 +340,7 @@ class renderer
 	};
 	text::glyph_instance *prepare_render(int num_chars);
 	void submit_render(const float *mvp);
-	void layout_text(text::glyph_instance *out, font_const_ptr font, const color &color,
+	void layout_text(text::glyph_instance *out, const font &font, const color &color,
 		const char *text, int num_chars,
 		int width, int height,
 		int halign, int valign,
@@ -358,11 +353,11 @@ class renderer
 public:
 	renderer(std::string typeface_path = "");
 	~renderer();
-	bool render(font_const_ptr font, const color &color, const char *text,
+	bool render(const font *font, const color &color, const char *text,
 		const float *mvp_transform,
 		int width, int height,
 		int halign, int valign);
-	bool render(font_const_ptr font, const color &color, const char *text,
+	bool render(const font *font, const color &color, const char *text,
 		int x, int y,
 		int width, int height,
 		int halign, int valign);
@@ -370,7 +365,7 @@ public:
 	bool render(text &txt, int dx, int dy);
 	bool render(text &txt, const float *mvp_transform);
 	typeface_t get_typeface(const std::string &path);
-	bool initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts);
+	bool initialize(const font_desc *font_descriptions, int count, const font **fonts);
 	void set_ambient_color(const color &color);
 };
 

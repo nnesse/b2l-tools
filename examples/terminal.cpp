@@ -71,8 +71,8 @@ int main(void)
 #endif
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
-	std::vector<gl_text::font_const_ptr> fonts;
-	std::vector<gl_text::font_desc> font_desc = {
+	const gl_text::font *fonts[1];
+	gl_text::font_desc font_desc[1] = {
 		{
 			.path = "ttf/LiberationSans-Regular.ttf",
 			.family = "LiberationSans",
@@ -83,7 +83,7 @@ int main(void)
 		}
 	};
 	gl_text::renderer renderer;
-	if (!renderer.initialize(font_desc, fonts)) {
+	if (!renderer.initialize(font_desc, 1, fonts)) {
 		glfwTerminate();
 		exit(-1);
 	}

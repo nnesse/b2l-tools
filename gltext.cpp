@@ -115,7 +115,7 @@ void glProgramUniform4fvEXT_emulation(GLuint program, GLint uniform, int count, 
 // text
 //
 
-void text::append(const font_const_ptr &font, const color &color, char c)
+void text::append(const font &font, const color &color, char c)
 {
 	const glyph *prev_glyph;
 	character *prev_character;
@@ -130,7 +130,7 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 	m_instance_buffer.resize(m_instance_buffer.size() + 1);
 	m_string.resize(m_string.size() + 1);
 
-	const glyph &glyph = font->get_glyph(c);
+	const glyph &glyph = font.get_glyph(c);
 
 	int x_pos;
 	if (prev_glyph) {
@@ -139,9 +139,9 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 		x_pos = 0;
 	}
 
-	if (prev_glyph && prev_character->font == font) {
+	if (prev_glyph && prev_character->font_ == &font) {
 		FT_Vector delta;
-		if (!FT_Get_Kerning(font->m_typeface,
+		if (!FT_Get_Kerning(font.m_typeface,
 				prev_glyph->typeface_index,
 				glyph.typeface_index,
 				FT_KERNING_DEFAULT,
@@ -156,11 +156,11 @@ void text::append(const font_const_ptr &font, const color &color, char c)
 	inst.color = color;
 	character.c = c;
 	character.x = x_pos;
-	character.font = font;
+	character.font_ = &font;
 	m_needs_layout = true;
 }
 
-text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
+text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
@@ -168,7 +168,7 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
-	font->select();
+	font.select();
 	if (str) {
 		m_instance_buffer.reserve(str->size());
 		m_string.reserve(str->size());
@@ -178,7 +178,7 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 	}
 }
 
-text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
+text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
@@ -186,7 +186,7 @@ text::text(const font_const_ptr &font, GLfloat r, GLfloat g, GLfloat b, GLfloat 
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
-	font->select();
+	font.select();
 	if (str) {
 		while (*str) {
 			append(font, color(r, g, b, a), *str);
@@ -298,7 +298,7 @@ void text::layout()
 				cur->num_chars = 0;
 				cur->height = 0;
 			}
-			cur->height = std::max(cur->height, character->font->get_height());
+			cur->height = std::max(cur->height, character->font_->get_height());
 			cur->num_chars++;
 			if (character->c == '\n') {
 				break_candidate_iter = m_string.end();
@@ -459,7 +459,7 @@ typeface_t renderer::get_typeface(const std::string &path)
 	return face;
 }
 
-bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::vector<font_const_ptr> &fonts)
+bool renderer::initialize(const font_desc *font_descriptions, int count, const font **fonts)
 {
 	if (m_initialized)
 		return false; //You can't reinitialize the renderer
@@ -505,7 +505,7 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	}
 
 	//Need at least one font
-	if (font_descriptions.empty())
+	if (!count)
 		return false;
 
 	//Create GLSL program
@@ -529,30 +529,31 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		}
 	};
 	std::priority_queue<glyph *, std::vector<glyph *>, glyph_comp> glyph_heap;
-	for (auto font_desc : font_descriptions) {
+	for (int i = 0; i < count; i++) {
 		font *f = new font();
-		typeface_t typeface = get_typeface(font_desc.path);
-		int width = font_desc.width;
-		int height = font_desc.height;
+		const font_desc *font_desc = font_descriptions + i;
+		typeface_t typeface = get_typeface(font_desc->path);
+		int width = font_desc->width;
+		int height = font_desc->height;
 
 		if (!typeface)
 			return false;
 
 		int max_char = 0;
-		for (auto c : font_desc.charset)
-			if (c > max_char)
-				max_char = c;
+		for (const char *c = font_desc->charset; *c; c++)
+			if (*c > max_char)
+				max_char = *c;
 		f->m_glyphs.resize(max_char + 1);
 		f->m_width = width;
 		f->m_height = height;
 		f->m_typeface = typeface;
-		f->m_family = font_desc.family;
-		f->m_style = font_desc.style;
+		f->m_family = font_desc->family;
+		f->m_style = font_desc->style;
 		FT_Set_Pixel_Sizes(typeface, width, height);
 
-		for (auto c : font_desc.charset) {
-			glyph &g = f->m_glyphs[c];
-			int index = FT_Get_Char_Index(typeface, c);
+		for (const char *c = font_desc->charset; *c; c++) {
+			glyph &g = f->m_glyphs[*c];
+			int index = FT_Get_Char_Index(typeface, *c);
 			FT_Load_Glyph(typeface, index, 0/* flags */);
 			FT_Render_Glyph(typeface->glyph, FT_RENDER_MODE_NORMAL);
 			g.pitch = typeface->glyph->bitmap.pitch;
@@ -568,7 +569,7 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 			g.typeface_index = index;
 			glyph_heap.push(&g);
 		}
-		fonts.push_back(font_const_ptr(f));
+		fonts[i] = f;
 	}
 
 	//
@@ -981,12 +982,12 @@ void renderer::set_ambient_color(const color &color)
 	glProgramUniform4fvEXT(m_glsl_program, m_ambient_color_loc, 1, (GLfloat *)&m_ambient_color);
 }
 
-void renderer::layout_text(text::glyph_instance *out, font_const_ptr font, const color &color, const char *text, int num_chars, int width, int height, int halign, int valign, int &y_delta)
+void renderer::layout_text(text::glyph_instance *out, const font &font, const color &color, const char *text, int num_chars, int width, int height, int halign, int valign, int &y_delta)
 {
-	font->select();
+	font.select();
 
 	int x_pos = 0;
-	int y_pos = font->get_height();
+	int y_pos = font.get_height();
 	int i = 0;
 	int break_pos = -1;
 	int break_line_width = 0;
@@ -999,7 +1000,7 @@ void renderer::layout_text(text::glyph_instance *out, font_const_ptr font, const
 	int top = line_top;
 	int bottom = line_bottom;
 	while(text[i]) {
-		const glyph &g = font->get_glyph(text[i]);
+		const glyph &g = font.get_glyph(text[i]);
 		if (text[i] == ' ') {
 			break_pos = i;
 			break_line_width = x_pos;
@@ -1033,7 +1034,7 @@ void renderer::layout_text(text::glyph_instance *out, font_const_ptr font, const
 			line_start = line_end;
 			i = line_start;
 			x_pos = 0;
-			y_pos += font->get_height();
+			y_pos += font.get_height();
 			break_pos = -1;
 			top = std::min(top, line_top);
 			bottom = std::max(bottom, line_bottom);
@@ -1112,7 +1113,7 @@ void renderer::submit_render(const float *mvp)
 	glDrawArrays(GL_POINTS, 0, m_num_chars);
 }
 
-bool renderer::render(font_const_ptr font, const color &color, const char *text,
+bool renderer::render(const font *font, const color &color, const char *text,
 	int x, int y,
 	int width, int height,
 	int halign, int valign)
@@ -1124,7 +1125,7 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 		return false;
 
 	int y_delta;
-	layout_text(out, font, color, text, num_chars, width, height, halign, valign, y_delta);
+	layout_text(out, *font, color, text, num_chars, width, height, halign, valign, y_delta);
 
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
@@ -1149,7 +1150,7 @@ void renderer::grid_fit_mvp_transform(const float *mvp_transform, float size_x, 
 	mvp_transform_fitted[13] = ((floorf(((mvp_transform[13]/mvp_transform[15]) + 1) * (size_y / 2.0f)) / (size_y / 2.0f)) - 1) * mvp_transform[15];
 }
 
-bool renderer::render(font_const_ptr font, const color &color, const char *text,
+bool renderer::render(const font *font, const color &color, const char *text,
 	const float *mvp_transform,
 	int width, int height,
 	int halign, int valign)
@@ -1168,7 +1169,7 @@ bool renderer::render(font_const_ptr font, const color &color, const char *text,
 		return false;
 
 	int y_delta;
-	layout_text(out, font, color, text, num_chars, width, height, halign, valign, y_delta);
+	layout_text(out, *font, color, text, num_chars, width, height, halign, valign, y_delta);
 
 	submit_render(mvp_transform_fitted);
 	return true;
@@ -1222,7 +1223,7 @@ bool renderer::render(text &txt, const float *mvp_transform)
 	return true;
 }
 
-text_stream &text_stream::operator<<(font_const_ptr font)
+text_stream &text_stream::operator<<(const font *font)
 {
 	flush();
 	m_font_stack.push_back(font);
@@ -1258,12 +1259,12 @@ void text_stream::flush()
 	int c;
 	m_font_stack.back()->select();
 	while ((c = std::stringstream::get()) != EOF) {
-		m_out.append(m_font_stack.back(), m_color_stack.back(), c);
+		m_out.append(*m_font_stack.back(), m_color_stack.back(), c);
 	}
 	clear();
 }
 
-text_stream::text_stream(text &out, font_const_ptr &default_font, const color &default_color)
+text_stream::text_stream(text &out, const font *default_font, const color &default_color)
 	: m_out(out)
 {
 	m_font_stack.push_back(default_font);
@@ -1277,7 +1278,7 @@ namespace std {
 gl_text::text_stream &endl(gl_text::text_stream &t)
 {
 	t.flush();
-	t.m_out.append(t.m_font_stack.back(), t.m_color_stack.back(), '\n');
+	t.m_out.append(*t.m_font_stack.back(), t.m_color_stack.back(), '\n');
 	return t;
 }
 

@@ -78,8 +78,8 @@ int main(void)
 #endif
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
-	std::vector<gl_text::font_const_ptr> fonts;
-	std::vector<gl_text::font_desc> font_desc = {
+	const gl_text::font *fonts[1];
+	gl_text::font_desc font_desc[1] = {
 		{
 			.path = "ttf/LiberationSans-Regular.ttf",
 			.family = "LiberationSans",
@@ -89,7 +89,7 @@ int main(void)
 			.charset = charset
 		}
 	};
-	if (!renderer.initialize(font_desc, fonts)) {
+	if (!renderer.initialize(font_desc, 1, fonts)) {
 		glfwTerminate();
 		exit(-1);
 	}
@@ -119,7 +119,8 @@ int main(void)
 		renderer.render(fonts[0],
 			gl_text::color(1,1,1,1),
 			"The quick brown fox jumps over\n the lazy dog 0123456789 ().\n",
-			0, 0, width, height, /* Occupy whole viewport */
+			0, 0,
+			width, height, /* Occupy whole viewport */
 			0, 0 /* horizontally and vertically center text */);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
