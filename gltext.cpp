@@ -33,7 +33,9 @@ THE SOFTWARE.
 
 namespace gl_text {
 
-static const int texture_size = 1024;
+#include "edtaa3func.c"
+
+static const int texture_size = 128;
 
 static GLuint buffer_bindings[0x10000];
 
@@ -574,8 +576,8 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	//
 	std::vector<glyph *> glyphs;
 	glyphs.reserve(glyph_heap.size());
-	int u = 0;
-	int v = 0;
+	int u = 16;
+	int v = 16;
 	int w = 0;
 	int height = 0;
 	bool first = true;
@@ -586,12 +588,12 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 			first = false;
 			height = g->height;
 		}
-		if ((u + g->width) > texture_size) {
-			u = 0;
-			v += height;
-			if ((v + g->height) > texture_size) {
-				u = 0;
-				v = 0;
+		if ((u + g->width + 16) > texture_size) {
+			u = 16;
+			v += height + 16;
+			if ((v + g->height + 16) > texture_size) {
+				u = 16;
+				v = 16;
 				w++;
 			}
 			height = g->height;
@@ -600,12 +602,15 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		g->v = v;
 		g->w = w;
 		glyph_heap.pop();
-		u += g->width;
+		u += g->width + 16;
 	}
 	int tex_array_size = w + 1;
 
 	//
-	//Blit the glyph bitmaps into a CPU texture
+	// Blit the glyph bitmaps into a CPU texture
+	//
+	// TODO: Convert glyphs to signed distance fields here rather than applying the transformation
+	// on the entire atlas
 	//
 	std::vector<uint8_t> atlas_buffer(tex_array_size * texture_size * texture_size);
 	struct texcoord {
@@ -614,7 +619,6 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 		int16_t w;
 		int16_t padding;
 	};
-
 	std::vector<int16_t> texcoord_array;
 	std::vector<int16_t> glyph_size_array;
 	for (glyph *g : glyphs) {
@@ -651,6 +655,37 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 	glTexBuffer(GL_TEXTURE_BUFFER, GL_RG16I, m_glyph_size_texture_buffer);
 
 	//
+	// Convert atlas to a signed distance field
+	//
+	std::vector<double> srcf;
+	std::vector<short> distx;
+	std::vector<short> disty;
+	std::vector<double> gx;
+	std::vector<double> gy;
+	std::vector<double> dist;
+	int texels_per_layer = texture_size * texture_size;
+	srcf.resize(texels_per_layer);
+	distx.resize(texels_per_layer);
+	disty.resize(texels_per_layer);
+	gx.resize(texels_per_layer);
+	gy.resize(texels_per_layer);
+	dist.resize(texels_per_layer);
+	for (int i = 0; i < tex_array_size; i++) {
+		uint8_t *src = atlas_buffer.data() + (i * texture_size * texture_size);
+		for (int index = 0; index < (texture_size * texture_size); index++) {
+			srcf[index] = (src[index]*1.0)/256;
+		}
+		computegradient(srcf.data(), texture_size, texture_size, gx.data(), gy.data());
+		edtaa3(srcf.data(), gx.data(), gy.data(), texture_size, texture_size, distx.data(),disty.data(), dist.data());
+		for (int index = 0; index < (texture_size * texture_size); index++) {
+			int val = 128 - dist[index]*16.0;
+			if (val < 0) val = 0;
+			if (val > 255) val = 255;
+			src[index] = val;
+		}
+	}
+
+	//
 	// Upload the altas texture to the GPU
 	//
 	glGenTextures(1, &m_atlas_texture_name);
@@ -678,8 +713,8 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 				GL_UNSIGNED_BYTE,
 				atlas_buffer.data());
 		}
-		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	} else {
@@ -707,12 +742,12 @@ bool renderer::initialize(const std::vector<font_desc> &font_descriptions, std::
 				GL_UNSIGNED_BYTE,
 				atlas_buffer.data());
 		}
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
-
 	m_initialized = true;
 	return m_initialized;
 }
@@ -746,13 +781,13 @@ bool renderer::init_program()
 		"uniform vec2 disp;\n"
 		"uniform usamplerBuffer glyph_size_sampler;\n"
 		"uniform usamplerBuffer uvw_sampler;\n"
-		"\n"
 		"out vec3 texcoord_f;\n"
 		"out vec4 color_f;\n"
 		"\n"
 		"void genVertex(vec2 corner, vec2 size, vec3 texcoord)\n"
 		"{\n"
-			"gl_Position = vec4((pos[0] + disp + (corner * size)) * scale + vec2(-1, 1), 1, 1);\n"
+			"vec4 pos = vec4((pos[0] + disp + (corner * size)) * scale + vec2(-1, 1), 1, 1);\n"
+			"gl_Position = pos;\n"
 			"texcoord_f = texcoord + vec3(corner * size, 0);\n"
 			"color_f = color[0];\n"
 			"EmitVertex();\n"
@@ -762,7 +797,9 @@ bool renderer::init_program()
 		"{\n"
 			"if (glyph_index[0] >= 0) {\n"
 				"vec2 size = vec2(texelFetch(glyph_size_sampler, glyph_index[0]).rg);\n"
+				"size += vec2(16);\n"
 				"vec3 texcoord = vec3(texelFetch(uvw_sampler, glyph_index[0]).rgb);\n"
+				"texcoord -= vec3(8, 8, 0);\n"
 				"genVertex(vec2(0,0), size, texcoord);\n"
 				"genVertex(vec2(1,0), size ,texcoord);\n"
 				"genVertex(vec2(0,1), size, texcoord);\n"
@@ -780,7 +817,12 @@ bool renderer::init_program()
 		"out vec4 frag_color;\n"
 		"void main()\n"
 		"{\n"
-			"frag_color = ambient_color * color_f * vec4(texelFetch(sampler, ivec3(texcoord_f), 0).r);\n"
+			"ivec3 tex_size = textureSize(sampler, 0);\n"
+			"float D = texture(sampler, vec3(vec2(texcoord_f.xy) / tex_size.xy, texcoord_f.z)).r;\n"
+			"D = (D - 0.48) * 16.0;\n"
+			"float aastep = length(vec2(dFdx(D), dFdy(D)));\n"
+			"float texel = smoothstep(-aastep, aastep, D);\n"
+			"frag_color = ambient_color * color_f * vec4(texel);\n"
 		"}\n";
 
 	//std::cout << m_use_ARB_buffer_storage << ":" << m_use_ARB_multi_bind << ":" << m_use_ARB_vertex_attrib_binding << ":" << m_use_EXT_direct_state_access << std::endl;
