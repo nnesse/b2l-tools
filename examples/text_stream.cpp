@@ -83,28 +83,28 @@ int main(void)
 	const gl_text::font *fonts[4];
 	gl_text::font_desc font_desc[4] = {
 		{
-			.path = "ttf/LiberationSans-Regular.ttf",
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
 			.family = "LiberationSans",
 			.style = gl_text::STYLE_REGULAR,
 			.width = 35,
 			.height = 35,
 			.charset = charset
 		}, {
-			.path = "ttf/LiberationSans-Italic.ttf",
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Italic.ttf"),
 			.family = "LiberationSans",
 			.style = gl_text::STYLE_ITALIC,
 			.width = 35,
 			.height = 35,
 			.charset = charset
 		}, {
-			.path = "ttf/LiberationSans-Bold.ttf",
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Bold.ttf"),
 			.family = "LiberationSans",
 			.style = gl_text::STYLE_BOLD,
 			.width = 35,
 			.height = 35,
 			.charset = charset
 		}, {
-			.path = "ttf/LiberationSans-BoldItalic.ttf",
+			.typeface = renderer.get_typeface("ttf/LiberationSans-BoldItalic.ttf"),
 			.family = "LiberationSans",
 			.style = (gl_text::STYLE_BOLD | gl_text::STYLE_ITALIC),
 			.width = 35,

@@ -44,7 +44,6 @@ using namespace glbindify;
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
-typedef FT_Face typeface_t;
 
 namespace gl_text {
 	class text_stream;
@@ -55,6 +54,8 @@ namespace std {
 };
 
 namespace gl_text {
+
+typedef FT_Face typeface_t;
 
 struct bounding_box {
 	float upper_left[2];
@@ -189,8 +190,8 @@ public:
 		gl_text::color color;
 	};
 
-	text(const font &font, float r, float g, float b, float a, const std::string *str = NULL);
-	text(const font &font, float r, float g, float b, float a, const char *str = NULL);
+	text(const font *font, float r, float g, float b, float a, const std::string *str = NULL);
+	text(const font *font, float r, float g, float b, float a, const char *str = NULL);
 	text();
 	~text();
 
@@ -226,7 +227,7 @@ public:
 	}
 
 	friend text_stream &std::endl(gl_text::text_stream &t);
-	void append(const font &font, const color &color, char c);
+	void append(const font *font, const color &color, char c);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<character> m_string;
@@ -265,7 +266,7 @@ enum font_style {
 // font desc
 //
 struct font_desc {
-	const char *path;
+	typeface_t typeface;
 	const char *family;
 	int style;
 	int width;
@@ -302,7 +303,6 @@ class renderer
 	//
 	// Freetype state
 	//
-	std::string m_typeface_path;
 	FT_Library m_ft_library;
 	std::unordered_map<std::string, FT_Face> m_typeface_cache;
 
@@ -351,7 +351,7 @@ class renderer
 
 	bool m_initialized;
 public:
-	renderer(std::string typeface_path = "");
+	renderer();
 	~renderer();
 	bool render(const font *font, const color &color, const char *text,
 		const float *mvp_transform,
@@ -364,7 +364,7 @@ public:
 
 	bool render(text &txt, int dx, int dy);
 	bool render(text &txt, const float *mvp_transform);
-	typeface_t get_typeface(const std::string &path);
+	typeface_t get_typeface(const char *path);
 	bool initialize(const font_desc *font_descriptions, int count, const font **fonts);
 	void set_ambient_color(const color &color);
 };

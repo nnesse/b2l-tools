@@ -81,7 +81,7 @@ int main(void)
 	const gl_text::font *fonts[1];
 	gl_text::font_desc font_desc[1] = {
 		{
-			.path = "ttf/LiberationSans-Regular.ttf",
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
 			.family = "LiberationSans",
 			.style = gl_text::STYLE_REGULAR,
 			.width = 35,

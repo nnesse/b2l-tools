@@ -115,7 +115,7 @@ void glProgramUniform4fvEXT_emulation(GLuint program, GLint uniform, int count, 
 // text
 //
 
-void text::append(const font &font, const color &color, char c)
+void text::append(const font *font, const color &color, char c)
 {
 	const glyph *prev_glyph;
 	character *prev_character;
@@ -130,7 +130,7 @@ void text::append(const font &font, const color &color, char c)
 	m_instance_buffer.resize(m_instance_buffer.size() + 1);
 	m_string.resize(m_string.size() + 1);
 
-	const glyph &glyph = font.get_glyph(c);
+	const glyph &glyph = font->get_glyph(c);
 
 	int x_pos;
 	if (prev_glyph) {
@@ -139,9 +139,9 @@ void text::append(const font &font, const color &color, char c)
 		x_pos = 0;
 	}
 
-	if (prev_glyph && prev_character->font_ == &font) {
+	if (prev_glyph && prev_character->font_ == font) {
 		FT_Vector delta;
-		if (!FT_Get_Kerning(font.m_typeface,
+		if (!FT_Get_Kerning(font->m_typeface,
 				prev_glyph->typeface_index,
 				glyph.typeface_index,
 				FT_KERNING_DEFAULT,
@@ -156,11 +156,11 @@ void text::append(const font &font, const color &color, char c)
 	inst.color = color;
 	character.c = c;
 	character.x = x_pos;
-	character.font_ = &font;
+	character.font_ = font;
 	m_needs_layout = true;
 }
 
-text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
+text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
@@ -168,7 +168,7 @@ text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const s
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
-	font.select();
+	font->select();
 	if (str) {
 		m_instance_buffer.reserve(str->size());
 		m_string.reserve(str->size());
@@ -178,7 +178,7 @@ text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const s
 	}
 }
 
-text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
+text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
 	m_layout_width(-1),
 	m_layout_height(-1),
 	m_layout_halign(-1),
@@ -186,7 +186,7 @@ text::text(const font &font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const c
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
-	font.select();
+	font->select();
 	if (str) {
 		while (*str) {
 			append(font, color(r, g, b, a), *str);
@@ -399,8 +399,7 @@ void text::layout()
 // renderer
 //
 
-renderer::renderer(std::string typeface_path) :
-	m_typeface_path(typeface_path),
+renderer::renderer() :
 	m_ft_library(NULL),
 	m_glsl_program(0),
 	m_fragment_shader(0),
@@ -439,7 +438,7 @@ renderer::~renderer()
 		glDeleteTextures(1, &m_atlas_texture_name);
 }
 
-typeface_t renderer::get_typeface(const std::string &path)
+typeface_t renderer::get_typeface(const char *path)
 {
 	FT_Face face;
 
@@ -448,7 +447,7 @@ typeface_t renderer::get_typeface(const std::string &path)
 	if (iter != m_typeface_cache.end()) {
 		face = iter->second;
 	} else {
-		int error = FT_New_Face(m_ft_library, (m_typeface_path + path).c_str(), 0, &face);
+		int error = FT_New_Face(m_ft_library, path, 0, &face);
 
 		if (error) {
 			return NULL;
@@ -532,7 +531,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 	for (int i = 0; i < count; i++) {
 		font *f = new font();
 		const font_desc *font_desc = font_descriptions + i;
-		typeface_t typeface = get_typeface(font_desc->path);
+		typeface_t typeface = font_desc->typeface;
 		int width = font_desc->width;
 		int height = font_desc->height;
 
@@ -1259,7 +1258,7 @@ void text_stream::flush()
 	int c;
 	m_font_stack.back()->select();
 	while ((c = std::stringstream::get()) != EOF) {
-		m_out.append(*m_font_stack.back(), m_color_stack.back(), c);
+		m_out.append(m_font_stack.back(), m_color_stack.back(), c);
 	}
 	clear();
 }
@@ -1278,7 +1277,7 @@ namespace std {
 gl_text::text_stream &endl(gl_text::text_stream &t)
 {
 	t.flush();
-	t.m_out.append(*t.m_font_stack.back(), t.m_color_stack.back(), '\n');
+	t.m_out.append(t.m_font_stack.back(), t.m_color_stack.back(), '\n');
 	return t;
 }
 

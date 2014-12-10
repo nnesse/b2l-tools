@@ -70,11 +70,12 @@ int main(void)
 	glbindify::gl::init();
 #endif
 
+	gl_text::renderer renderer;
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	const gl_text::font *fonts[1];
 	gl_text::font_desc font_desc[1] = {
 		{
-			.path = "ttf/LiberationSans-Regular.ttf",
+			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
 			.family = "LiberationSans",
 			.style = gl_text::STYLE_REGULAR,
 			.width = 20,
@@ -82,7 +83,6 @@ int main(void)
 			.charset = charset
 		}
 	};
-	gl_text::renderer renderer;
 	if (!renderer.initialize(font_desc, 1, fonts)) {
 		glfwTerminate();
 		exit(-1);
