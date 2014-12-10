@@ -83,6 +83,21 @@ static GLboolean glUnmapNamedBufferEXT_emulation(GLuint vbo)
 	return ret;
 }
 
+extern void glTextureSubImage3DEXT_emulation(GLuint tex_id,
+	GLenum binding,
+	GLint layer,
+	GLint pu, GLint pv, GLint pw,
+	GLsizei w, GLsizei h, GLsizei d,
+	GLenum type, GLenum format, const void *data)
+{
+	glBindTexture(binding, tex_id);
+	glTexSubImage3D(binding,
+		layer,
+		pu, pv, pw,
+		w, h, d,
+		type, format, data);
+}
+
 static GLuint bound_program;
 
 static void (*glUseProgram_org)(GLuint program);
@@ -131,6 +146,9 @@ void text::append(const font *font, const color &color, char c)
 	m_string.resize(m_string.size() + 1);
 
 	const glyph &glyph = font->get_glyph(c);
+	if (!font->m_renderer->m_layer_loaded[glyph.w]) {
+		font->m_renderer->load_atlas_layer(glyph.w);
+	}
 
 	int x_pos;
 	if (prev_glyph) {
@@ -458,6 +476,42 @@ typeface_t renderer::get_typeface(const char *path)
 	return face;
 }
 
+void renderer::load_atlas_layer(int i)
+{
+	std::vector<double> srcf;
+	std::vector<short> distx;
+	std::vector<short> disty;
+	std::vector<double> gx;
+	std::vector<double> gy;
+	std::vector<double> dist;
+	int texels_per_layer = texture_size * texture_size;
+	srcf.resize(texels_per_layer);
+	distx.resize(texels_per_layer);
+	disty.resize(texels_per_layer);
+	gx.resize(texels_per_layer);
+	gy.resize(texels_per_layer);
+	dist.resize(texels_per_layer);
+	uint8_t *src = m_atlas_buffer.data() + (i * texture_size * texture_size);
+	for (int index = 0; index < (texture_size * texture_size); index++) {
+		srcf[index] = (src[index]*1.0)/256;
+	}
+	computegradient(srcf.data(), texture_size, texture_size, gx.data(), gy.data());
+	edtaa3(srcf.data(), gx.data(), gy.data(), texture_size, texture_size, distx.data(),disty.data(), dist.data());
+	for (int index = 0; index < (texture_size * texture_size); index++) {
+		int val = 128 - dist[index]*16.0;
+		if (val < 0) val = 0;
+		if (val > 255) val = 255;
+		src[index] = val;
+	}
+	glTextureSubImage3DEXT(m_atlas_texture_name,
+		GL_TEXTURE_2D_ARRAY,
+		0, /* layer */
+		0, 0, i, /* uvw offset */
+		texture_size, texture_size, 1, /* uvw size */
+		GL_RED, GL_UNSIGNED_BYTE, m_atlas_buffer.data() + (texture_size * texture_size * i));
+	m_layer_loaded[i] = true;
+}
+
 bool renderer::initialize(const font_desc *font_descriptions, int count, const font **fonts)
 {
 	if (m_initialized)
@@ -488,6 +542,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 		glBindBuffer = glBindBuffer_trap;
 		glUseProgram = glUseProgram_trap;
 		glNamedBufferDataEXT = glNamedBufferDataEXT_emulation;
+		glTextureSubImage3DEXT = glTextureSubImage3DEXT_emulation;
 		glMapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
 		glUnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
 		glProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
@@ -497,6 +552,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 		glbindify::gl::UseProgram = glUseProgram_org;
 		glbindify::gl::NamedBufferDataEXT = glNamedBufferDataEXT_emulation;
 		glbindify::gl::MapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
+		glbindify::gl::TextureSubImage3DEXT = glTextureSubImage3DEXT_emulation;
 		glbindify::gl::UnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
 		glbindify::gl::ProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
 		glbindify::gl::ProgramUniform4fvEXT = glProgramUniform4fvEXT_emulation;
@@ -548,6 +604,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 		f->m_typeface = typeface;
 		f->m_family = font_desc->family;
 		f->m_style = font_desc->style;
+		f->m_renderer = this;
 		FT_Set_Pixel_Sizes(typeface, width, height);
 
 		for (const char *c = font_desc->charset; *c; c++) {
@@ -612,17 +669,12 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 	// TODO: Convert glyphs to signed distance fields here rather than applying the transformation
 	// on the entire atlas
 	//
-	std::vector<uint8_t> atlas_buffer(tex_array_size * texture_size * texture_size);
-	struct texcoord {
-		int16_t u;
-		int16_t v;
-		int16_t w;
-		int16_t padding;
-	};
+	m_atlas_buffer.resize(tex_array_size * texture_size * texture_size);
+	m_layer_loaded.resize(tex_array_size);
 	std::vector<int16_t> texcoord_array;
 	std::vector<int16_t> glyph_size_array;
 	for (glyph *g : glyphs) {
-		uint8_t *dest = atlas_buffer.data() + g->u + (g->v * texture_size) + (g->w * texture_size * texture_size);
+		uint8_t *dest = m_atlas_buffer.data() + g->u + (g->v * texture_size) + (g->w * texture_size * texture_size);
 		uint8_t *source = g->buffer.data();
 		for (int i = 0; i < g->height; i++) {
 			memcpy(dest, source, g->width);
@@ -655,38 +707,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 	glTexBuffer(GL_TEXTURE_BUFFER, GL_RG16I, m_glyph_size_texture_buffer);
 
 	//
-	// Convert atlas to a signed distance field
-	//
-	std::vector<double> srcf;
-	std::vector<short> distx;
-	std::vector<short> disty;
-	std::vector<double> gx;
-	std::vector<double> gy;
-	std::vector<double> dist;
-	int texels_per_layer = texture_size * texture_size;
-	srcf.resize(texels_per_layer);
-	distx.resize(texels_per_layer);
-	disty.resize(texels_per_layer);
-	gx.resize(texels_per_layer);
-	gy.resize(texels_per_layer);
-	dist.resize(texels_per_layer);
-	for (int i = 0; i < tex_array_size; i++) {
-		uint8_t *src = atlas_buffer.data() + (i * texture_size * texture_size);
-		for (int index = 0; index < (texture_size * texture_size); index++) {
-			srcf[index] = (src[index]*1.0)/256;
-		}
-		computegradient(srcf.data(), texture_size, texture_size, gx.data(), gy.data());
-		edtaa3(srcf.data(), gx.data(), gy.data(), texture_size, texture_size, distx.data(),disty.data(), dist.data());
-		for (int index = 0; index < (texture_size * texture_size); index++) {
-			int val = 128 - dist[index]*16.0;
-			if (val < 0) val = 0;
-			if (val > 255) val = 255;
-			src[index] = val;
-		}
-	}
-
-	//
-	// Upload the altas texture to the GPU
+	// Allocate and altas texture and setup texture filtering
 	//
 	glGenTextures(1, &m_atlas_texture_name);
 	if (m_use_EXT_direct_state_access) {
@@ -696,12 +717,6 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 				1, /* layers */
 				GL_R8,
 				texture_size, texture_size, tex_array_size /* uvw size */);
-			glTextureSubImage3DEXT(m_atlas_texture_name,
-				GL_TEXTURE_2D_ARRAY,
-				0, /* layer */
-				0, 0, 0, /* uvw offset */
-				texture_size, texture_size, tex_array_size, /* uvw size */
-				GL_RED, GL_UNSIGNED_BYTE, atlas_buffer.data());
 		} else {
 			glTextureImage3DEXT(m_atlas_texture_name,
 				GL_TEXTURE_2D_ARRAY,
@@ -711,7 +726,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 				0, /* border */
 				GL_RED,
 				GL_UNSIGNED_BYTE,
-				atlas_buffer.data());
+				NULL);
 		}
 		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTextureParameteriEXT(m_atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -725,29 +740,23 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 				1, /* layers */
 				GL_R8,
 				texture_size, texture_size, tex_array_size /* uvw size */);
-			glTexSubImage3D(
-				GL_TEXTURE_2D_ARRAY,
-				0, /* layer */
-				0, 0, 0, /* uvw offset */
-				texture_size, texture_size, tex_array_size, /* uvw size */
-				GL_RED, GL_UNSIGNED_BYTE, atlas_buffer.data());
 		} else {
 			glTexImage3D(
 				GL_TEXTURE_2D_ARRAY,
-				0, /* layers */
+				0, /* layer */
 				GL_R8,
 				texture_size, texture_size, tex_array_size /* uvw size */,
 				0, /* border */
 				GL_RED,
 				GL_UNSIGNED_BYTE,
-				atlas_buffer.data());
+				NULL);
 		}
-		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
+
 	m_initialized = true;
 	return m_initialized;
 }
@@ -1000,6 +1009,9 @@ void renderer::layout_text(text::glyph_instance *out, const font &font, const co
 	int bottom = line_bottom;
 	while(text[i]) {
 		const glyph &g = font.get_glyph(text[i]);
+		if (!m_layer_loaded[g.w]) {
+			load_atlas_layer(g.w);
+		}
 		if (text[i] == ' ') {
 			break_pos = i;
 			break_line_width = x_pos;

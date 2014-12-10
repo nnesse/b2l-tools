@@ -119,6 +119,7 @@ class font {
 	std::vector<glyph> m_glyphs;
 	std::string m_family;
 	int m_style;
+	renderer *m_renderer;
 	friend class renderer;
 	friend class text;
 	friend class text_stream;
@@ -174,7 +175,6 @@ class text
 {
 public:
 	friend class renderer;
-
 	struct character {
 		float x;
 		char c;
@@ -349,6 +349,11 @@ class renderer
 		float size_x, float size_y,
 		float *mvp_transform_fitted);
 
+	std::vector<uint8_t> m_atlas_buffer;
+	std::vector<bool> m_layer_loaded;
+
+	void load_atlas_layer(int i);
+	friend class text;
 	bool m_initialized;
 public:
 	renderer();
