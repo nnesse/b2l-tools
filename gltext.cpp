@@ -794,7 +794,7 @@ bool renderer::init_program()
 		"\n"
 		"void genVertex(vec2 corner, vec2 size, vec3 texcoord)\n"
 		"{\n"
-			"gl_Position = mvp * vec4((pos[0] + (corner * size)), 0, 1);\n"
+			"gl_Position = mvp * vec4((pos[0] - vec2(8, 8) +  (corner * size)), 0, 1);\n"
 			"texcoord_f = texcoord + vec3(corner * size, 0);\n"
 			"color_f = color[0];\n"
 			"EmitVertex();\n"
