@@ -1169,6 +1169,12 @@ bool renderer::render(const font *font, const color &color, const char *text,
 	int num_chars = strlen(text);
 	text::glyph_instance *out = prepare_render(num_chars);
 
+	if (!out)
+		return false;
+
+	int y_delta;
+	layout_text(out, *font, color, text, num_chars, width, height, halign, valign, y_delta);
+
 	GLint viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
 	float size_x = viewport[2];
@@ -1176,11 +1182,9 @@ bool renderer::render(const font *font, const color &color, const char *text,
 	float mvp_transform_fitted[16];
 	grid_fit_mvp_transform(mvp_transform, size_x, size_y, mvp_transform_fitted);
 
-	if (!out)
-		return false;
-
-	int y_delta;
-	layout_text(out, *font, color, text, num_chars, width, height, halign, valign, y_delta);
+	for (int i = 0; i < 4; i++) {
+		mvp_transform_fitted[12 + i] += mvp_transform_fitted[4 + i] * y_delta;
+	}
 
 	submit_render(mvp_transform_fitted);
 	return true;
@@ -1228,6 +1232,10 @@ bool renderer::render(text &txt, const float *mvp_transform)
 	float size_y = viewport[3];
 	float mvp_transform_fitted[16];
 	grid_fit_mvp_transform(mvp_transform, size_x, size_y, mvp_transform_fitted);
+
+	for (int i = 0; i < 4; i++) {
+		mvp_transform_fitted[12 + i] += mvp_transform_fitted[4 + i] * txt.m_y_delta;
+	}
 
 	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(text::glyph_instance));
 	submit_render(mvp_transform_fitted);
