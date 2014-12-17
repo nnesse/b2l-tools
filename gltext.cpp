@@ -181,8 +181,8 @@ void text::append(const font *font, const color &color, char c)
 text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const std::string *str) :
 	m_layout_width(-1),
 	m_layout_height(-1),
-	m_layout_halign(-1),
-	m_layout_valign(-1),
+	m_layout_halign(HALIGN_LEFT),
+	m_layout_valign(VALIGN_TOP),
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
@@ -199,8 +199,8 @@ text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const s
 text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const char *str) :
 	m_layout_width(-1),
 	m_layout_height(-1),
-	m_layout_halign(-1),
-	m_layout_valign(-1),
+	m_layout_halign(HALIGN_LEFT),
+	m_layout_valign(VALIGN_TOP),
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
@@ -216,8 +216,8 @@ text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const c
 text::text() :
 	m_layout_width(-1),
 	m_layout_height(-1),
-	m_layout_halign(-1),
-	m_layout_valign(-1),
+	m_layout_halign(HALIGN_LEFT),
+	m_layout_valign(VALIGN_TOP),
 	m_needs_layout(false),
 	m_needs_vert_alignment(false)
 {
@@ -227,7 +227,7 @@ text::~text()
 {
 }
 
-void text::set_layout(int width, int height, int halign, int valign)
+void text::set_layout(int width, int height, enum halign halign, enum valign valign)
 {
 	if (m_layout_width != width || m_layout_halign != halign) {
 		m_lines.clear();
@@ -361,13 +361,13 @@ void text::layout()
 			int left = first_char->x;
 			int right = last_char->x + (last_char->get_glyph().advance_x/64);
 			switch(m_layout_halign) {
-			case -1:
+			case HALIGN_LEFT:
 				x_adjust = 0 - left;
 				break;
-			case 0:
+			case HALIGN_CENTER:
 				x_adjust = (m_layout_width/2) - ((left + right)/2);
 				break;
-			case 1:
+			case HALIGN_RIGHT:
 				x_adjust = m_layout_width - right;
 				break;
 			}
@@ -397,13 +397,13 @@ void text::layout()
 		int top = m_lines.front().top;
 		int bottom = m_lines.back().bottom;
 		switch(m_layout_valign) {
-		case -1:
+		case VALIGN_TOP:
 			m_y_delta = 0;
 			break;
-		case 0:
+		case VALIGN_CENTER:
 			m_y_delta = (m_layout_height/2) - ((top + bottom)/2);
 			break;
-		case 1:
+		case VALIGN_BOTTOM:
 			m_y_delta = m_layout_height - bottom;
 			break;
 		}
@@ -990,7 +990,7 @@ void renderer::set_ambient_color(const color &color)
 	glProgramUniform4fvEXT(m_glsl_program, m_ambient_color_loc, 1, (GLfloat *)&m_ambient_color);
 }
 
-void renderer::layout_text(text::glyph_instance *out, const font &font, const color &color, const char *text, int num_chars, int width, int height, int halign, int valign, int &y_delta)
+void renderer::layout_text(text::glyph_instance *out, const font &font, const color &color, const char *text, int num_chars, int width, int height, enum halign halign, enum valign valign, int &y_delta)
 {
 	font.select();
 
@@ -1127,7 +1127,7 @@ void renderer::submit_render(const float *mvp)
 bool renderer::render(const font *font, const color &color, const char *text,
 	int x, int y,
 	int width, int height,
-	int halign, int valign)
+	enum halign halign, enum valign valign)
 {
 	int num_chars = strlen(text);
 	text::glyph_instance *out = prepare_render(num_chars);
@@ -1164,7 +1164,7 @@ void renderer::grid_fit_mvp_transform(const float *mvp_transform, float size_x, 
 bool renderer::render(const font *font, const color &color, const char *text,
 	const float *mvp_transform,
 	int width, int height,
-	int halign, int valign)
+	enum halign halign, enum valign valign)
 {
 	int num_chars = strlen(text);
 	text::glyph_instance *out = prepare_render(num_chars);

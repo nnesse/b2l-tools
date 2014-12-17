@@ -121,7 +121,7 @@ int main(void)
 			"The quick brown fox jumps over\n the lazy dog 0123456789 ().\n",
 			0, 0,
 			width, height, /* Occupy whole viewport */
-			0, 0 /* horizontally and vertically center text */);
+			gl_text::HALIGN_CENTER, gl_text::VALIGN_CENTER /* horizontally and vertically center text */);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}

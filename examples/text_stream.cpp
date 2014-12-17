@@ -153,7 +153,7 @@ int main(void)
 		glbindify::glViewport(0, 0, width, height);
 		glbindify::glClear(GL_COLOR_BUFFER_BIT);
 #endif
-		test_text.set_layout(width, height, 0, 0);
+		test_text.set_layout(width, height, gl_text::HALIGN_CENTER, gl_text::VALIGN_CENTER);
 		renderer.render(test_text, 0, 0);
 		glfwSwapBuffers(window);
 		glfwPollEvents();

@@ -57,9 +57,22 @@ namespace gl_text {
 
 typedef FT_Face typeface_t;
 
-struct bounding_box {
-	float upper_left[2];
-	float size[2];
+enum halign {
+	HALIGN_LEFT = -1,
+	HALIGN_CENTER = 0,
+	HALIGN_RIGHT = 1,
+};
+
+enum valign {
+	VALIGN_TOP = -1,
+	VALIGN_CENTER = 0,
+	VALIGN_BOTTOM = 1,
+};
+
+enum font_style {
+	STYLE_REGULAR = 0,
+	STYLE_ITALIC = 1,
+	STYLE_BOLD = 2,
 };
 
 class font;
@@ -195,7 +208,7 @@ public:
 	text();
 	~text();
 
-	void set_layout(int width, int height, int halign, int valign);
+	void set_layout(int width, int height, enum halign halign, enum valign valign);
 
 	void set_background(float r, float g, float b, float a) {
 		m_background_color.r = r;
@@ -233,8 +246,8 @@ private:
 	std::vector<character> m_string;
 	int m_layout_width;
 	int m_layout_height;
-	int m_layout_halign;
-	int m_layout_valign;
+	enum halign m_layout_halign;
+	enum valign m_layout_valign;
 	color m_background_color;
 
 	struct line {
@@ -255,12 +268,6 @@ private:
 	bool m_buffer_dirty; //Set to true if m_instance_buffer has changed
 };
 class text;
-
-enum font_style {
-	STYLE_REGULAR = 0,
-	STYLE_ITALIC = 1,
-	STYLE_BOLD = 2,
-};
 
 //
 // font desc
@@ -343,7 +350,7 @@ class renderer
 	void layout_text(text::glyph_instance *out, const font &font, const color &color,
 		const char *text, int num_chars,
 		int width, int height,
-		int halign, int valign,
+		enum halign halign, enum valign valign,
 		int &y_delta);
 	void grid_fit_mvp_transform(const float *mvp_transform,
 		float size_x, float size_y,
@@ -361,11 +368,11 @@ public:
 	bool render(const font *font, const color &color, const char *text,
 		const float *mvp_transform,
 		int width, int height,
-		int halign, int valign);
+		enum halign halign, enum valign valign);
 	bool render(const font *font, const color &color, const char *text,
 		int x, int y,
 		int width, int height,
-		int halign, int valign);
+		enum halign halign, enum valign valign);
 
 	bool render(text &txt, int dx, int dy);
 	bool render(text &txt, const float *mvp_transform);

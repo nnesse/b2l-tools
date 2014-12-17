@@ -115,7 +115,7 @@ int main(void)
 		glbindify::glViewport(0, 0, width, height);
 		glbindify::glClear(GL_COLOR_BUFFER_BIT);
 #endif
-		g_test_text.set_layout(width, -1, -1, -1);
+		g_test_text.set_layout(width, -1, gl_text::HALIGN_LEFT, gl_text::VALIGN_TOP);
 		int last_line_pos = g_test_text.get_line_pos(g_test_text.num_lines() - 1);
 		if (last_line_pos > (height - 10)) {
 			renderer.render(g_test_text, 0, (height - 10) - last_line_pos);
