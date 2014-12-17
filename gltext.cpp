@@ -126,55 +126,63 @@ void glProgramUniform4fvEXT_emulation(GLuint program, GLint uniform, int count, 
 	glUseProgram(prev);
 }
 
+int get_advance(const glyph *prev, const glyph *next)
+{
+	int ret = 0;
+	if (prev) {
+		int d = prev->advance_x;
+		if (prev->font == next->font) {
+			FT_Vector delta;
+			const font *font = prev->font;
+			if (!FT_Get_Kerning(font->m_typeface,
+					prev->typeface_index,
+					next->typeface_index,
+					FT_KERNING_DEFAULT,
+					&delta)) {
+				d += delta.x;
+			}
+		}
+		ret += (d + 32)/64;
+	}
+	return ret;
+}
+
 //
 // text
 //
 
-void text::append(const font *font, const color &color, char c)
+void text::append(const gl_text::glyph &glyph, const color &color)
 {
-	const glyph *prev_glyph;
-	character *prev_character;
-	if (m_string.size()) {
-		prev_character = &m_string.back();
-		prev_glyph = &prev_character->get_glyph();
-	} else {
-		prev_character = NULL;
-		prev_glyph = NULL;
-	}
 	int i = m_instance_buffer.size();
 	m_instance_buffer.resize(m_instance_buffer.size() + 1);
 	m_string.resize(m_string.size() + 1);
 
-	const glyph &glyph = font->get_glyph(c);
-	if (!font->m_renderer->m_layer_loaded[glyph.w]) {
+	character *prev_character;
+	if (m_string.size() > 1) {
+		prev_character = &m_string[m_string.size() - 2];
+	} else {
+		prev_character = NULL;
+	}
+
+	const font *font = glyph.font;
+
+	if (font && !font->m_renderer->m_layer_loaded[glyph.w]) {
 		font->m_renderer->load_atlas_layer(glyph.w);
 	}
 
-	int x_pos;
-	if (prev_glyph) {
-		x_pos = prev_character->x + (prev_glyph->advance_x/64);
-	} else {
-		x_pos = 0;
-	}
-
-	if (prev_glyph && prev_character->font_ == font) {
-		FT_Vector delta;
-		if (!FT_Get_Kerning(font->m_typeface,
-				prev_glyph->typeface_index,
-				glyph.typeface_index,
-				FT_KERNING_DEFAULT,
-				&delta)) {
-			x_pos += ((delta.x + 32)/64);
-		}
+	int x_pos = 0;
+	if (prev_character) {
+		x_pos = prev_character->x + get_advance(prev_character->g, &glyph);
 	}
 
 	glyph_instance &inst = m_instance_buffer[i];
 	character &character = m_string[i];
 	inst.glyph_index = glyph.atlas_index;
 	inst.color = color;
-	character.c = c;
+	character.c = glyph.c;
 	character.x = x_pos;
 	character.font_ = font;
+	character.g = &glyph;
 	m_needs_layout = true;
 }
 
@@ -191,7 +199,7 @@ text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const s
 		m_instance_buffer.reserve(str->size());
 		m_string.reserve(str->size());
 		for (auto c : *str) {
-			append(font, color(r, g, b, a), c);
+			append(font->get_glyph(c), color(r, g, b, a));
 		}
 	}
 }
@@ -207,7 +215,7 @@ text::text(const font *font, GLfloat r, GLfloat g, GLfloat b, GLfloat a, const c
 	font->select();
 	if (str) {
 		while (*str) {
-			append(font, color(r, g, b, a), *str);
+			append(font->get_glyph(*str), color(r, g, b, a));
 			str++;
 		}
 	}
@@ -293,7 +301,9 @@ void text::layout()
 
 		for (auto iter = (m_string.begin() + cur->first_char); iter != m_string.end(); iter++) {
 			character *character = &(*iter);
-			const glyph &g = character->get_glyph();
+			if (!character->font_)
+				continue;
+			const glyph &g = *character->g;
 
 			if (m_layout_width > 0 && (character->x + g.left + g.width + x_adjust) > m_layout_width && character->c != ' ') {
 				//
@@ -359,7 +369,7 @@ void text::layout()
 			}
 			int x_adjust;
 			int left = first_char->x;
-			int right = last_char->x + (last_char->get_glyph().advance_x/64);
+			int right = last_char->x + (last_char->g->advance_x/64);
 			switch(m_layout_halign) {
 			case HALIGN_LEFT:
 				x_adjust = 0 - left;
@@ -376,7 +386,7 @@ void text::layout()
 			for (int i = 0; i < line.num_chars; i++) {
 				character &character = m_string[line.first_char + i];
 				glyph_instance &g_inst = m_instance_buffer[line.first_char + i];
-				const glyph &g = character.get_glyph();
+				const glyph &g = *character.g;
 				int char_top = -g.top + y_pos;
 				g_inst.pos[0] = character.x + g.left + x_adjust;
 				g_inst.pos[1] = char_top;
@@ -612,6 +622,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 			int index = FT_Get_Char_Index(typeface, *c);
 			FT_Load_Glyph(typeface, index, 0/* flags */);
 			FT_Render_Glyph(typeface->glyph, FT_RENDER_MODE_NORMAL);
+			g.c = *c;
 			g.pitch = typeface->glyph->bitmap.pitch;
 			g.width = typeface->glyph->bitmap.width;
 			g.height = typeface->glyph->bitmap.rows;
@@ -622,6 +633,7 @@ bool renderer::initialize(const font_desc *font_descriptions, int count, const f
 			g.top = typeface->glyph->bitmap_top;
 			g.advance_x = typeface->glyph->advance.x;
 			g.advance_y = typeface->glyph->advance.y;
+			g.font = f;
 			g.typeface_index = index;
 			glyph_heap.push(&g);
 		}
@@ -921,20 +933,20 @@ bool renderer::init_program()
 			2,
 			GL_FLOAT,
 			GL_FALSE,
-			offsetof(text::glyph_instance, pos));
+			offsetof(glyph_instance, pos));
 		glVertexAttribBinding(POS_LOC, 1);
 
 		glVertexAttribFormat(COLOR_LOC,
 			4,
 			GL_FLOAT,
 			GL_FALSE,
-			offsetof(text::glyph_instance, color));
+			offsetof(glyph_instance, color));
 		glVertexAttribBinding(COLOR_LOC, 1);
 
 		glVertexAttribIFormat(GLYPH_INDEX_LOC,
 			1,
 			GL_UNSIGNED_INT,
-			offsetof(text::glyph_instance, glyph_index));
+			offsetof(glyph_instance, glyph_index));
 		glVertexAttribBinding(GLYPH_INDEX_LOC, 1);
 	}
 
@@ -943,7 +955,7 @@ bool renderer::init_program()
 		glBindVertexBuffer(1, /*binding point */
 			m_stream_vbo,
 			0, /* offset */
-			sizeof(text::glyph_instance) /* stride */);
+			sizeof(glyph_instance) /* stride */);
 	} else {
 		glBindBuffer(GL_ARRAY_BUFFER, m_stream_vbo);
 
@@ -951,21 +963,21 @@ bool renderer::init_program()
 			2,
 			GL_FLOAT,
 			GL_FALSE,
-			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, pos));
+			sizeof(glyph_instance),
+			(void *)offsetof(glyph_instance, pos));
 
 		glVertexAttribPointer(COLOR_LOC,
 			4,
 			GL_FLOAT,
 			GL_FALSE,
-			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, color));
+			sizeof(glyph_instance),
+			(void *)offsetof(glyph_instance, color));
 
 		glVertexAttribIPointer(GLYPH_INDEX_LOC,
 			1,
 			GL_UNSIGNED_INT,
-			sizeof(text::glyph_instance),
-			(void *)offsetof(text::glyph_instance, glyph_index));
+			sizeof(glyph_instance),
+			(void *)offsetof(glyph_instance, glyph_index));
 	}
 
 	//Cache uniform locations
@@ -990,7 +1002,7 @@ void renderer::set_ambient_color(const color &color)
 	glProgramUniform4fvEXT(m_glsl_program, m_ambient_color_loc, 1, (GLfloat *)&m_ambient_color);
 }
 
-void renderer::layout_text(text::glyph_instance *out, const font &font, const color &color, const char *text, int num_chars, int width, int height, enum halign halign, enum valign valign, int &y_delta)
+void renderer::layout_text(glyph_instance *out, const font &font, const color &color, const char *text, int num_chars, int width, int height, enum halign halign, enum valign valign, int &y_delta)
 {
 	font.select();
 
@@ -1007,8 +1019,11 @@ void renderer::layout_text(text::glyph_instance *out, const font &font, const co
 	int break_line_bottom = -1;
 	int top = line_top;
 	int bottom = line_bottom;
+	const glyph *prev_glyph = NULL;
 	while(text[i]) {
 		const glyph &g = font.get_glyph(text[i]);
+		x_pos += get_advance(prev_glyph, &g);
+		prev_glyph = &g;
 		if (!m_layer_loaded[g.w]) {
 			load_atlas_layer(g.w);
 		}
@@ -1059,7 +1074,6 @@ void renderer::layout_text(text::glyph_instance *out, const font &font, const co
 		out[i].pos[1] = y_pos - g.top;
 		line_top = std::min(line_top, (int)(y_pos - g.top));
 		line_bottom = std::max(line_bottom, (int)(y_pos - g.top + g.height));
-		x_pos += g.advance_x/64;
 		i++;
 	}
 	if (line_start != num_chars) {
@@ -1083,19 +1097,19 @@ void renderer::layout_text(text::glyph_instance *out, const font &font, const co
 		y_delta = 0;
 }
 
-text::glyph_instance *renderer::prepare_render(int num_chars)
+glyph_instance *renderer::prepare_render(int num_chars)
 {
 	if (!m_initialized)
 		return NULL;
 
 	//Orphan previous buffer
-	int buffer_size = sizeof(text::glyph_instance) * num_chars;
+	int buffer_size = sizeof(glyph_instance) * num_chars;
 	glNamedBufferDataEXT(m_stream_vbo,
 			buffer_size,
 			NULL,
 			GL_STREAM_DRAW);
 	//Copy in new data
-	text::glyph_instance * ret = (text::glyph_instance *) glMapNamedBufferRangeEXT(
+	glyph_instance * ret = (glyph_instance *) glMapNamedBufferRangeEXT(
 		m_stream_vbo,
 		0, buffer_size,
 		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
@@ -1130,7 +1144,7 @@ bool renderer::render(const font *font, const color &color, const char *text,
 	enum halign halign, enum valign valign)
 {
 	int num_chars = strlen(text);
-	text::glyph_instance *out = prepare_render(num_chars);
+	glyph_instance *out = prepare_render(num_chars);
 
 	if (!out)
 		return false;
@@ -1167,7 +1181,7 @@ bool renderer::render(const font *font, const color &color, const char *text,
 	enum halign halign, enum valign valign)
 {
 	int num_chars = strlen(text);
-	text::glyph_instance *out = prepare_render(num_chars);
+	glyph_instance *out = prepare_render(num_chars);
 
 	if (!out)
 		return false;
@@ -1211,10 +1225,10 @@ bool renderer::render(text &txt, int dx, int dy)
 	};
 
 	size_t num_chars = txt.m_instance_buffer.size();
-	text::glyph_instance *out = prepare_render(num_chars);
+	glyph_instance *out = prepare_render(num_chars);
 	if (!out)
 		return false;
-	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(text::glyph_instance));
+	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(glyph_instance));
 	submit_render(mvp);
 	return true;
 }
@@ -1222,7 +1236,7 @@ bool renderer::render(text &txt, int dx, int dy)
 bool renderer::render(text &txt, const float *mvp_transform)
 {
 	size_t num_chars = txt.m_instance_buffer.size();
-	text::glyph_instance *out = prepare_render(num_chars);
+	glyph_instance *out = prepare_render(num_chars);
 	if (!out)
 		return false;
 
@@ -1237,7 +1251,7 @@ bool renderer::render(text &txt, const float *mvp_transform)
 		mvp_transform_fitted[12 + i] += mvp_transform_fitted[4 + i] * txt.m_y_delta;
 	}
 
-	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(text::glyph_instance));
+	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(glyph_instance));
 	submit_render(mvp_transform_fitted);
 	return true;
 }
@@ -1278,7 +1292,7 @@ void text_stream::flush()
 	int c;
 	m_font_stack.back()->select();
 	while ((c = std::stringstream::get()) != EOF) {
-		m_out.append(m_font_stack.back(), m_color_stack.back(), c);
+		m_out.append(m_font_stack.back()->get_glyph(c), m_color_stack.back());
 	}
 	clear();
 }
@@ -1297,7 +1311,7 @@ namespace std {
 gl_text::text_stream &endl(gl_text::text_stream &t)
 {
 	t.flush();
-	t.m_out.append(t.m_font_stack.back(), t.m_color_stack.back(), '\n');
+	t.m_out.append(t.m_font_stack.back()->get_glyph('\n'), t.m_color_stack.back());
 	return t;
 }
 

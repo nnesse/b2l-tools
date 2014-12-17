@@ -80,9 +80,11 @@ class font;
 //
 // glyph
 //
-struct glyph {
+class glyph {
 	/* index into typeface */
 	int typeface_index;
+
+	char c;
 
 	/* index into atlas */
 	int atlas_index;
@@ -110,14 +112,37 @@ struct glyph {
 	int v;
 	int w;
 
+	const gl_text::font *font;
+
 	/* Glyph bitmap */
 	int width;
 	int height;
 	int pitch;
 
-	glyph() : typeface_index(-1), atlas_index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
-
 	std::vector<uint8_t> buffer;
+	friend class renderer;
+	friend class text;
+	friend int gl_text::get_advance(const glyph *prev, const glyph *next);
+public:
+	glyph() : typeface_index(-1), atlas_index(-1), left(0), top(0), advance_x(0), advance_y(0), u(0), v(0), w(0), width(0), height(0), pitch(0) {}
+	int get_left() const {
+		return left;
+	}
+	int get_top() const {
+		return top;
+	}
+	int get_width() const {
+		return width;
+	}
+	int get_height() const {
+		return height;
+	}
+	int get_advance() const {
+		return advance_x;
+	}
+	int get_index() const {
+		return atlas_index;
+	}
 };
 
 class renderer;
@@ -136,32 +161,21 @@ class font {
 	friend class renderer;
 	friend class text;
 	friend class text_stream;
-
+	friend int get_advance(const glyph *prev, const glyph *next);
+	void select() const;
+public:
 	font() {
 		m_glyphs.resize(256);
-	}
-
-	int width() const {
-		return m_width;
-	}
-
-	int height() const {
-		return m_height;
-	}
-
-	const std::string &family() const {
-		return m_family;
-	}
-
-	int style() const {
-		return m_style;
 	}
 	const glyph &get_glyph(char c) const {
 		return m_glyphs[c];
 	}
-
-public:
-	void select() const;
+	const std::string &family() const {
+		return m_family;
+	}
+	int get_style() const {
+		return m_style;
+	}
 	int get_height() const {
 		return m_height;
 	}
@@ -184,6 +198,12 @@ struct color {
 	color() { }
 };
 
+struct glyph_instance {
+	float pos[2];
+	int glyph_index;
+	gl_text::color color;
+};
+
 class text
 {
 public:
@@ -192,15 +212,7 @@ public:
 		float x;
 		char c;
 		const font *font_;
-		const glyph &get_glyph() const {
-			return font_->get_glyph(c);
-		}
-	};
-
-	struct glyph_instance {
-		float pos[2];
-		int glyph_index;
-		gl_text::color color;
+		const glyph *g;
 	};
 
 	text(const font *font, float r, float g, float b, float a, const std::string *str = NULL);
@@ -240,7 +252,7 @@ public:
 	}
 
 	friend text_stream &std::endl(gl_text::text_stream &t);
-	void append(const font *font, const color &color, char c);
+	void append(const gl_text::glyph &glyph, const color &color);
 private:
 	std::vector<glyph_instance> m_instance_buffer;
 	std::vector<character> m_string;
@@ -301,6 +313,8 @@ public:
 	text_stream(text& out, const font *default_font, const color &default_color);
 };
 
+int get_advance(const glyph *prev, const glyph *next);
+
 //
 // renderer
 //
@@ -345,9 +359,7 @@ class renderer
 		GLYPH_INDEX_LOC = 1,
 		COLOR_LOC = 2,
 	};
-	text::glyph_instance *prepare_render(int num_chars);
-	void submit_render(const float *mvp);
-	void layout_text(text::glyph_instance *out, const font &font, const color &color,
+	void layout_text(glyph_instance *out, const font &font, const color &color,
 		const char *text, int num_chars,
 		int width, int height,
 		enum halign halign, enum valign valign,
@@ -365,6 +377,10 @@ class renderer
 public:
 	renderer();
 	~renderer();
+
+	glyph_instance *prepare_render(int num_chars);
+	void submit_render(const float *mvp);
+
 	bool render(const font *font, const color &color, const char *text,
 		const float *mvp_transform,
 		int width, int height,
