@@ -2,7 +2,7 @@
 # Link with freetype2 and glfw staticly and enable GLBINDIFY support with gltext
 #
 
-all: simple text_stream terminal
+all: simple text_stream terminal transforms
 
 GLLOADER?=glew
 
@@ -53,6 +53,9 @@ text_stream: text_stream.cpp $(OBJS) gltext.hpp
 
 terminal: terminal.cpp $(OBJS) gltext.hpp
 	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -o $@
+
+transforms: transforms.cpp $(OBJS) gltext.hpp
+	$(CXX) -std=c++11 $(CPPFLAGS) $(CXXFLAGS) $< $(OBJS) $(LIBS) -lm -o $@
 
 clean:
 	@rm -f *.o gl_3_3.* simple
