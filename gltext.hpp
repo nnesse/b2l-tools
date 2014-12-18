@@ -364,10 +364,6 @@ class renderer
 		int width, int height,
 		enum halign halign, enum valign valign,
 		int &y_delta);
-	void grid_fit_mvp_transform(const float *mvp_transform,
-		float size_x, float size_y,
-		float *mvp_transform_fitted);
-
 	std::vector<uint8_t> m_atlas_buffer;
 	std::vector<bool> m_layer_loaded;
 
@@ -377,6 +373,8 @@ class renderer
 public:
 	renderer();
 	~renderer();
+
+	static void grid_fit_mvp_transform(float *mvp_transform, int size_x, int size_y);
 
 	glyph_instance *prepare_render(int num_chars);
 	void submit_render(const float *mvp);

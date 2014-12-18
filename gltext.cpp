@@ -1166,13 +1166,10 @@ bool renderer::render(const font *font, const color &color, const char *text,
 	return true;
 }
 
-void renderer::grid_fit_mvp_transform(const float *mvp_transform, float size_x, float size_y, float *mvp_transform_fitted)
+void renderer::grid_fit_mvp_transform(float *mvp_transform, int size_x, int size_y)
 {
-
-	for (int i = 0; i < 16; i++)
-		mvp_transform_fitted[i] = mvp_transform[i];
-	mvp_transform_fitted[12] = ((floorf(((mvp_transform[12]/mvp_transform[15]) + 1) * (size_x / 2.0f)) / (size_x / 2.0f)) - 1) * mvp_transform[15];
-	mvp_transform_fitted[13] = ((floorf(((mvp_transform[13]/mvp_transform[15]) + 1) * (size_y / 2.0f)) / (size_y / 2.0f)) - 1) * mvp_transform[15];
+	mvp_transform[12] = ((floorf(((mvp_transform[12]/mvp_transform[15]) + 1) * (size_x / 2.0f)) / (size_x / 2.0f)) - 1) * mvp_transform[15];
+	mvp_transform[13] = ((floorf(((mvp_transform[13]/mvp_transform[15]) + 1) * (size_y / 2.0f)) / (size_y / 2.0f)) - 1) * mvp_transform[15];
 }
 
 bool renderer::render(const font *font, const color &color, const char *text,
@@ -1189,18 +1186,16 @@ bool renderer::render(const font *font, const color &color, const char *text,
 	int y_delta;
 	layout_text(out, *font, color, text, num_chars, width, height, halign, valign, y_delta);
 
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	float size_x = viewport[2];
-	float size_y = viewport[3];
-	float mvp_transform_fitted[16];
-	grid_fit_mvp_transform(mvp_transform, size_x, size_y, mvp_transform_fitted);
-
-	for (int i = 0; i < 4; i++) {
-		mvp_transform_fitted[12 + i] += mvp_transform_fitted[4 + i] * y_delta;
+	if (y_delta) {
+		float mvp_transform_copy[16];
+		for (int i = 0; i < 16; i++)
+			mvp_transform_copy[i] = mvp_transform[i];
+		for (int i = 0; i < 4; i++)
+			mvp_transform_copy[12 + i] += mvp_transform_copy[4 + i] * y_delta;
+		submit_render(mvp_transform_copy);
+	} else {
+		submit_render(mvp_transform);
 	}
-
-	submit_render(mvp_transform_fitted);
 	return true;
 }
 
@@ -1240,19 +1235,20 @@ bool renderer::render(text &txt, const float *mvp_transform)
 	if (!out)
 		return false;
 
-	GLint viewport[4];
-	glGetIntegerv(GL_VIEWPORT, viewport);
-	float size_x = viewport[2];
-	float size_y = viewport[3];
-	float mvp_transform_fitted[16];
-	grid_fit_mvp_transform(mvp_transform, size_x, size_y, mvp_transform_fitted);
-
-	for (int i = 0; i < 4; i++) {
-		mvp_transform_fitted[12 + i] += mvp_transform_fitted[4 + i] * txt.m_y_delta;
-	}
-
 	memcpy(out, txt.m_instance_buffer.data(), num_chars * sizeof(glyph_instance));
-	submit_render(mvp_transform_fitted);
+
+	if (txt.m_y_delta) {
+		float mvp_transform_copy[16];
+		for (int i = 0; i < 12; i++) {
+			mvp_transform_copy[i] = mvp_transform[i];
+		}
+		for (int i = 0; i < 4; i++) {
+			mvp_transform_copy[12 + i] += mvp_transform[4 + i] * txt.m_y_delta;
+		}
+		submit_render(mvp_transform_copy);
+	} else {
+		submit_render(mvp_transform);
+	}
 	return true;
 }
 
