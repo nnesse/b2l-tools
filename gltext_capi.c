@@ -1,4 +1,6 @@
-#include "gltext.h"
+#include "gltext_capi.h"
+
+#include <math.h>
 
 #include "edtaa3func.c"
 
@@ -56,7 +58,7 @@ struct renderer
 	int uvw_sampler_loc;
 	int glyph_size_sampler_loc;
 	int mvp_loc;
-	gl_text__color m_ambient_color;
+	struct gl_text__color ambient_color;
 	int num_chars;
 
 	uint8_t *atlas_buffer;
@@ -155,15 +157,15 @@ static void glProgramUniform4fvEXT_emulation(GLuint program, GLint uniform, int 
 	glUseProgram(prev);
 }
 
-int gl_text__get_advance(const glyph *prev, const glyph *next)
+int gl_text__get_advance(const struct gl_text__glyph *prev, const struct gl_text__glyph *next)
 {
 	int ret = 0;
 	if (prev) {
 		int d = prev->advance_x;
 		if (prev->font == next->font) {
 			FT_Vector delta;
-			const font *font = prev->font;
-			if (!FT_Get_Kerning(font->m_typeface,
+			const struct gl_text__font *font = prev->font;
+			if (!FT_Get_Kerning(font->typeface,
 					prev->typeface_index,
 					next->typeface_index,
 					FT_KERNING_DEFAULT,
@@ -176,20 +178,20 @@ int gl_text__get_advance(const glyph *prev, const glyph *next)
 	return ret;
 }
 
-glyph_instance *gl_text__renderer__prepare_render(gl_text__renderer_t renderer_, int num_chars)
+struct gl_text__glyph_instance *gl_text__renderer__prepare_render(gl_text__renderer_t renderer_, int num_chars)
 {
 	struct renderer *inst = (struct renderer *)renderer_;
 	if (!inst->initialized)
 		return NULL;
 
 	//Orphan previous buffer
-	int buffer_size = sizeof(glyph_instance) * num_chars;
+	int buffer_size = sizeof(struct gl_text__glyph_instance) * num_chars;
 	glNamedBufferDataEXT(inst->stream_vbo,
 			buffer_size,
 			NULL,
 			GL_STREAM_DRAW);
 	//Copy in new data
-	glyph_instance * ret = (glyph_instance *) glMapNamedBufferRangeEXT(
+	struct gl_text__glyph_instance * ret = (struct gl_text__glyph_instance *) glMapNamedBufferRangeEXT(
 		inst->stream_vbo,
 		0, buffer_size,
 		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
@@ -199,12 +201,7 @@ glyph_instance *gl_text__renderer__prepare_render(gl_text__renderer_t renderer_,
 
 void gl_text__renderer__submit_render(gl_text__renderer_t renderer, const float *mvp)
 {
-	struct renderer *inst = (struct renderer *)renderer_;
-}
-
-void gl_text__renderer__submit_render(gl_text__renderer_t renderer, const float *mvp);
-{
-	struct renderer *inst = (struct renderer *)renderer_;
+	struct renderer *inst = (struct renderer *)renderer;
 	glUnmapNamedBufferEXT(inst->stream_vbo);
 	glUseProgram(inst->glsl_program);
 	glBindVertexArray(inst->gl_vertex_array);
@@ -224,16 +221,16 @@ void gl_text__renderer__submit_render(gl_text__renderer_t renderer, const float 
 	glDrawArrays(GL_POINTS, 0, inst->num_chars);
 }
 
-void gl_text__renderer__set_ambient_color(gl_text__renderer_t renderer, gl_text__color *color)
+void gl_text__renderer__set_ambient_color(gl_text__renderer_t renderer, struct gl_text__color *color)
 {
-	struct renderer *inst = (struct renderer *)renderer_;
+	struct renderer *inst = (struct renderer *)renderer;
 	inst->ambient_color = *color;
 	glProgramUniform4fvEXT(inst->glsl_program, inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
 }
 
 gl_text__renderer_t gl_text__renderer__create()
 {
-	renderer *inst = malloc(sizeof(struct renderer));
+	struct renderer *inst = malloc(sizeof(struct renderer));
 	memset(inst, 0, sizeof(*inst));
 	inst->ft_library = NULL;
 	inst->glsl_program = 0;
@@ -246,7 +243,10 @@ gl_text__renderer_t gl_text__renderer__create()
 	inst->use_ARB_multi_bind = false;
 	inst->use_ARB_vertex_attrib_binding = false;
 	inst->use_EXT_direct_state_access = false;
-	inst->ambient_color = 1, 1, 1, 1;
+	inst->ambient_color.r = 1;
+	inst->ambient_color.g = 1;
+	inst->ambient_color.b = 1;
+	inst->ambient_color.a = 1;
 	inst->initialized = false;
 	FT_Init_FreeType(&inst->ft_library);
 	return inst;
@@ -254,7 +254,7 @@ gl_text__renderer_t gl_text__renderer__create()
 
 void gl_text__renderer__free(gl_text__renderer_t renderer)
 {
-	struct renderer *inst = (struct renderer *)renderer_;
+	struct renderer *inst = (struct renderer *)renderer;
 	if (inst->fragment_shader)
 		glDeleteShader(inst->fragment_shader);
 	if (inst->geometry_shader)
@@ -270,10 +270,11 @@ void gl_text__renderer__free(gl_text__renderer_t renderer)
 	free(inst);
 }
 
-gl_text__typeface_t gl_text__renderer__get_typeface(const char *path)
+gl_text__typeface_t gl_text__renderer__get_typeface(gl_text__renderer_t renderer, const char *path)
 {
+	struct renderer *inst = (struct renderer *)renderer;
 	FT_Face face;
-	int error = FT_New_Face(m_ft_library, path, 0, &face);
+	int error = FT_New_Face(inst->ft_library, path, 0, &face);
 
 	if (error) {
 		return NULL;
@@ -365,8 +366,7 @@ bool init_program(struct renderer *inst)
 	if (!success) {
 		char info_log[1000];
 		glGetShaderInfoLog(inst->geometry_shader, sizeof(info_log), NULL, info_log);
-		std::cout << "renderer: Geometry shader compile failed" << std::endl
-			<< info_log << std::endl;
+		printf("renderer: Geometry shader compile failed\n%s", info_log);
 		glDeleteShader(inst->geometry_shader);
 		inst->geometry_shader = 0;
 		return false;
@@ -379,8 +379,7 @@ bool init_program(struct renderer *inst)
 	if (!success) {
 		char info_log[1000];
 		glGetShaderInfoLog(inst->fragment_shader, sizeof(info_log), NULL, info_log);
-		std::cout << "renderer: Fragment shader compile failed" << std::endl
-			<< info_log << std::endl;
+		printf("renderer: Fragment shader compile failed\n%s", info_log);
 		glDeleteShader(inst->fragment_shader);
 		inst->fragment_shader = 0;
 		glDeleteShader(inst->geometry_shader);
@@ -395,8 +394,7 @@ bool init_program(struct renderer *inst)
 	if (!success) {
 		char info_log[1000];
 		glGetShaderInfoLog(inst->vertex_passthrough_shader, sizeof(info_log), NULL, info_log);
-		std::cout << "renderer: Vertex point shader compile failed" << std::endl
-			<< info_log << std::endl;
+		printf("renderer: Vertex shader compile failed\n%s", info_log);
 		glDeleteShader(inst->fragment_shader);
 		inst->fragment_shader = 0;
 		glDeleteShader(inst->vertex_passthrough_shader);
@@ -415,8 +413,7 @@ bool init_program(struct renderer *inst)
 	if (!success) {
 		char info_log[1000];
 		glGetProgramInfoLog(inst->glsl_program, sizeof(info_log), NULL, info_log);
-		std::cout << "renderer: Program link failed" << std::endl
-			<< info_log << std::endl;
+		printf("renderer: Program link failed\n%s", info_log);
 		glDeleteShader(inst->fragment_shader);
 		inst->fragment_shader = 0;
 		glDeleteShader(inst->vertex_passthrough_shader);
@@ -441,20 +438,20 @@ bool init_program(struct renderer *inst)
 			2,
 			GL_FLOAT,
 			GL_FALSE,
-			offsetof(glyph_instance, pos));
+			offsetof(struct gl_text__glyph_instance, pos));
 		glVertexAttribBinding(POS_LOC, 1);
 
 		glVertexAttribFormat(COLOR_LOC,
 			4,
 			GL_FLOAT,
 			GL_FALSE,
-			offsetof(glyph_instance, color));
+			offsetof(struct gl_text__glyph_instance, color));
 		glVertexAttribBinding(COLOR_LOC, 1);
 
 		glVertexAttribIFormat(GLYPH_INDEX_LOC,
 			1,
 			GL_UNSIGNED_INT,
-			offsetof(glyph_instance, glyph_index));
+			offsetof(struct gl_text__glyph_instance, atlas_index));
 		glVertexAttribBinding(GLYPH_INDEX_LOC, 1);
 	}
 
@@ -463,7 +460,7 @@ bool init_program(struct renderer *inst)
 		glBindVertexBuffer(1, /*binding point */
 			inst->stream_vbo,
 			0, /* offset */
-			sizeof(glyph_instance) /* stride */);
+			sizeof(struct gl_text__glyph_instance) /* stride */);
 	} else {
 		glBindBuffer(GL_ARRAY_BUFFER, inst->stream_vbo);
 
@@ -471,21 +468,21 @@ bool init_program(struct renderer *inst)
 			2,
 			GL_FLOAT,
 			GL_FALSE,
-			sizeof(glyph_instance),
-			(void *)offsetof(glyph_instance, pos));
+			sizeof(struct gl_text__glyph_instance),
+			(void *)offsetof(struct gl_text__glyph_instance, pos));
 
 		glVertexAttribPointer(COLOR_LOC,
 			4,
 			GL_FLOAT,
 			GL_FALSE,
-			sizeof(glyph_instance),
-			(void *)offsetof(glyph_instance, color));
+			sizeof(struct gl_text__glyph_instance),
+			(void *)offsetof(struct gl_text__glyph_instance, color));
 
 		glVertexAttribIPointer(GLYPH_INDEX_LOC,
 			1,
 			GL_UNSIGNED_INT,
-			sizeof(glyph_instance),
-			(void *)offsetof(glyph_instance, glyph_index));
+			sizeof(struct gl_text__glyph_instance),
+			(void *)offsetof(struct gl_text__glyph_instance, atlas_index));
 	}
 
 	//Cache uniform locations
@@ -505,11 +502,11 @@ bool init_program(struct renderer *inst)
 }
 
 bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
-	const struct font_desc *font_descriptions,
+	const struct gl_text__font_desc *font_descriptions,
 	int count,
 	const struct gl_text__font **fonts)
 {
-	struct renderer *inst = (struct renderer *)renderer_;
+	struct renderer *inst = (struct renderer *)renderer;
 	if (inst->initialized)
 		return false; //You can't reinitialize the renderer
 
@@ -532,7 +529,7 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 	inst->use_ARB_vertex_attrib_binding = GL_ARB_vertex_attrib_binding;
 	inst->use_EXT_direct_state_access = GL_EXT_direct_state_access;
 #endif
-	if (!m_use_EXT_direct_state_access) {
+	if (!inst->use_EXT_direct_state_access) {
 		glBindBuffer_org = glBindBuffer;
 		glUseProgram_org = glUseProgram;
 		glBindBuffer = glBindBuffer_trap;
@@ -550,15 +547,16 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 		return false;
 
 	//Create GLSL program
-	if (!init_program())
+	if (!init_program(inst))
 		return false;
 
 	//Initialize glyph bitmaps
 	int total_glyphs = 0;
-	for (int i = 0; i < count; i++) {
-		gl_text__font *f = malloc(sizeof struct gl_text__font);
-		const font_desc *font_desc = font_descriptions + i;
-		gl_text__typeface_t typeface = font_desc->typeface;
+	int i;
+	for (i = 0; i < count; i++) {
+		struct gl_text__font *f = (struct gl_text__font *)malloc(sizeof(struct gl_text__font));
+		const struct gl_text__font_desc *font_desc = font_descriptions + i;
+		FT_Face typeface = (FT_Face) font_desc->typeface;
 		int width = font_desc->width;
 		int height = font_desc->height;
 
@@ -583,7 +581,7 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 		FT_Set_Pixel_Sizes(typeface, width, height);
 
 		for (const char *c = font_desc->charset; *c; c++) {
-			glyph *g = f->glyph_array + (*c);
+			struct gl_text__glyph *g = f->glyph_array + (*c);
 			int index = FT_Get_Char_Index(typeface, *c);
 			FT_Load_Glyph(typeface, index, 0/* flags */);
 			FT_Render_Glyph(typeface->glyph, FT_RENDER_MODE_NORMAL);
@@ -593,14 +591,13 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 			g->bitmap_height = typeface->glyph->bitmap.rows;
 			size_t image_size = g->bitmap_pitch * g->bitmap_height;
 			g->bitmap_bits = (uint8_t *)malloc(image_size);
-			memcpy(g.bitmap_bits, typeface->glyph->bitmap.buffer, image_size);
+			memcpy(g->bitmap_bits, typeface->glyph->bitmap.buffer, image_size);
 			g->left = typeface->glyph->bitmap_left;
 			g->top = typeface->glyph->bitmap_top;
 			g->advance_x = typeface->glyph->advance.x;
 			g->advance_y = typeface->glyph->advance.y;
 			g->font = f;
 			g->typeface_index = index;
-			glyph_heap.push(g);
 			total_glyphs++;
 		}
 		f->glyph_array['\n'].c = '\n';
@@ -616,30 +613,29 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 	int w = 0;
 	int height = 0;
 	bool first = true;
-	for (int i = 0; i < count; i++) {
-		gl_text__font *f = fonts[i];
-		const font_desc *font_desc = font_descriptions + i;
+	for (i = 0; i < count; i++) {
+		const struct gl_text__font *f = fonts[i];
+		const struct gl_text__font_desc *font_desc = font_descriptions + i;
 		for (const char *c = font_desc->charset; *c; c++) {
-			glyph *g = f->glyph_array + (*c);
+			struct gl_text__glyph *g = f->glyph_array + (*c);
 			if (first) {
 				first = false;
-				height = g->height;
+				height = g->bitmap_height;
 			}
-			if ((u + g->width + 16) > texture_size) {
+			if ((u + g->bitmap_width + 16) > texture_size) {
 				u = 16;
 				v += height + 16;
-				if ((v + g->height + 16) > texture_size) {
+				if ((v + g->bitmap_height + 16) > texture_size) {
 					u = 16;
 					v = 16;
 					w++;
 				}
-				height = g->height;
+				height = g->bitmap_height;
 			}
 			g->u = u;
 			g->v = v;
 			g->w = w;
-			glyph_heap.pop();
-			u += g->width + 16;
+			u += g->bitmap_width + 16;
 		}
 	}
 	int tex_array_size = w + 1;
@@ -656,10 +652,12 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 	int16_t *glyph_size_array = (int16_t *)malloc(total_glyphs * sizeof(int16_t) * 2);
 	int16_t *texcoord_ptr = texcoord_array;
 	int16_t *glyph_size_ptr = glyph_size_array;
-	for (int i = 0; i < count; i++) {
-		gl_text__font *f = fonts[i];
-		const font_desc *font_desc = font_descriptions + i;
+	int j = 0;
+	for (i = 0; i < count; i++) {
+		const struct gl_text__font *f = fonts[i];
+		const struct gl_text__font_desc *font_desc = font_descriptions + i;
 		for (const char *c = font_desc->charset; *c; c++) {
+			struct gl_text__glyph *g = f->glyph_array + (*c);
 			uint8_t *dest = inst->atlas_buffer + g->u + (g->v * texture_size) + (g->w * texture_size * texture_size);
 			uint8_t *source = g->bitmap_bits;
 			for (int i = 0; i < g->bitmap_height; i++) {
@@ -667,13 +665,13 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 				dest += texture_size;
 				source += g->bitmap_pitch;
 			}
-			g->atlas_index = texcoord_array.size()/4;
+			g->atlas_index = j++;
 			*(texcoord_ptr++) = g->u;
 			*(texcoord_ptr++) = g->v;
 			*(texcoord_ptr++) = g->w;
 			*(texcoord_ptr++) = 0;
-			*(glyph_size_ptr++) = (int16_t)g->width;
-			*(glyph_size_ptr++) = (int16_t)g->height;
+			*(glyph_size_ptr++) = (int16_t)g->bitmap_width;
+			*(glyph_size_ptr++) = (int16_t)g->bitmap_height;
 		}
 	}
 

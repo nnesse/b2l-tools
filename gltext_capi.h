@@ -4,13 +4,18 @@
 #if defined(__cplusplus)
 extern "C" {
 
+#else
+
 #include <stdbool.h>
 
 #endif
 
+#include <stdint.h>
 
 typedef void *gl_text__renderer_t;
 typedef void *gl_text__typeface_t;
+
+struct gl_text__font;
 
 //
 // glyph
@@ -47,14 +52,14 @@ struct gl_text__glyph {
 	int v;
 	int w;
 
-	const gl_text::font *font;
+	const struct gl_text__font *font;
 
 	/* Glyph bitmap */
 	int bitmap_width;
 	int bitmap_height;
 	int bitmap_pitch;
 	uint8_t *bitmap_bits;
-	
+
 	/*
 	glyph() :
 		typeface_index(-1),
@@ -81,17 +86,17 @@ struct gl_text__glyph_instance {
 	int atlas_index;
 
 	/* Color of glyph */
-	gl_text__color color;
+	struct gl_text__color color;
 };
 
 //
 // font
 //
-class gl_text__font {
+struct gl_text__font {
 	int width;
 	int height;
 	gl_text__typeface_t typeface;
-	glyph *glyph_array;
+	struct gl_text__glyph *glyph_array;
 	const char *family;
 	int style;
 	gl_text__renderer_t renderer;
@@ -109,21 +114,21 @@ struct gl_text__font_desc {
 	const char *charset;
 };
 
-int gl_text__get_advance(const struct glyph *prev, const struct glyph *next); //*
+int gl_text__get_advance(const struct gl_text__glyph *prev, const struct gl_text__glyph *next); //*
 
-gl_text__typeface_t  gl_text__get_typeface(const char *path); //*
+gl_text__typeface_t gl_text__renderer__get_typeface(gl_text__renderer_t renderer, const char *path); //*
 
 gl_text__renderer_t  gl_text__renderer__create(); //*
 void gl_text__renderer__free(gl_text__renderer_t renderer); //*
 
 bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
-	const struct font_desc *font_descriptions,
+	const struct gl_text__font_desc *font_descriptions,
 	int count,
 	const struct gl_text__font **fonts);
 
-void gl_text__renderer__prepare_render(gl_text__renderer_t renderer, int num_chars); //*
+struct gl_text__glyph_instance *gl_text__renderer__prepare_render(gl_text__renderer_t renderer, int num_chars); //*
 void gl_text__renderer__submit_render(gl_text__renderer_t renderer, const float *mvp); //*
-void gl_text__renderer__set_ambient_color(gl_text__renderer_t renderer, gl_text__color *color); //*
+void gl_text__renderer__set_ambient_color(gl_text__renderer_t renderer, struct gl_text__color *color); //*
 
 #if defined(__cplusplus)
 }

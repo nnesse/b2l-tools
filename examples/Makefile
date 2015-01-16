@@ -10,9 +10,11 @@ VPATH = ..
 CPPFLAGS = -I../ -I.
 EXT_OBJS =
 
-CXXFLAGS = -std=c++11 -Wall -Werror
-CXXFLAGS += $(shell pkg-config glfw3 --cflags)
-CXXFLAGS += $(shell pkg-config freetype2 --cflags)
+CFLAGS := -Wall -Werror
+CFLAGS += $(shell pkg-config glfw3 --cflags)
+CFLAGS += $(shell pkg-config freetype2 --cflags)
+CXXFLAGS := $(CFLAGS) -std=c++11
+CFLAGS += -std=c99
 LIBS = $(shell pkg-config glfw3 --libs)
 LIBS += $(shell pkg-config freetype2 --libs)
 
@@ -29,12 +31,21 @@ CPPFLAGS+= -DGLTEXT_USE_GLBINDIFY=1
 # Generate OpenGL 3.3 bindings with glbindify
 #
 gl_3_3.cpp gl_3_3.hpp:
-	glbindify -a gl -v 3.3 \
+	glbindify -l C++ -a gl -v 3.3 \
 		-e EXT_direct_state_access \
 		-e ARB_multi_bind \
 		-e ARB_vertex_attrib_binding \
 		-e ARB_buffer_storage \
 		-e ARB_texture_storage
+
+gl_3_3.c gl_3_3.h:
+	glbindify -l C -a gl -v 3.3 \
+		-e EXT_direct_state_access \
+		-e ARB_multi_bind \
+		-e ARB_vertex_attrib_binding \
+		-e ARB_buffer_storage \
+		-e ARB_texture_storage
+
 gltext.o: gl_3_3.cpp gl_3_3.hpp gltext.hpp
 OBJS += gl_3_3.o
 endif
