@@ -48,11 +48,6 @@ struct renderer
 	GLuint texcoord_texture_buffer;
 	GLuint glyph_size_texture;
 	GLuint glyph_size_texture_buffer;
-	bool use_ARB_buffer_storage;
-	bool use_ARB_texture_storage;
-	bool use_ARB_multi_bind;
-	bool use_ARB_vertex_attrib_binding;
-	bool use_EXT_direct_state_access;
 	int sampler_loc;
 	int ambient_color_loc;
 	int uvw_sampler_loc;
@@ -67,95 +62,6 @@ struct renderer
 };
 
 static const int texture_size = 128;
-
-static GLuint buffer_bindings[0x10000];
-
-static GLuint get_bound_buffer(GLenum binding_point)
-{
-	return buffer_bindings[binding_point];
-}
-
-static void (*glBindBuffer_org)(GLenum binding_point, GLuint vbo);
-
-static void glBindBuffer_trap(GLenum binding_point, GLuint vbo)
-{
-	if (buffer_bindings[binding_point] != vbo) {
-		glBindBuffer_org(binding_point, vbo);
-		buffer_bindings[binding_point] = vbo;
-	}
-}
-
-static void glNamedBufferDataEXT_emulation(GLuint vbo, GLsizeiptr offset, const void *data, GLenum access)
-{
-	GLuint prev = get_bound_buffer(GL_ARRAY_BUFFER);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER,
-		offset,
-		data,
-		access);
-	glBindBuffer(GL_ARRAY_BUFFER, prev);
-}
-
-static void *glMapNamedBufferRangeEXT_emulation(GLuint vbo, GLintptr offset, GLsizeiptr size, GLbitfield flags)
-{
-	GLuint prev = get_bound_buffer(GL_ARRAY_BUFFER);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	void * ret = glMapBufferRange(GL_ARRAY_BUFFER, offset, size, flags);
-	glBindBuffer(GL_ARRAY_BUFFER, prev);
-	return ret;
-}
-
-static GLboolean glUnmapNamedBufferEXT_emulation(GLuint vbo)
-{
-	GLuint prev = get_bound_buffer(GL_ARRAY_BUFFER);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	GLboolean ret = glUnmapBuffer(GL_ARRAY_BUFFER);
-	glBindBuffer(GL_ARRAY_BUFFER, prev);
-	return ret;
-}
-
-static void glTextureSubImage3DEXT_emulation(GLuint tex_id,
-	GLenum binding,
-	GLint layer,
-	GLint pu, GLint pv, GLint pw,
-	GLsizei w, GLsizei h, GLsizei d,
-	GLenum type, GLenum format, const void *data)
-{
-	glBindTexture(binding, tex_id);
-	glTexSubImage3D(binding,
-		layer,
-		pu, pv, pw,
-		w, h, d,
-		type, format, data);
-}
-
-static GLuint bound_program;
-
-static void (*glUseProgram_org)(GLuint program);
-
-static void glUseProgram_trap(GLuint program)
-{
-	if (bound_program != program) {
-		bound_program = program;
-		glUseProgram_org(program);
-	}
-}
-
-static void glProgramUniform1iEXT_emulation(GLuint program, GLint uniform, GLint value)
-{
-	GLuint prev = bound_program;
-	glUseProgram(program);
-	glUniform1i(uniform, value);
-	glUseProgram(prev);
-}
-
-static void glProgramUniform4fvEXT_emulation(GLuint program, GLint uniform, int count, const GLfloat *value)
-{
-	GLuint prev = bound_program;
-	glUseProgram(program);
-	glUniform4fv(uniform, count, value);
-	glUseProgram(prev);
-}
 
 int gl_text__get_advance(const struct gl_text__glyph *prev, const struct gl_text__glyph *next)
 {
@@ -186,13 +92,14 @@ struct gl_text__glyph_instance *gl_text__renderer__prepare_render(gl_text__rende
 
 	//Orphan previous buffer
 	int buffer_size = sizeof(struct gl_text__glyph_instance) * num_chars;
-	glNamedBufferDataEXT(inst->stream_vbo,
+	glBindBuffer(GL_ARRAY_BUFFER, inst->stream_vbo);
+	glBufferData(GL_ARRAY_BUFFER,
 			buffer_size,
 			NULL,
 			GL_STREAM_DRAW);
 	//Copy in new data
-	struct gl_text__glyph_instance * ret = (struct gl_text__glyph_instance *) glMapNamedBufferRangeEXT(
-		inst->stream_vbo,
+	struct gl_text__glyph_instance * ret = (struct gl_text__glyph_instance *) glMapBufferRange(
+		GL_ARRAY_BUFFER,
 		0, buffer_size,
 		GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
 	inst->num_chars = num_chars;
@@ -202,22 +109,17 @@ struct gl_text__glyph_instance *gl_text__renderer__prepare_render(gl_text__rende
 void gl_text__renderer__submit_render(gl_text__renderer_t renderer, const float *mvp)
 {
 	struct renderer *inst = (struct renderer *)renderer;
-	glUnmapNamedBufferEXT(inst->stream_vbo);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glUseProgram(inst->glsl_program);
 	glBindVertexArray(inst->gl_vertex_array);
-
 	glUniformMatrix4fv(inst->mvp_loc, 1, GL_FALSE, mvp);
-	if (inst->use_ARB_multi_bind) {
-		GLuint textures[] = {inst->atlas_texture_name, inst->texcoord_texture, inst->glyph_size_texture};
-		glBindTextures(0 /* tex unit */, 3, textures);
-	} else {
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_BUFFER, inst->texcoord_texture);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_BUFFER, inst->glyph_size_texture);
-	}
+	glUniform4fv(inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_BUFFER, inst->texcoord_texture);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_BUFFER, inst->glyph_size_texture);
 	glDrawArrays(GL_POINTS, 0, inst->num_chars);
 }
 
@@ -225,7 +127,6 @@ void gl_text__renderer__set_ambient_color(gl_text__renderer_t renderer, struct g
 {
 	struct renderer *inst = (struct renderer *)renderer;
 	inst->ambient_color = *color;
-	glProgramUniform4fvEXT(inst->glsl_program, inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
 }
 
 gl_text__renderer_t gl_text__renderer__create()
@@ -238,11 +139,6 @@ gl_text__renderer_t gl_text__renderer__create()
 	inst->vertex_passthrough_shader = 0;
 	inst->geometry_shader = 0;
 	inst->atlas_texture_name = 0;
-	inst->use_ARB_buffer_storage = false;
-	inst->use_ARB_texture_storage = false;
-	inst->use_ARB_multi_bind = false;
-	inst->use_ARB_vertex_attrib_binding = false;
-	inst->use_EXT_direct_state_access = false;
 	inst->ambient_color.r = 1;
 	inst->ambient_color.g = 1;
 	inst->ambient_color.b = 1;
@@ -353,8 +249,6 @@ bool init_program(struct renderer *inst)
 			"frag_color = ambient_color * color_f * vec4(texel);\n"
 		"}\n";
 
-	//std::cout << m_use_ARB_buffer_storage << ":" << m_use_ARB_multi_bind << ":" << m_use_ARB_vertex_attrib_binding << ":" << m_use_EXT_direct_state_access << std::endl;
-
 	GLint success;
 	glGenVertexArrays(1, &inst->gl_vertex_array);
 	glBindVertexArray(inst->gl_vertex_array);
@@ -430,74 +324,41 @@ bool init_program(struct renderer *inst)
 	glEnableVertexAttribArray(POS_LOC);
 	glEnableVertexAttribArray(COLOR_LOC);
 
-	if (inst->use_ARB_vertex_attrib_binding) {
-		//
-		// Glyph instance array setup
-		//
-		glVertexAttribFormat(POS_LOC,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			offsetof(struct gl_text__glyph_instance, pos));
-		glVertexAttribBinding(POS_LOC, 1);
-
-		glVertexAttribFormat(COLOR_LOC,
-			4,
-			GL_FLOAT,
-			GL_FALSE,
-			offsetof(struct gl_text__glyph_instance, color));
-		glVertexAttribBinding(COLOR_LOC, 1);
-
-		glVertexAttribIFormat(GLYPH_INDEX_LOC,
-			1,
-			GL_UNSIGNED_INT,
-			offsetof(struct gl_text__glyph_instance, atlas_index));
-		glVertexAttribBinding(GLYPH_INDEX_LOC, 1);
-	}
-
 	glGenBuffers(1, &inst->stream_vbo);
-	if (inst->use_ARB_vertex_attrib_binding) {
-		glBindVertexBuffer(1, /*binding point */
-			inst->stream_vbo,
-			0, /* offset */
-			sizeof(struct gl_text__glyph_instance) /* stride */);
-	} else {
-		glBindBuffer(GL_ARRAY_BUFFER, inst->stream_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, inst->stream_vbo);
 
-		glVertexAttribPointer(POS_LOC,
-			2,
-			GL_FLOAT,
-			GL_FALSE,
-			sizeof(struct gl_text__glyph_instance),
-			(void *)offsetof(struct gl_text__glyph_instance, pos));
+	glVertexAttribPointer(POS_LOC,
+		2,
+		GL_FLOAT,
+		GL_FALSE,
+		sizeof(struct gl_text__glyph_instance),
+		(void *)offsetof(struct gl_text__glyph_instance, pos));
 
-		glVertexAttribPointer(COLOR_LOC,
-			4,
-			GL_FLOAT,
-			GL_FALSE,
-			sizeof(struct gl_text__glyph_instance),
-			(void *)offsetof(struct gl_text__glyph_instance, color));
+	glVertexAttribPointer(COLOR_LOC,
+		4,
+		GL_FLOAT,
+		GL_FALSE,
+		sizeof(struct gl_text__glyph_instance),
+		(void *)offsetof(struct gl_text__glyph_instance, color));
 
-		glVertexAttribIPointer(GLYPH_INDEX_LOC,
-			1,
-			GL_UNSIGNED_INT,
-			sizeof(struct gl_text__glyph_instance),
-			(void *)offsetof(struct gl_text__glyph_instance, atlas_index));
-	}
+	glVertexAttribIPointer(GLYPH_INDEX_LOC,
+		1,
+		GL_UNSIGNED_INT,
+		sizeof(struct gl_text__glyph_instance),
+		(void *)offsetof(struct gl_text__glyph_instance, atlas_index));
 
 	//Cache uniform locations
-
 	inst->mvp_loc = glGetUniformLocation(inst->glsl_program, "mvp");
-
 	inst->sampler_loc = glGetUniformLocation(inst->glsl_program, "sampler");
 	inst->uvw_sampler_loc = glGetUniformLocation(inst->glsl_program, "uvw_sampler");
 	inst->ambient_color_loc = glGetUniformLocation(inst->glsl_program, "ambient_color");
 	inst->glyph_size_sampler_loc = glGetUniformLocation(inst->glsl_program, "glyph_size_sampler");
 
-	glProgramUniform1iEXT(inst->glsl_program, inst->sampler_loc, 0);
-	glProgramUniform1iEXT(inst->glsl_program, inst->uvw_sampler_loc, 1);
-	glProgramUniform1iEXT(inst->glsl_program, inst->glyph_size_sampler_loc, 2);
-	glProgramUniform4fvEXT(inst->glsl_program, inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
+	glUseProgram(inst->glsl_program);
+	glUniform1i(inst->sampler_loc, 0);
+	glUniform1i(inst->uvw_sampler_loc, 1);
+	glUniform1i(inst->glyph_size_sampler_loc, 2);
+	glUniform4fv(inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
 	return true;
 }
 
@@ -512,35 +373,6 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 
 	if (!inst->ft_library)
 		return false;
-
-	//Query OpenGL extension support
-#if GLTEXT_USE_GLEW
-	if (!glewExperimental) {
-		inst->use_ARB_buffer_storage = GLEW_ARB_buffer_storage;
-		inst->use_ARB_texture_storage = GLEW_ARB_texture_storage;
-		inst->use_ARB_multi_bind = GLEW_ARB_multi_bind;
-		inst->use_ARB_vertex_attrib_binding = GLEW_ARB_vertex_attrib_binding;
-		inst->use_EXT_direct_state_access = GLEW_EXT_direct_state_access;
-	}
-#elif GLTEXT_USE_GLBINDIFY
-	inst->use_ARB_buffer_storage = GL_ARB_buffer_storage;
-	inst->use_ARB_texture_storage = GL_ARB_texture_storage;
-	inst->use_ARB_multi_bind = GL_ARB_multi_bind;
-	inst->use_ARB_vertex_attrib_binding = GL_ARB_vertex_attrib_binding;
-	inst->use_EXT_direct_state_access = GL_EXT_direct_state_access;
-#endif
-	if (!inst->use_EXT_direct_state_access) {
-		glBindBuffer_org = glBindBuffer;
-		glUseProgram_org = glUseProgram;
-		glBindBuffer = glBindBuffer_trap;
-		glUseProgram = glUseProgram_trap;
-		glNamedBufferDataEXT = glNamedBufferDataEXT_emulation;
-		glTextureSubImage3DEXT = glTextureSubImage3DEXT_emulation;
-		glMapNamedBufferRangeEXT = glMapNamedBufferRangeEXT_emulation;
-		glUnmapNamedBufferEXT = glUnmapNamedBufferEXT_emulation;
-		glProgramUniform1iEXT = glProgramUniform1iEXT_emulation;
-		glProgramUniform4fvEXT = glProgramUniform4fvEXT_emulation;
-	}
 
 	//Need at least one font
 	if (!count)
@@ -607,6 +439,8 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 
 	//
 	// Position the glyphs in the altas's uvw space
+	//
+	// TODO: Use a priority queue to assign glyph positions
 	//
 	int u = 16;
 	int v = 16;
@@ -701,52 +535,19 @@ bool gl_text__renderer__initialize(gl_text__renderer_t renderer,
 	// Allocate and altas texture and setup texture filtering
 	//
 	glGenTextures(1, &inst->atlas_texture_name);
-	if (inst->use_EXT_direct_state_access) {
-		if (inst->use_ARB_texture_storage) {
-			glTextureStorage3DEXT(inst->atlas_texture_name,
-				GL_TEXTURE_2D_ARRAY,
-				1, /* layers */
-				GL_R8,
-				texture_size, texture_size, tex_array_size /* uvw size */);
-		} else {
-			glTextureImage3DEXT(inst->atlas_texture_name,
-				GL_TEXTURE_2D_ARRAY,
-				0, /* layers */
-				GL_R8,
-				texture_size, texture_size, tex_array_size /* uvw size */,
-				0, /* border */
-				GL_RED,
-				GL_UNSIGNED_BYTE,
-				NULL);
-		}
-		glTextureParameteriEXT(inst->atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteriEXT(inst->atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTextureParameteriEXT(inst->atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteriEXT(inst->atlas_texture_name, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	} else {
-		glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
-		if (inst->use_ARB_texture_storage) {
-			glTexStorage3D(
-				GL_TEXTURE_2D_ARRAY,
-				1, /* layers */
-				GL_R8,
-				texture_size, texture_size, tex_array_size /* uvw size */);
-		} else {
-			glTexImage3D(
-				GL_TEXTURE_2D_ARRAY,
-				0, /* layer */
-				GL_R8,
-				texture_size, texture_size, tex_array_size /* uvw size */,
-				0, /* border */
-				GL_RED,
-				GL_UNSIGNED_BYTE,
-				NULL);
-		}
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	}
+	glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
+	glTexImage3D(GL_TEXTURE_2D_ARRAY,
+		0, /* layer */
+		GL_R8,
+		texture_size, texture_size, tex_array_size /* uvw size */,
+		0, /* border */
+		GL_RED,
+		GL_UNSIGNED_BYTE,
+		NULL);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	inst->initialized = true;
 	return inst->initialized;
