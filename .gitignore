@@ -2,6 +2,6 @@
 *.swo
 *.swp
 *~
-
 examples/simple
+gl_?_?.?
 *.o

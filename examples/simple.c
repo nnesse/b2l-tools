@@ -22,15 +22,15 @@ THE SOFTWARE.
 
 */
 
-#include "gltext.hpp"
+#include "gltext.h"
+#include "gl_3_3.h"
 
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #include <stdlib.h>
 #include <stdio.h>
 
-
-#include <iostream>
 
 static void error_callback(int error, const char* description)
 {
@@ -43,11 +43,13 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
 		glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
+#include <math.h>
+
 int main(void)
 {
 	GLFWwindow* window;
 
-	gl_text::renderer renderer;
+	gltext_renderer_t renderer = gltext_renderer_new();
 
 	glfwSetErrorCallback(error_callback);
 
@@ -57,13 +59,9 @@ int main(void)
 	glfwWindowHint(GLFW_SAMPLES, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-#if GLTEXT_USE_GLEW
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-#else
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#endif
 
-	window = glfwCreateWindow(1024, 256, "Simple text output example", NULL, NULL);
+	window = glfwCreateWindow(1024, 128, "Simple text output example", NULL, NULL);
 	if (!window) {
 		glfwTerminate();
 		exit(-1);
@@ -71,57 +69,64 @@ int main(void)
 
 	glfwMakeContextCurrent(window);
 
-#if GLTEXT_USE_GLEW
-	glewInit();
-#else
-	glbindify::gl::init();
-#endif
+	init_gl();
 
-	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
-	const gl_text::font *fonts[1];
-	gl_text::font_desc font_desc[1] = {
-		{
-			.typeface = renderer.get_typeface("ttf/LiberationSans-Regular.ttf"),
-			.family = "LiberationSans",
-			.style = gl_text::STYLE_REGULAR,
-			.width = 35,
-			.height = 35,
-			.charset = charset
-		}
+	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
+	struct gltext_font fonts[1];
+	struct gltext_font_desc font_desc = {
+		.typeface = gltext_renderer_get_typeface(renderer, "ttf/LiberationSans-Regular.ttf"),
+		.width = 20,
+		.height = 20,
+		.charset = charset
 	};
-	if (!renderer.initialize(font_desc, 1, fonts)) {
+	if (!gltext_renderer_initialize(renderer, &font_desc, 1, fonts)) {
 		glfwTerminate();
 		exit(-1);
 	}
 
 	glfwSetKeyCallback(window, key_callback);
 
-#if GLTEXT_USE_GLEW
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#else
-	glbindify::glEnable(GL_BLEND);
-	glbindify::glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#endif
 
 	glfwSwapInterval(1);
+
 
 	while (!glfwWindowShouldClose(window)) {
 		int width, height;
 		glfwGetFramebufferSize(window, &width, &height);
-#if GLTEXT_USE_GLEW
 		glViewport(0, 0, width, height);
 		glClear(GL_COLOR_BUFFER_BIT);
-#else
-		glbindify::glViewport(0, 0, width, height);
-		glbindify::glClear(GL_COLOR_BUFFER_BIT);
-#endif
-		renderer.render(fonts[0],
-			gl_text::color(1,1,1,1),
-			"The quick brown fox jumps over\n the lazy dog 0123456789 ().\n",
-			0, 0,
-			width, height, /* Occupy whole viewport */
-			gl_text::HALIGN_CENTER, gl_text::VALIGN_CENTER /* horizontally and vertically center text */);
+		float mvp[16] = {
+			2.0/width,0,0,0,
+			0,-2.0/height,0,0,
+			0,0,1,0,
+			-1,0,0,1};
+		
+		const char *str = "The quick brown fox jumps over the lazy dog()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
+		struct gltext_glyph_instance *r = gltext_renderer_prepare_render(renderer, strlen(str));
+
+		struct gltext_glyph *g_prev = NULL;
+		float x_pos = 0;
+		float y_pos = 0;
+		struct gltext_color color = {
+			.r = 1,
+			.g = 1,
+			.b = 1,
+			.a = 1
+		};
+		while (*str) {
+			struct gltext_glyph *g_cur = fonts[0].glyph_array + (*str);
+			x_pos += gltext_get_advance(g_prev, g_cur);
+			r->pos[0] = x_pos;
+			r->pos[1] = y_pos;
+			r->w = g_cur->w;
+			r->color = color;
+			r++;
+			str++;
+			g_prev = g_cur;
+		}
+		gltext_renderer_submit_render(renderer, mvp);
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
