@@ -1,5 +1,5 @@
 #include "glwin.h"
-#include "gl_4_2.h"
+#include "glb_gl.h"
 
 void on_redraw(struct glwin *win)
 {
@@ -24,7 +24,7 @@ int main()
 	glwin_show_window(win);
 	GLXContext ctx = glwin_create_context(win, 4, 2);
 	glwin_manager_make_current(win, ctx);
-	init_gl();
+	init_gl(3, 2);
 	while (glwin_manager_process_events()) {
 		glwin_manager_wait_events();
 	}

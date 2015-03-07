@@ -1,3 +1,5 @@
+#define GLB_ENABLE_GLX_create_context
+#define GLB_ENABLE_GLX_create_context_profile
 #include "glwin.h"
 
 #include <X11/Xlib.h>
@@ -148,7 +150,7 @@ bool glwin_manager_init()
 	g_epoll_fd = epoll_create1(0);
 	g_display = XOpenDisplay(NULL);
 	g_x11_fd = XConnectionNumber(g_display);
-	init_glx();
+	init_glx(1, 4);
 
 	struct rlimit rl;
 	int rc = getrlimit(RLIMIT_NOFILE, &rl);

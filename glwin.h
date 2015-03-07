@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 #include <X11/Xlib.h>
-#include "glx_1_4.h"
+
+#define GLB_ENABLE_GLX_ARB_create_context
+#define GLB_ENABLE_GLX_ARB_create_context_profile
+#include "glb_glx.h"
 
 #include "list.h"
 
