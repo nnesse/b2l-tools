@@ -23,7 +23,7 @@ THE SOFTWARE.
 */
 
 #include "gltext.h"
-#include "gl_3_3.h"
+#include "glb_gl.h"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -69,7 +69,7 @@ int main(void)
 
 	glfwMakeContextCurrent(window);
 
-	init_gl();
+	init_gl(3, 3);
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	struct gltext_font fonts[1];

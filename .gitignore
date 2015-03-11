@@ -3,5 +3,5 @@
 *.swp
 *~
 examples/simple
-gl_?_?.?
+glb_gl.?
 *.o

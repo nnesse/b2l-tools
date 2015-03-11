@@ -21,18 +21,13 @@ OBJS = gltext.o
 # Generate OpenGL 3.3 bindings with glbindify
 #
 
-gl_3_3.c gl_3_3.h:
-	glbindify -l C -a gl -v 3.3 \
-		-e EXT_direct_state_access \
-		-e ARB_multi_bind \
-		-e ARB_vertex_attrib_binding \
-		-e ARB_buffer_storage \
-		-e ARB_texture_storage
+glb_gl.c glb_gl.h:
+	glbindify -a gl
 
-gl_3_3.o: gl_3_3.c gl_3_3.h
-OBJS += gl_3_3.o
+glb_gl.o: glb_gl.c glb_gl.h
+OBJS += glb_gl.o
 
-gltext_capi.o: gltext.c gltext.h
+gltext.o: gltext.c gltext.h glb_gl.h
 
 #
 # Build examples using implicit rules to build gltext and bindings
@@ -41,4 +36,4 @@ simple: simple.c $(OBJS) gltext.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $< $(OBJS) $(LIBS) -o $@
 
 clean:
-	@rm -f *.o gl_3_3.* simple
+	@rm -f *.o glb_gl.* simple

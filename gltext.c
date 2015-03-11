@@ -4,7 +4,8 @@
 
 #include "edtaa3func.c"
 
-#include "gl_3_3.h"
+#define GLB_GL_VERSION 33
+#include "glb_gl.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
