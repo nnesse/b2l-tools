@@ -5,7 +5,7 @@
 #include "edtaa3func.c"
 
 #define GLB_GL_VERSION 33
-#include "glb_gl.h"
+#include "glb-glcore.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -384,11 +384,11 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 		FT_Face typeface = (FT_Face) font_desc->typeface;
 		int width = font_desc->width;
 		int height = font_desc->height;
+		int max_char = 0;
 
 		if (!typeface)
 			return false;
 
-		int max_char = 0;
 		for (const char *c = font_desc->charset; *c; c++)
 			if (*c > max_char)
 				max_char = *c;
@@ -526,7 +526,6 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	//glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
 	inst->initialized = true;
 	return inst->initialized;
