@@ -16,11 +16,9 @@ struct glwin_callbacks {
 	void (*on_create)(struct glwin *win);
 	void (*on_resize)(struct glwin *win);
 	void (*on_redraw)(struct glwin *win);
-	void (*on_lbutton_down)(struct glwin *, int, int);
-	void (*on_lbutton_up)(struct glwin *, int, int);
-	void (*on_rbutton_down)(struct glwin *, int, int);
-	void (*on_rbutton_up)(struct glwin *, int, int);
-	void (*on_mouse_move)(struct glwin *, int, int, int, int);
+	void (*on_mouse_button_up)(struct glwin *, int, int, int);
+	void (*on_mouse_button_down)(struct glwin *, int, int, int);
+	void (*on_mouse_move)(struct glwin *, int, int);
 	void (*on_mouse_wheel)(struct glwin *, int, int, int);
 	void (*on_key_down)(struct glwin *, int);
 	void (*on_key_up)(struct glwin *, int);
@@ -36,7 +34,8 @@ struct glwin {
 	int win_width;
 	int win_height;
 	int socket_fd;
-	struct hlist_node node;	
+	struct hlist_node node;
+	int x_state_mask;
 };
 
 bool glwin_manager_init();
@@ -57,5 +56,9 @@ void glwin_manager_fd_unbind(int fd);
 GLXContext glwin_create_context(struct glwin *win, int maj_ver, int min_ver);
 void glwin_swap_buffers(struct glwin *win);
 void glwin_show_window(struct glwin *win);
+
+bool glwin_is_button_pressed(struct glwin *win, int button_no);
+
+bool glwin_is_modifier_pressed(struct glwin *win, int modifier_no);
 
 #endif

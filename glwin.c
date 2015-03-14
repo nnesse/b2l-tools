@@ -55,6 +55,51 @@ static void on_mouse_wheel(struct glwin *win, int x, int y, int a)
 		win->callbacks.on_mouse_wheel(win, x, y, a);
 }
 
+bool glwin_is_button_pressed(struct glwin *win, int button)
+{
+	switch (button)
+	{
+	case 1:
+		return win->x_state_mask & Button1Mask;
+		break;
+	case 2:
+		return win->x_state_mask & Button2Mask;
+		break;
+	case 3:
+		return win->x_state_mask & Button3Mask;
+		break;
+	}
+	return false;
+}
+
+bool glwin_is_modifier_pressed(struct glwin *win, int mod)
+{
+	switch (mod)
+	{
+	case 1:
+		return win->x_state_mask & Mod1Mask;
+		break;
+	case 2:
+		return win->x_state_mask & Mod2Mask;
+		break;
+	case 3:
+		return win->x_state_mask & Mod3Mask;
+		break;
+	case 4:
+		return win->x_state_mask & Mod4Mask;
+		break;
+	case 5:
+		return win->x_state_mask & Mod5Mask;
+		break;
+	}
+	return false;
+}
+
+bool glwin_is_shift_pressed(struct glwin *win)
+{
+	return win->x_state_mask & Mod1Mask;
+}
+
 static int handle_x_event(struct glwin *win, XEvent *event)
 {
 	switch (event->type) {
@@ -72,6 +117,7 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 		char buf[20];
 		XKeyEvent *key_event = (XKeyEvent *)event;
 		KeySym k;
+		win->x_state_mask = key_event->state;
 		XLookupString(key_event, buf, 20, &k, NULL);
 		if (win->callbacks.on_key_down)
 			win->callbacks.on_key_down(win, k);
@@ -80,41 +126,48 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 		char buf[20];
 		XKeyEvent *key_event = (XKeyEvent *)event;
 		KeySym k;
+		win->x_state_mask = key_event->state;
 		XLookupString(key_event, buf, 20, &k, NULL);
 		if (win->callbacks.on_key_up)
 			win->callbacks.on_key_up(win, k);
 	} break;
 	case ButtonPress: {
 		XButtonEvent *button_event = (XButtonEvent *)event;
+		win->x_state_mask = button_event->state;
 		switch (button_event->button) {
 		case 1:
-			if (win->callbacks.on_lbutton_down)
-				win->callbacks.on_lbutton_down(win, button_event->x, button_event->y);
-			break;
+		case 2:
 		case 3:
-			if (win->callbacks.on_rbutton_down)
-				win->callbacks.on_rbutton_down(win, button_event->x, button_event->y);
+			if (win->callbacks.on_mouse_button_down)
+				win->callbacks.on_mouse_button_down(win, button_event->button, button_event->x, button_event->y);
 			break;
 		case 4:
-			on_mouse_wheel(win, button_event->x, button_event->y, -120); //120 == WHEEL_DELTA on windows
+			on_mouse_wheel(win, button_event->x, button_event->y, -1);
 			break;
 		case 5:
-			on_mouse_wheel(win, button_event->x, button_event->y, 120);
+			on_mouse_wheel(win, button_event->x, button_event->y, 1);
 			break;
 		}
 	} break;
 	case ButtonRelease: {
 		XButtonEvent *button_event = (XButtonEvent *)event;
+		win->x_state_mask = button_event->state;
 		switch (button_event->button) {
 		case 1:
-			if (win->callbacks.on_rbutton_up)
-				win->callbacks.on_rbutton_up(win, button_event->x, button_event->y);
-			break;
+		case 2:
 		case 3:
-			if (win->callbacks.on_rbutton_up)
-				win->callbacks.on_rbutton_up(win, button_event->x, button_event->y);
+			if (win->callbacks.on_mouse_button_up)
+				win->callbacks.on_mouse_button_up(win, button_event->button, button_event->x, button_event->y);
 			break;
 		}
+	} break;
+	case MotionNotify: {
+		XMotionEvent *motion_event = (XMotionEvent *)event;
+		win->x_state_mask = motion_event->state;
+		if (win->callbacks.on_mouse_move)
+			win->callbacks.on_mouse_move(win,
+				motion_event->x,
+				motion_event->y);
 	} break;
 	case Expose: {
 		XExposeEvent *expose_event = (XExposeEvent *)event;
@@ -128,15 +181,6 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 		if (client_event->data.l[0] == g_delete_atom)
 			if (win->callbacks.on_destroy)
 				win->callbacks.on_destroy(win);
-	} break;
-	case MotionNotify: {
-		XMotionEvent *motion_event = (XMotionEvent *)event;
-		if (win->callbacks.on_mouse_move)
-			win->callbacks.on_mouse_move(win,
-				motion_event->x,
-				motion_event->y,
-				motion_event->state & Button1Mask,
-				motion_event->state & Button3Mask);
 	} break;
 	default:
 		break;
