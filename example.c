@@ -1,5 +1,5 @@
 #include "glwin.h"
-#include "glb_gl.h"
+#include "glb-glcore.h"
 
 void on_redraw(struct glwin *win)
 {
