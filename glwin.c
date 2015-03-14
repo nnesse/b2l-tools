@@ -15,28 +15,32 @@ static Display *g_display;
 static int g_screen;
 static Atom g_delete_atom;
 
-struct hlist_head g_win_lookup;
+struct glwin *g_win_list = NULL;
 int g_glwin_count = 0;
 struct glwin **g_fd_binding;
 
 static struct glwin *find_glwin(Window w)
 {
-	struct glwin *win;
-	hlist_for_each_entry(win, &g_win_lookup, node)
+	struct glwin *win = g_win_list;
+	while (win) {
 		if (win->window == w)
 			return win;
+		win = win->next;
+	}
 	return NULL;
 }
 
 static void retire_glwin(struct glwin *win)
 {
-	struct glwin *pos;
-	hlist_for_each_entry(pos, &g_win_lookup, node) {
+	struct glwin *pos = g_win_list;
+	while (win) {
 		if (pos == win) {
-			hlist_del(&pos->node);
+			*(pos->pprev) = pos->next;
+			pos->next->pprev = pos->pprev;
 			g_glwin_count--;
 			break;
 		}
+		pos = pos->next;
 	}
 }
 
@@ -46,7 +50,9 @@ static void register_glwin(struct glwin *win)
 	if (test)
 		return;
 	g_glwin_count++;
-	hlist_add_head(&win->node, &g_win_lookup);
+	win->next = g_win_list;
+	win->pprev = &g_win_list;
+	g_win_list = win;
 }
 
 static void on_mouse_wheel(struct glwin *win, int x, int y, int a)
@@ -105,10 +111,9 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 	switch (event->type) {
 	case ConfigureNotify: {
 		XConfigureEvent *configure_event = (XConfigureEvent *)event;
-		if (win->win_width != configure_event->width ||
-				win->win_height != configure_event->height) {
-			win->win_width = configure_event->width;
-			win->win_height = configure_event->height;
+		if (win->width != configure_event->width || win->height != configure_event->height) {
+			win->width = configure_event->width;
+			win->height = configure_event->height;
 			if (win->callbacks.on_resize)
 				win->callbacks.on_resize(win);
 		}
@@ -292,8 +297,8 @@ struct glwin *glwin_manager_create_window(const char *title, struct glwin_callba
 		     SubstructureNotifyMask);
 
 	struct glwin *win = (struct glwin *) malloc(sizeof(struct glwin));
-	win->win_width = width;
-	win->win_height = height;
+	win->width = width;
+	win->height = height;
 	win->fb_config = fb_config;
 	win->window = window;
 	win->glx_window = glx_window;

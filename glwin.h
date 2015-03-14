@@ -8,8 +8,6 @@
 #define GLB_ENABLE_GLX_ARB_create_context_profile
 #include "glb-glx.h"
 
-#include "list.h"
-
 struct glwin;
 
 struct glwin_callbacks {
@@ -31,10 +29,10 @@ struct glwin {
 	GLXFBConfig fb_config;
 	GLXWindow glx_window;
 	struct glwin_callbacks callbacks;
-	int win_width;
-	int win_height;
-	int socket_fd;
-	struct hlist_node node;
+	int width;
+	int height;
+	struct glwin *next;
+	struct glwin **pprev;
 	int x_state_mask;
 };
 

@@ -2,7 +2,7 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
-Name: glb-glcore
+Name: glwin
 Description: OpenGL window manager
 Version: @PACKAGE_VERSION@
 Requires: glb-glcore

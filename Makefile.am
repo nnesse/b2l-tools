@@ -6,7 +6,7 @@ libglwin_la_SOURCES = glwin.c glb-glx.c
 libglwin_la_LIBADD = $(GLB_GLCORE_LIBS)
 libglwin_la_CFLAGS = $(GLB_GLCORE_CFLAGS)
 
-bin_PROGRAMS = example
+noinst_PROGRAMS = example
 example_SOURCES = example.c
 example_LDADD = $(GLB_GLCORE_LIBS) libglwin.la
 example_CFLAGS = $(GLB_GLCORE_CFLAGS)
