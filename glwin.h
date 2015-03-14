@@ -6,7 +6,7 @@
 
 #define GLB_ENABLE_GLX_ARB_create_context
 #define GLB_ENABLE_GLX_ARB_create_context_profile
-#include "glb_glx.h"
+#include "glb-glx.h"
 
 #include "list.h"
 
