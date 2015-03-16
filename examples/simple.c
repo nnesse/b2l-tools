@@ -66,7 +66,6 @@ int main()
 	glwin_show_window(win);
 	GLXContext ctx = glwin_create_context(win, 3, 3);
 	glwin_manager_make_current(win, ctx);
-	init_gl(3, 3);
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	struct gltext_font_desc font_desc = {
