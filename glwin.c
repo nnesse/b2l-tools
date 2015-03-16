@@ -324,6 +324,12 @@ GLXContext glwin_create_context(struct glwin *win, int maj_ver, int min_ver)
 		0
 	};
 	GLXContext context = glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
+	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
+	bool success = glb_glcore_init(maj_ver, min_ver);
+	if (!success) {
+		glXDestroyContext(g_display, context);
+		context = 0;
+	}
 	return context;
 }
 
