@@ -1,6 +1,8 @@
 #include "glwin.h"
 #include "glb-glcore.h"
 
+#include <stdlib.h>
+
 void on_redraw(struct glwin *win)
 {
 	glClearColor(0,0,1,1);
@@ -21,10 +23,13 @@ int main()
 	};
 	glwin_manager_init();	
 	struct glwin *win = glwin_manager_create_window("Hello window", &cb, 512, 512);
+	if (!win)
+		exit(-1);
+
 	glwin_show_window(win);
-	GLXContext ctx = glwin_create_context(win, 4, 2);
-	glwin_manager_make_current(win, ctx);
-	init_gl(3, 2);
+	GLXContext ctx = glwin_create_context(win, 3, 3);
+	if (!ctx)
+		exit(-1);
 	while (glwin_manager_process_events()) {
 		glwin_manager_wait_events();
 	}
