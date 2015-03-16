@@ -8,8 +8,7 @@ libglwin_la_CFLAGS = $(GLB_GLCORE_CFLAGS)
 
 noinst_PROGRAMS = example
 example_SOURCES = example.c
-example_LDADD = $(GLB_GLCORE_LIBS) libglwin.la
-example_CFLAGS = $(GLB_GLCORE_CFLAGS)
+example_LDADD = libglwin.la
 
 BUILT_SOURCES = glb-glx.c glb-glx.h
 CLEANFILES = glb-glx.c glb-glx.h
