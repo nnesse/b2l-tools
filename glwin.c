@@ -190,6 +190,8 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 	default:
 		break;
 	}
+	if (win->callbacks.on_x_event)
+		win->callbacks.on_x_event(win);
 	return 0;
 }
 
@@ -199,7 +201,7 @@ bool glwin_manager_init()
 	g_epoll_fd = epoll_create1(0);
 	g_display = XOpenDisplay(NULL);
 	g_x11_fd = XConnectionNumber(g_display);
-	init_glx(1, 4);
+	glb_glx_init(1, 4);
 
 	struct rlimit rl;
 	int rc = getrlimit(RLIMIT_NOFILE, &rl);

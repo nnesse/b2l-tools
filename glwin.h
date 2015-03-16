@@ -22,6 +22,7 @@ struct glwin_callbacks {
 	void (*on_key_up)(struct glwin *, int);
 	void (*on_destroy)(struct glwin *);
 	void (*on_fd_event)(struct glwin *, int, uint32_t);
+	void (*on_x_event)();
 };
 
 struct glwin {
@@ -31,9 +32,10 @@ struct glwin {
 	struct glwin_callbacks callbacks;
 	int width;
 	int height;
+	XEvent current_event;
+	int x_state_mask;
 	struct glwin *next;
 	struct glwin **pprev;
-	int x_state_mask;
 };
 
 bool glwin_manager_init();
