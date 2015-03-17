@@ -367,11 +367,17 @@ void glwin_swap_buffers(struct glwin *win)
 	XSync(g_display, 0);
 }
 
-void glwin_manager_wait_events()
+int glwin_manager_wait_events()
 {
-	//TODO: check for errors
 	if (!g_event_count)
 		g_event_count = epoll_wait(g_epoll_fd, g_events, 100, -1);
+	if (g_event_count == -1) {
+		fprintf(stderr, "glwin_manager_wait_events() epoll_wait failed: %s", strerror(errno));
+		g_event_count = 0;
+		return -1;
+	} else {
+		return 0;
+	}
 }
 
 void glwin_manager_destroy_window(struct glwin *win)

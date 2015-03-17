@@ -48,7 +48,7 @@ struct glwin *glwin_manager_create_window(const char *title,
 
 void glwin_manager_make_current(struct glwin *win, GLXContext context);
 bool glwin_manager_process_events();
-void glwin_manager_wait_events();
+int glwin_manager_wait_events();
 void glwin_manager_destroy_window(struct glwin *win);
 void glwin_manager_fd_bind(int fd, struct glwin *win);
 void glwin_manager_fd_unbind(int fd);
