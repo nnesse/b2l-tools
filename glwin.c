@@ -6,6 +6,8 @@
 #include <sys/epoll.h>
 #include <sys/resource.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <errno.h>
 
 static int g_epoll_fd;
 static int g_x11_fd;
