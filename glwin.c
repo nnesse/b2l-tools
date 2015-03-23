@@ -38,7 +38,8 @@ static void retire_glwin(struct glwin *win)
 	while (win) {
 		if (pos == win) {
 			*(pos->pprev) = pos->next;
-			pos->next->pprev = pos->pprev;
+			if (pos->next)
+				pos->next->pprev = pos->pprev;
 			g_glwin_count--;
 			break;
 		}
