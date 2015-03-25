@@ -8,11 +8,9 @@ LT_INIT()
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE([foreign])
 
-PKG_CHECK_MODULES(GLB_GLCORE,glb-glcore >= 0.1)
-PKG_CHECK_MODULES(GLWIN,glwin >= 0.1)
 PKG_CHECK_MODULES(FREETYPE2,freetype2 >= 2.53)
 
 AC_PROG_CC
 
-AC_CONFIG_FILES(Makefile gltext.pc examples/Makefile)
+AC_CONFIG_FILES(Makefile examples/Makefile)
 AC_OUTPUT
