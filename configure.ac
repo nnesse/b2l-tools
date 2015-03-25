@@ -5,11 +5,11 @@ AC_CANONICAL_SYSTEM
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([foreign])
 
-PKG_CHECK_MODULES(GLB_GLCORE,[glb-glcore >= 0.1])
+AC_HAVE_LIBRARY('glb-glcore','glb_glcore_init')
 
 LT_INIT()
 
 AC_PROG_CC
 
-AC_CONFIG_FILES(Makefile glwin.pc)
+AC_CONFIG_FILES(Makefile)
 AC_OUTPUT
