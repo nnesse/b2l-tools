@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-static int g_epoll_fd;
+int glwin_epoll_fd;
 static int g_x11_fd;
 static int g_event_count;
 static struct epoll_event g_events[100];
@@ -201,7 +201,7 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 bool glwin_manager_init()
 {
 	g_event_count = 0;
-	g_epoll_fd = epoll_create1(0);
+	glwin_epoll_fd = epoll_create1(0);
 	g_display = XOpenDisplay(NULL);
 	g_x11_fd = XConnectionNumber(g_display);
 	glb_glx_init(1, 4);
@@ -215,7 +215,7 @@ bool glwin_manager_init()
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
 	ev.data.fd = g_x11_fd;
-	epoll_ctl(g_epoll_fd, EPOLL_CTL_ADD, g_x11_fd, &ev); //TODO: check for errors
+	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_ADD, g_x11_fd, &ev); //TODO: check for errors
 
 	g_screen = DefaultScreen(g_display);
 	g_delete_atom = XInternAtom(g_display, "WM_DELETE_WINDOW", True);
@@ -345,6 +345,13 @@ static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
 
 bool glwin_manager_process_events()
 {
+	if (!g_event_count)
+		g_event_count = epoll_wait(glwin_epoll_fd, g_events, 100, 0);
+	if (g_event_count == -1) {
+		fprintf(stderr, "glwin_manager_process_events() epoll_wait failed: %s", strerror(errno));
+		g_event_count = 0;
+	}
+
 	XEvent event;
 	int i;
 	for (i = 0; i < g_event_count; i++) {
@@ -373,7 +380,7 @@ void glwin_swap_buffers(struct glwin *win)
 int glwin_manager_wait_events()
 {
 	if (!g_event_count)
-		g_event_count = epoll_wait(g_epoll_fd, g_events, 100, -1);
+		g_event_count = epoll_wait(glwin_epoll_fd, g_events, 100, -1);
 	if (g_event_count == -1) {
 		fprintf(stderr, "glwin_manager_wait_events() epoll_wait failed: %s", strerror(errno));
 		g_event_count = 0;
@@ -397,13 +404,13 @@ void glwin_manager_fd_bind(int fd, struct glwin *win)
 	struct epoll_event ev;
 	ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
 	ev.data.fd = fd;
-	epoll_ctl(g_epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_ADD, fd, &ev);
 	g_fd_binding[fd] = win;
 }
 
 void glwin_manager_fd_unbind(int fd)
 {
-	epoll_ctl(g_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	g_fd_binding[fd] = NULL;
 }
 

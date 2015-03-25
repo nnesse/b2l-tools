@@ -61,4 +61,6 @@ bool glwin_is_button_pressed(struct glwin *win, int button_no);
 
 bool glwin_is_modifier_pressed(struct glwin *win, int modifier_no);
 
+extern int glwin_epoll_fd;
+
 #endif
