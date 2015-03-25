@@ -2,6 +2,7 @@
 #define GL_WIN_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <X11/Xlib.h>
 
 #define GLB_ENABLE_GLX_ARB_create_context
@@ -48,7 +49,7 @@ struct glwin *glwin_manager_create_window(const char *title,
 
 void glwin_manager_make_current(struct glwin *win, GLXContext context);
 bool glwin_manager_process_events();
-int glwin_manager_wait_events();
+int glwin_manager_get_events(bool block);
 void glwin_manager_destroy_window(struct glwin *win);
 void glwin_manager_fd_bind(int fd, struct glwin *win);
 void glwin_manager_fd_unbind(int fd);

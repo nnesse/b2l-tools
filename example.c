@@ -12,7 +12,7 @@ void on_redraw(struct glwin *win)
 
 void on_destroy(struct glwin *win)
 {
-	glwin_manager_destroy_window(win);	
+	glwin_manager_destroy_window(win);
 }
 
 int main()
@@ -21,7 +21,7 @@ int main()
 		.on_redraw = on_redraw,
 		.on_destroy = on_destroy
 	};
-	glwin_manager_init();	
+	glwin_manager_init();
 	struct glwin *win = glwin_manager_create_window("Hello window", &cb, 512, 512);
 	if (!win)
 		exit(-1);
@@ -31,6 +31,7 @@ int main()
 	if (!ctx)
 		exit(-1);
 	while (glwin_manager_process_events()) {
-		glwin_manager_wait_events();
+		if (glwin_manager_get_events(true) < 0)
+			break;
 	}
 }

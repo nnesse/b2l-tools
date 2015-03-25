@@ -343,15 +343,22 @@ static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
 	return True;
 }
 
+int glwin_manager_get_events(bool block)
+{
+	int rc = 0;
+	if (g_event_count < 100) {
+		rc = epoll_wait(glwin_epoll_fd, g_events + g_event_count, 100 - g_event_count, block ? -1 : 0);
+		if (rc == -1) {
+			fprintf(stderr, "glwin_manager_get_events(): epoll_wait() failed: %s", strerror(errno));
+		} else {
+			g_event_count += rc;
+		}
+	}
+	return rc;
+}
+
 bool glwin_manager_process_events()
 {
-	if (!g_event_count)
-		g_event_count = epoll_wait(glwin_epoll_fd, g_events, 100, 0);
-	if (g_event_count == -1) {
-		fprintf(stderr, "glwin_manager_process_events() epoll_wait failed: %s", strerror(errno));
-		g_event_count = 0;
-	}
-
 	XEvent event;
 	int i;
 	for (i = 0; i < g_event_count; i++) {
@@ -375,19 +382,6 @@ void glwin_swap_buffers(struct glwin *win)
 {
 	glXSwapBuffers(g_display, win->glx_window);
 	XSync(g_display, 0);
-}
-
-int glwin_manager_wait_events()
-{
-	if (!g_event_count)
-		g_event_count = epoll_wait(glwin_epoll_fd, g_events, 100, -1);
-	if (g_event_count == -1) {
-		fprintf(stderr, "glwin_manager_wait_events() epoll_wait failed: %s", strerror(errno));
-		g_event_count = 0;
-		return -1;
-	} else {
-		return 0;
-	}
 }
 
 void glwin_manager_destroy_window(struct glwin *win)
