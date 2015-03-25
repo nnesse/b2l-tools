@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "glwin.h"
 #include "gltext.h"
@@ -13,6 +14,7 @@ void on_redraw(struct glwin *win)
 	width = win->width;
 	height = win->height;
 	glViewport(0, 0, width, height);
+	glClearColor(0,0,0,1);
 	glClear(GL_COLOR_BUFFER_BIT);
 	float mvp[16] = {
 		2.0/width,0,0,0,
@@ -65,6 +67,10 @@ int main()
 	struct glwin *win = glwin_manager_create_window("Simple text test", &cb, 1024, 256);
 	glwin_show_window(win);
 	GLXContext ctx = glwin_create_context(win, 3, 3);
+	if (!ctx) {
+		fprintf(stderr, "Failed to create OpenGL context\n");
+		return 0;
+	}
 	glwin_manager_make_current(win, ctx);
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
@@ -75,6 +81,7 @@ int main()
 		.charset = charset
 	};
 	if (!gltext_renderer_initialize(g_renderer, &font_desc, 1, g_fonts)) {
+		fprintf(stderr, "Failed to initialize renderer\n");
 		exit(-1);
 	}
 
@@ -82,6 +89,6 @@ int main()
 	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	while (glwin_manager_process_events()) {
-		glwin_manager_wait_events();
+		glwin_manager_get_events(true);
 	}
 }
