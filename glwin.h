@@ -14,7 +14,7 @@ struct glwin;
 struct glwin_callbacks {
 	void (*on_create)(struct glwin *win);
 	void (*on_resize)(struct glwin *win);
-	void (*on_redraw)(struct glwin *win);
+	void (*on_expose)(struct glwin *win);
 	void (*on_mouse_button_up)(struct glwin *, int, int, int);
 	void (*on_mouse_button_down)(struct glwin *, int, int, int);
 	void (*on_mouse_move)(struct glwin *, int, int);

@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-void on_redraw(struct glwin *win)
+void on_expose(struct glwin *win)
 {
 	glClearColor(0,0,1,1);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -18,7 +18,7 @@ void on_destroy(struct glwin *win)
 int main()
 {
 	struct glwin_callbacks cb = {
-		.on_redraw = on_redraw,
+		.on_expose = on_expose,
 		.on_destroy = on_destroy
 	};
 	glwin_manager_init();

@@ -180,8 +180,8 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 	case Expose: {
 		XExposeEvent *expose_event = (XExposeEvent *)event;
 		if (expose_event->count == 0) {
-			if(win->callbacks.on_redraw)
-				win->callbacks.on_redraw(win);
+			if(win->callbacks.on_expose)
+				win->callbacks.on_expose(win);
 		}
 	} break;
 	case ClientMessage: {
