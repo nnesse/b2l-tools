@@ -1,14 +1,13 @@
 AM_CPPFLAGS = -I$(top_builddir)
-ACLOCAL_AMFLAGS=-I m4
 
 lib_LTLIBRARIES = libglwin.la
 libglwin_la_SOURCES = glwin.c glb-glx.c
-libglwin_la_LIBADD = -lglb-glcore -lX11 -lGL
+libglwin_la_LIBADD = -lX11 -lGL
 libglwin_la_CFLAGS =
 
 noinst_PROGRAMS = example
 example_SOURCES = example.c
-example_LDADD = libglwin.la
+example_LDADD = libglwin.la -lglb-glcore
 
 BUILT_SOURCES = glb-glx.c glb-glx.h
 CLEANFILES = glb-glx.c glb-glx.h

@@ -2,7 +2,6 @@ AC_PREREQ(2.59)
 AC_INIT(glwin, 0.1)
 
 AC_CANONICAL_SYSTEM
-AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([foreign])
 
 AC_HAVE_LIBRARY('glb-glcore','glb_glcore_init')
