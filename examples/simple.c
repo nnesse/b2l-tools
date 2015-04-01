@@ -72,6 +72,7 @@ int main()
 		return 0;
 	}
 	glwin_manager_make_current(win, ctx);
+	glb_glcore_init(3, 3);
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	struct gltext_font_desc font_desc = {
