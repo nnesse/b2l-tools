@@ -328,14 +328,7 @@ GLXContext glwin_create_context(struct glwin *win, int maj_ver, int min_ver)
 		GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
 		0
 	};
-	GLXContext context = glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
-	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
-	bool success = glb_glcore_init(maj_ver, min_ver);
-	if (!success) {
-		glXDestroyContext(g_display, context);
-		context = 0;
-	}
-	return context;
+	return glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
 }
 
 static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
