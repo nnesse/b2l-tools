@@ -8,7 +8,7 @@
 gltext_renderer_t g_renderer;
 struct gltext_font g_fonts[1];
 
-void on_redraw(struct glwin *win)
+void on_expose(struct glwin *win)
 {
 	int width, height;
 	width = win->width;
@@ -57,7 +57,7 @@ void on_destroy(struct glwin *win)
 int main()
 {
 	struct glwin_callbacks cb = {
-		.on_redraw = on_redraw,
+		.on_expose = on_expose,
 		.on_destroy = on_destroy
 	};
 
