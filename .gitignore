@@ -48,3 +48,5 @@ config.sub
 #libtool
 libtool
 ltmain.sh
+
+.libs
