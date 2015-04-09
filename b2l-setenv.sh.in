@@ -1,0 +1,8 @@
+#!/bin/sh
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+datarootdir=@datarootdir@
+export LUA_PATH=$datarootdir/b2l/lua/?.lua
+export LUA_CPATH=$datarootdir/b2l/lib/lua/?.so
+export PATH=$bindir:$PATH

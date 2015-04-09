@@ -1,0 +1,242 @@
+return {
+scene = {
+	frame_start = 1.000000,
+	frame_end= 250.000000,
+	frame_step = 1.000000,
+	objects = {
+		['Armature_chicken'] = {
+			type = 'ARMATURE',
+			data = 'Armature_chicken',
+			num_frames = 249,
+			nla_tracks = {
+				{
+					name = 'NlaTrack.003',
+					{
+						name = 'Walk',
+						frame_start = 33,
+						frame_end = 58,
+					},
+					{
+						name = 'Idle',
+						frame_start = 106,
+						frame_end = 169,
+					},
+				},
+				{
+					name = 'NlaTrack',
+					{
+						name = 'Paw',
+						frame_start = 16,
+						frame_end = 31,
+					},
+				},
+				{
+					name = 'NlaTrack.004',
+					{
+						name = 'Pick',
+						frame_start = 1,
+						frame_end = 15,
+					},
+				},
+				{
+					name = 'NlaTrack.001',
+					{
+						name = 'Die',
+						frame_start = 59,
+						frame_end = 82,
+					},
+					{
+						name = 'Sleep',
+						frame_start = 82,
+						frame_end = 106,
+					},
+				},
+			},
+			object_transform_array_offset = 0,
+		},
+		['Chicken'] = {
+			parent = 'Armature_chicken',
+			parent_type = 'OBJECT',
+			type = 'MESH',
+			data = 'Chicken',
+			vertex_groups = {
+				'Wishbone',
+				'NeckBone',
+				'Head',
+				'TailFeather_L',
+				'Breast_L',
+				'Leg_L',
+				'Drum_L',
+				'Foot_L',
+				'RightBreast',
+				'RightLeg',
+				'LeftDRum',
+				'RightFoot',
+				'Shoulder_L',
+				'Wing_L',
+				'RightShould',
+				'RightWing',
+				'Foot_R',
+				'Drum_R',
+				'Leg_R',
+				'Wing_R',
+				'TailFeather_R',
+				'Shoulder_R',
+				'Breast_R',
+				'LegIK_L',
+				'LegIK_R',
+			},
+			armature_deform = 'Armature_chicken',
+			num_frames = 249,
+			object_transform_array_offset = 16000,
+			vertex_group_transform_array_offset = 32000,
+		},
+		['Lamp.001'] = {
+			type = 'LAMP',
+			data = 'Spot.005',
+			num_frames = 249,
+			object_transform_array_offset = 432000,
+		},
+		['Lamp'] = {
+			type = 'LAMP',
+			data = 'Spot.004',
+			num_frames = 249,
+			object_transform_array_offset = 448000,
+		},
+		['Point'] = {
+			type = 'LAMP',
+			data = 'Point.005',
+			num_frames = 249,
+			object_transform_array_offset = 464000,
+		},
+		['Camera.001'] = {
+			type = 'CAMERA',
+			data = 'Camera.002',
+			num_frames = 249,
+			object_transform_array_offset = 480000,
+		},
+		['Camera'] = {
+			type = 'CAMERA',
+			data = 'Camera.001',
+			num_frames = 249,
+			object_transform_array_offset = 496000,
+		},
+	}
+},
+meshes={
+	['Chicken'] = {
+		num_triangles = 430,
+		num_verticies = 307,
+		uv_layers = {'UVMap2',},
+		weights_per_vertex = 11,
+		submeshes = {
+			{
+				material_name = 'Chicken',
+				triangle_no = 0,
+				triangle_count = 430,
+			},
+		},
+		index_array_offset = 512000,
+		vertex_co_array_offset = 514580,
+		vertex_normal_array_offset = 518264,
+		uv_array_offset = 521948,
+		weights_array_offset = 524404,
+	},
+},
+armatures={
+	['Armature_chicken'] = {
+		{
+			name = 'Root',
+		},
+		{
+			name = 'Hip',
+			parent='Root',
+		},
+		{
+			name = 'TailFeather_L',
+			parent='Hip',
+		},
+		{
+			name = 'Breast_L',
+			parent='Hip',
+		},
+		{
+			name = 'Leg_L',
+			parent='Breast_L',
+		},
+		{
+			name = 'Drum_L',
+			parent='Leg_L',
+		},
+		{
+			name = 'Foot_L',
+			parent='Drum_L',
+		},
+		{
+			name = 'Shoulder_L',
+			parent='Hip',
+		},
+		{
+			name = 'Wing_L',
+			parent='Shoulder_L',
+		},
+		{
+			name = 'Breast_R',
+			parent='Hip',
+		},
+		{
+			name = 'Leg_R',
+			parent='Breast_R',
+		},
+		{
+			name = 'Drum_R',
+			parent='Leg_R',
+		},
+		{
+			name = 'Foot_R',
+			parent='Drum_R',
+		},
+		{
+			name = 'Shoulder_R',
+			parent='Hip',
+		},
+		{
+			name = 'Wing_R',
+			parent='Shoulder_R',
+		},
+		{
+			name = 'TailFeather_R',
+			parent='Hip',
+		},
+		{
+			name = 'Feet',
+			parent='Root',
+		},
+		{
+			name = 'LegIK_L',
+			parent='Feet',
+		},
+		{
+			name = 'LegIK_R',
+			parent='Feet',
+		},
+		{
+			name = 'Wishbone',
+			parent='Root',
+		},
+		{
+			name = 'NeckBone',
+			parent='Wishbone',
+		},
+		{
+			name = 'Head',
+			parent='NeckBone',
+		},
+		tail_array_offset = 537912,
+		transform_array_offset = 538176,
+	}
+},
+materials={
+	'Chicken',
+},
+}
