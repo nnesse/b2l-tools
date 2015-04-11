@@ -332,8 +332,8 @@ local vbox_main = Gtk.VBox {
 		Gtk.HBox {
 			vs_chooser,
 			{
-				Gtk.ToolButton {
-					icon_name = "window-new",
+				Gtk.Button {
+					label = "Edit",
 					on_clicked = function()
 						GLib.spawn_async(nil,
 							{ editor, vs_chooser:get_filename() },
@@ -362,8 +362,8 @@ local vbox_main = Gtk.VBox {
 		Gtk.HBox {
 			fs_chooser,
 			{
-				Gtk.ToolButton {
-					icon_name = "window-new",
+				Gtk.Button {
+					label = "Edit",
 					on_clicked = function()
 						GLib.spawn_async(nil,
 							{ editor, fs_chooser:get_filename() },
