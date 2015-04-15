@@ -4,6 +4,7 @@ local Gtk = lgi.require('Gtk')
 local Gdk = lgi.require('Gdk')
 local GLib = lgi.require('GLib')
 local GdkPixbuf = lgi.require('GdkPixbuf')
+local pprint = require 'pprint'
 
 scene = false
 
@@ -71,18 +72,36 @@ function update_shaders()
 	end
 	for k, v in pairs(controls) do
 		if not uniforms[k] then
-			if controls[k].datatype == "sampler2D" then
+			if controls[k].datatype == "sampler2D" and controls[k].texunit then
 				texture_units[controls[k].texunit] = false
 			end
-			controls[k] = nil
 		end
-		vbox_settings:remove(v.widget)
+		if (v.widget) then
+			vbox_settings:remove(v.widget)
+		end
+		if not uniforms[k] then
+			controls[k].widget = nil
+		end
 	end
 	for i, k in ipairs(uniforms) do
 		local v = uniforms[k]
+		local value = false
+		if not controls[k] then
+			controls[k] = {}
+		end
+		if controls[k].datatype == v then
+			if controls[k].mat_value ~= nil then
+				value = controls[k].mat_value
+				controls[k].mat_value = nil
+			else
+				value = controls[k].value
+			end
+		end
 		if v == "float" then
-			if not controls[k] then
-				controls[k] = { value = 0.5 }
+			if controls[k].value == nil then
+				value = 0.5
+			end
+			if not controls[k].widget then
 				local widget = Gtk.Expander {
 					label = k,
 					expanded = true,
@@ -91,7 +110,6 @@ function update_shaders()
 						adjustment = Gtk.Adjustment {
 							lower = 0,
 							upper = 1,
-							value = controls[k].value
 						},
 						on_value_changed = function(self)
 							controls[k].value = self:get_value()
@@ -100,18 +118,19 @@ function update_shaders()
 					}
 				}
 				controls[k].widget = widget
-				widget:get_child():set_value(controls[k].value)
 			end
+			controls[k].widget:get_child():set_value(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "vec3" then
-			if not controls[k] then
-				local init_color = Gdk.RGBA {red = 1, green = 1, blue = 1, alpha = 1}
-				controls[k] = { value = {init_color.red, init_color.green, init_color.blue} }
+			if controls[k].value == nil then
+				value = {1, 1, 1}
+			end
+			if not controls[k].widget then
+				controls[k] = {}
 				local widget = Gtk.Expander {
 					label = k,
 					expanded = true,
 					Gtk.ColorButton {
-						rgba = init_color,
 						use_alpha = false,
 						on_notify = function(self)
 							controls[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
@@ -121,12 +140,15 @@ function update_shaders()
 				}
 				controls[k].widget = widget
 			end
+			controls[k].widget:get_child():set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "bool" then
-			if not controls[k] then
-				controls[k] = { value = false }
-				widget = Gtk.CheckButton {
-					active = controls[k].value,
+			if controls[k].value == nil then
+				value = false
+			end
+			if not controls[k].widget then
+				controls[k] = {}
+				local widget = Gtk.CheckButton {
 					label = k,
 					on_notify = function(self)
 						controls[k].value = self.active
@@ -134,17 +156,20 @@ function update_shaders()
 					end
 				}
 				controls[k].widget = widget
-				widget:set_active(controls[k].value)
 			end
+			controls[k].widget:set_active(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "sampler2D" then
-			if not controls[k] then
+			if controls[k].value == nil then
+				value = nil
+			end
+			if not controls[k].widget then
 				local t = 1;
 				while texture_units[t] == true do
 					t = t + 1
 				end
 				texture_units[t] = true
-				controls[k] = { value = nil, texunit = t }
+				controls[k] = { texunit= t }
 				local widget = Gtk.Expander {
 					label = k,
 					expanded = true,
@@ -153,30 +178,35 @@ function update_shaders()
 						action = "OPEN",
 						on_selection_changed = function(chooser)
 							local filename = chooser:get_filename()
-							local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
-							if pbuf then
-								controls[k].value = pbuf
-								controls[k].needs_upload = true
-								queue_render()
-							else
-								local dialog = Gtk.MessageDialog {
-									parent = window,
-									message_type = 'ERROR', buttons = 'CLOSE',
-									text = ("Failed to open image file: %s"):format(err),
-									on_response = Gtk.Widget.destroy
-								}
-								dialog:show_all()
+							if filename then
+								local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
+								if pbuf then
+									controls[k].value = filename
+									controls[k].pbuf = pbuf
+									controls[k].needs_upload = true
+									queue_render()
+								else
+									local dialog = Gtk.MessageDialog {
+										parent = window,
+										message_type = 'ERROR', buttons = 'CLOSE',
+										text = ("Failed to open image file: %s"):format(err),
+										on_response = Gtk.Widget.destroy
+									}
+									dialog:show_all()
+								end
 							end
 						end,
 					}
 				}
 				controls[k].widget = widget
 			end
+			if value ~= nil then
+				controls[k].widget:get_child():set_filename(value)
+			end
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		end
-		if controls[k] then
-			controls[k].datatype = v
-		end
+		controls[k].value = value
+		controls[k].datatype = v
 	end
 	vbox_settings:show_all()
 	queue_render()
@@ -198,9 +228,29 @@ function load_b2l_file(filename)
 	local lua_name = filename
 	if lua_name then
 		local bin_name = lua_name .. ".bin"
+		local mat_name = lua_name .. ".mat"
 		scene = (loadfile(lua_name))()
 		b2l_gl.parse_scene(scene, bin_name)
-		update_shaders()
+		local material_fn = loadfile(mat_name)
+		if material_fn then
+			local material = material_fn()
+			if material then
+				for k, v in pairs(controls) do
+					v.mat_value = nil
+				end
+				for k, v in pairs(material.params) do
+					if k ~= 'vs_filename' and k ~= 'fs_filename' then
+						if controls[k] and controls[k].datatype == v.datatype then
+							controls[k].mat_value = v.value
+						else
+							controls[k] = { ['mat_value'] = v.value, ['datatype'] = v.datatype }
+						end
+					end
+				end
+				vs_chooser:set_filename(material.shaders['vs_filename'])
+				fs_chooser:set_filename(material.shaders['fs_filename'])
+			end
+		end
 	end
 end
 
@@ -214,8 +264,7 @@ b2l_file_button = Gtk.FileChooserButton {
 	end,
 }
 
-function reload_fs()
-	local filename = fs_chooser:get_filename()
+function reload_fs(filename)
 	if filename then
 		local fs_text_next, err = GLib.file_get_contents(filename)
 		if fs_text_next then
@@ -229,13 +278,12 @@ fs_chooser = Gtk.FileChooserButton {
 		action = "OPEN",
 		filter = frag_glsl_filter,
 		on_selection_changed = function(chooser)
-			reload_fs()
+			reload_fs(chooser:get_filename())
 			update_shaders()
 		end,
 	}
 
-function reload_vs()
-	local filename = vs_chooser:get_filename()
+function reload_vs(filename)
 	if filename then
 		local vs_text_next, err = GLib.file_get_contents(filename)
 		if vs_text_next then
@@ -249,10 +297,30 @@ vs_chooser = Gtk.FileChooserButton {
 	action = "OPEN",
 	filter = vert_glsl_filter,
 	on_selection_changed = function(chooser)
-		reload_vs()
+		reload_vs(chooser:get_filename())
 		update_shaders()
 	end,
 }
+
+function open_b2l_chooser_dialog()
+	local chooser = Gtk.FileChooserDialog {
+		title = "Open B2l file",
+		parent = window,
+		action = 'OPEN',
+		on_response = function(self, id, data)
+			self:hide()
+		end,
+	}
+	chooser:add_button('Cancel', Gtk.ResponseType.CANCEL)
+	chooser:add_button('Open', Gtk.ResponseType.ACCEPT)
+	chooser:add_filter(b2l_filter)
+	local res = chooser:run()
+	if res == Gtk.ResponseType.ACCEPT then
+		local filename = chooser:get_filename()
+		load_b2l_file(filename)
+		b2l_file_button:set_filename(filename)
+	end
+end
 
 -- Pack everything into the window.
 local vbox_main = Gtk.VBox {
@@ -264,23 +332,7 @@ local vbox_main = Gtk.VBox {
 					Gtk.MenuItem {
 						label = "Open",
 						on_activate = function()
-							local chooser = Gtk.FileChooserDialog {
-								title = "Open Brt file",
-								parent = window,
-								action = 'OPEN',
-								on_response = function(self, id, data)
-									self:hide()
-								end,
-							}
-							chooser:add_button('Open', Gtk.ResponseType.ACCEPT)
-							chooser:add_button('Cancel', Gtk.ResponseType.CANCEL)
-							chooser:add_filter(b2l_filter)
-							local res = chooser:run()
-							if res == Gtk.ResponseType.ACCEPT then
-								local filename = chooser:get_filename()
-								load_b2l_file(filename)
-								b2l_file_button:set_filename(filename)
-							end
+							open_b2l_chooser_dialog()
 						end,
 					},
 					Gtk.MenuItem {
@@ -298,10 +350,43 @@ local vbox_main = Gtk.VBox {
 	{
 		Gtk.Toolbar {
 			Gtk.ToolButton {
+				icon_name = "document-open",
+				on_clicked = function()
+					open_b2l_chooser_dialog()
+				end,
+			},
+			Gtk.ToolButton {
+				icon_name = "document-save",
+				on_clicked = function()
+					local params = {}
+					local shaders = {}
+					local material = {
+						['shaders'] = shaders,
+						['params'] = params
+					}
+					shaders['vs_filename'] = vs_chooser:get_filename()
+					shaders['fs_filename'] = fs_chooser:get_filename()
+					str = "return "
+					local printer = function(s)
+						str = str .. s
+					end
+					for k,v in pairs(controls) do
+						if v.widget then
+							params[k] = {
+								datatype = v.datatype,
+								value = v.value
+							}
+						end
+					end
+					pprint.pformat(material, {}, printer)
+					GLib.file_set_contents(b2l_file_button:get_filename() .. ".mat", str)
+				end,
+			},
+			Gtk.ToolButton {
 				icon_name = "view-refresh",
 				on_clicked = function()
-					reload_fs()
-					reload_vs()
+					reload_fs(fs_chooser:get_filename())
+					reload_vs(vs_chooser:get_filename())
 					update_shaders()
 				end,
 			},

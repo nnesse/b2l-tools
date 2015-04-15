@@ -806,9 +806,10 @@ static void redraw(struct glwin *win)
 				texunit = lua_tointeger(L, -1) - 1;
 				lua_pop(L, 1);
 
-				lua_getfield(L, value, "_native");
+				lua_getfield(L, variable, "pbuf");
+				lua_getfield(L, -1, "_native");
 				pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
-				lua_pop(L, 1);
+				lua_pop(L, 2);
 				glActiveTexture(GL_TEXTURE0 + texunit);
 				glBindTexture(GL_TEXTURE_2D, g_texture_names[texunit]);
 				int width = gdk_pixbuf_get_width(pbuf);
