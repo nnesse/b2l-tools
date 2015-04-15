@@ -3,7 +3,8 @@ export prefix=@prefix@
 export exec_prefix=@exec_prefix@
 export includedir=@includedir@
 export datadir=@datarootdir@/b2l
-export datalibdir=@datarootdir@/b2l/lib
+export dataluadir=${datadir}/lua
+export datalibluadir=${datadir}/lib/lua
 export bindir=@bindir@
 export libdir=@libdir@
 VPATH=$(srcdir)
@@ -36,7 +37,9 @@ clean:
 
 install: b2l_material_editor.so b2l-material-editor.sh $(srcdir)/b2l_material_editor.lua
 	$(INSTALL) -d $(datadir)
-	$(INSTALL) -d $(datalibdir)
-	$(INSTALL_PROGRAM) b2l_material_editor.so $(datalibdir)/lua
+	$(INSTALL) -d $(dataluadir)
+	$(INSTALL) -d $(datalibluadir)
+	$(INSTALL_PROGRAM) b2l_material_editor.so $(datalibluadir)
 	$(INSTALL_DATA) $(srcdir)/b2l_material_editor.lua $(datadir)
+	$(INSTALL_DATA) $(srcdir)/pprint.lua $(dataluadir)
 	$(INSTALL_PROGRAM) b2l-material-editor.sh $(bindir)
