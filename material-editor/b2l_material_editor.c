@@ -22,6 +22,17 @@
 
 #define MAX_TEXTURE_UNITS 8
 
+static int parse_scene(lua_State *L);
+static int need_redraw(lua_State *L);
+static int set_shaders(lua_State *L);
+
+luaL_Reg lua_b2l_material_editor[] = {
+	{ "parse_scene", parse_scene },
+	{ "need_redraw", need_redraw},
+	{ "set_shaders", set_shaders },
+	{ NULL, NULL }
+};
+
 static GLuint g_texture_names[MAX_TEXTURE_UNITS];
 
 static struct mesh *g_mesh;
@@ -271,7 +282,7 @@ static void on_mouse_move(struct glwin *win, int x, int y)
 
 static void on_expose(struct glwin *win)
 {
-	g_need_redraw = true;
+	need_redraw(g_L);
 }
 
 static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
@@ -280,7 +291,7 @@ static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
 
 static void on_resize(struct glwin *win)
 {
-	g_need_redraw = true;
+	need_redraw(g_L);
 }
 
 static void on_destroy(struct glwin *win)
@@ -418,27 +429,14 @@ void add_mesh(struct mesh *ent)
 	mesh_hash[h] = ent;
 }
 
-static int parse_scene(lua_State *L);
-static int need_redraw(lua_State *L);
-static int set_shaders(lua_State *L);
-
 static bool recompile_shaders(struct scene *s);
 static void init_scene(struct scene *s);
-
-luaL_Reg lua_b2l_material_editor[] = {
-	{ "parse_scene", parse_scene },
-	{ "need_redraw", need_redraw},
-	{ "set_shaders", set_shaders },
-	{ NULL, NULL }
-};
 
 static int event_process()
 {
 	glwin_manager_get_events(false);
 	bool ret = glwin_manager_process_events();
-	//if (ret && g_need_redraw) {
-		redraw(g_win);
-	//}
+	redraw(g_win);
 	return ret;
 }
 
@@ -736,7 +734,8 @@ static void redraw(struct glwin *win)
 		gl_init_result = glb_glcore_init(3, 3);
 	}
 	if (!gl_init_result) {
-		printf("init failed\n");
+		printf("Failed to initialize OpenGL bindings\n");
+		exit(-1);
 		return;
 	}
 
@@ -756,7 +755,7 @@ static void redraw(struct glwin *win)
 	}
 
 	if (!s || !s->initialized || !s->program_valid)
-		return;
+		goto end;
 
 	if (m->vao == 0) {
 		glGenVertexArrays(1, &m->vao);
@@ -871,12 +870,12 @@ static void redraw(struct glwin *win)
 	}
 
 	glDrawElements(GL_TRIANGLES, 3 * m->num_triangles, GL_UNSIGNED_SHORT, (void *)((int64_t)m->index_array_offset));
+end:
 	{
 		GLenum err = glGetError();
 		if (err)
 			printf("render_scene GL error = %d\n", err);
 	}
-end:
 	glwin_swap_buffers(g_win);
 	glXMakeContextCurrent(display, write_draw, read_draw, prev_ctx);
 	g_need_redraw = false;
