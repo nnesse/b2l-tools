@@ -3,7 +3,11 @@ AC_INIT([b2l-material-editor],[0.1])
 
 AC_CHECK_PROG(BISON,bison,bison)
 
-AS_IF([test x$BISON! = xbison],AC_MSG_ERROR([Could not find bison]))
+AS_IF([test x$BISON != xbison],AC_MSG_ERROR([Could not find bison]))
+
+AC_CHECK_PROG(FLEX,flex,flex)
+
+AS_IF([test x$FLEX != xflex],AC_MSG_ERROR([Could not find flex]))
 
 AC_MSG_CHECKING([if bison is new enough])
 dir=`mktemp -d`

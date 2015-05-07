@@ -17,6 +17,9 @@ CFLAGS+= @CFLAGS@ @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@
 LDFLAGS:= -lglwin -lglb-glcore -lGL
 LDFLAGS+= @LDFLAGS@ @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@
 
+FLEX = @FLEX@
+BISON = @BISON@
+
 INSTALL?=install
 INSTALL_PROGRAM?=$(INSTALL)
 INSTALL_DATA?=$(INSTALL) -m 644
@@ -24,10 +27,10 @@ INSTALL_DATA?=$(INSTALL) -m 644
 all: b2l_material_editor.so
 
 glsl.yy.c: glsl.lex
-	flex -o $@ $<
+	$(FLEX) -o $@ $<
 
 glsl.tab.c glsl.tab.h: glsl.y
-	bison $<
+	$(BISON) $<
 
 b2l_material_editor.so: b2l_material_editor.c glsl.yy.c glsl.tab.c glsl_common.h
 	$(CC) $(CFLAGS) glsl.tab.c $< $(LDFLAGS) -o $@
