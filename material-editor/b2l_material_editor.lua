@@ -273,13 +273,33 @@ function reload_fs(filename)
 	end
 end
 
+fs_edit_button = Gtk.Button {
+		label = "Edit",
+		sensitive = false,
+		on_clicked = function()
+			GLib.spawn_async(nil,
+				{ editor, fs_chooser:get_filename() },
+				nil,
+				GLib.SpawnFlags {
+					'SEARCH_PATH'
+				},
+				nil)
+			end,
+		}
+
 fs_chooser = Gtk.FileChooserButton {
 		title = "Fragment shader",
 		action = "OPEN",
 		filter = frag_glsl_filter,
 		on_selection_changed = function(chooser)
-			reload_fs(chooser:get_filename())
+			local filename = chooser:get_filename()
+			reload_fs(filename)
 			update_shaders()
+			if filename then
+				fs_edit_button.sensitive = true
+			else
+				fs_edit_button.sensitive = false
+			end
 		end,
 	}
 
@@ -292,13 +312,35 @@ function reload_vs(filename)
 	end
 end
 
+
+vs_edit_button = Gtk.Button {
+	label = "Edit",
+	sensitive = false,
+	on_clicked = function()
+		GLib.spawn_async(nil,
+			{ editor, vs_chooser:get_filename() },
+			nil,
+			GLib.SpawnFlags {
+				'SEARCH_PATH'
+			},
+			nil)
+	end,
+}
+
+
 vs_chooser = Gtk.FileChooserButton {
 	title = "Vertex shader",
 	action = "OPEN",
 	filter = vert_glsl_filter,
 	on_selection_changed = function(chooser)
-		reload_vs(chooser:get_filename())
+		local filename = chooser:get_filename()
+		reload_vs(filename)
 		update_shaders()
+		if filename then
+			vs_edit_button.sensitive = true
+		else
+			vs_edit_button.sensitive = false
+		end
 	end,
 }
 
@@ -417,18 +459,7 @@ local vbox_main = Gtk.VBox {
 		Gtk.HBox {
 			vs_chooser,
 			{
-				Gtk.Button {
-					label = "Edit",
-					on_clicked = function()
-						GLib.spawn_async(nil,
-							{ editor, vs_chooser:get_filename() },
-							nil,
-							GLib.SpawnFlags {
-								'SEARCH_PATH'
-							},
-							nil)
-					end,
-				},
+				vs_edit_button,
 				expand = false,
 				fill = false
 			},
@@ -447,18 +478,7 @@ local vbox_main = Gtk.VBox {
 		Gtk.HBox {
 			fs_chooser,
 			{
-				Gtk.Button {
-					label = "Edit",
-					on_clicked = function()
-						GLib.spawn_async(nil,
-							{ editor, fs_chooser:get_filename() },
-							nil,
-							GLib.SpawnFlags {
-								'SEARCH_PATH'
-							},
-							nil)
-					end,
-				},
+				fs_edit_button,
 				expand = false,
 				fill = false
 			},
