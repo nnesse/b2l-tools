@@ -331,6 +331,7 @@ fs_chooser = Gtk.FileChooserButton {
 			else
 				fs_edit_button.sensitive = false
 			end
+			fs_filename = filename
 		end,
 	}
 
