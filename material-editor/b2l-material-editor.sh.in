@@ -3,4 +3,4 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 bindir=@bindir@
 . ${bindir}/b2l-setenv.sh
-lua ${datarootdir}/b2l/b2l_material_editor.lua
+lua ${datarootdir}/b2l_material_editor.lua
