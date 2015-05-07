@@ -55,6 +55,10 @@ function queue_render()
 	b2l_gl:need_redraw()
 end
 
+function setting_changed()
+	save_toolbutton.sensitive = true
+end
+
 function update_shaders()
 	if not scene then
 		return
@@ -112,6 +116,9 @@ function update_shaders()
 							upper = 1,
 						},
 						on_value_changed = function(self)
+							if controls[k].value ~= self:get_value() then
+								setting_changed()
+							end
 							controls[k].value = self:get_value()
 							queue_render()
 						end
@@ -119,6 +126,7 @@ function update_shaders()
 				}
 				controls[k].widget = widget
 			end
+			controls[k].value = value
 			controls[k].widget:get_child():set_value(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "vec3" then
@@ -132,7 +140,14 @@ function update_shaders()
 					expanded = true,
 					Gtk.ColorButton {
 						use_alpha = false,
-						on_notify = function(self)
+						on_color_set = function(self)
+							save_toolbutton.sensitive = true
+							local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
+							if value[1] ~= controls[k].value[1] or
+								value[2] ~= controls[k].value[2] or
+								value[3] ~= controls[k].value[3] then
+								setting_changed()
+							end
 							controls[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
 							queue_render()
 						end
@@ -140,6 +155,7 @@ function update_shaders()
 				}
 				controls[k].widget = widget
 			end
+			controls[k].value = value
 			controls[k].widget:get_child():set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "bool" then
@@ -150,13 +166,17 @@ function update_shaders()
 				controls[k] = {}
 				local widget = Gtk.CheckButton {
 					label = k,
-					on_notify = function(self)
+					on_toggled = function(self)
+						if controls[k].value ~= self.active then
+							setting_changed()
+						end
 						controls[k].value = self.active
 						queue_render()
 					end
 				}
 				controls[k].widget = widget
 			end
+			controls[k].value = value
 			controls[k].widget:set_active(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "sampler2D" then
@@ -177,7 +197,11 @@ function update_shaders()
 						title = k,
 						action = "OPEN",
 						on_selection_changed = function(chooser)
+							save_toolbutton.sensitive = true
 							local filename = chooser:get_filename()
+							if controls[k].value ~= filename then
+								setting_changed()
+							end
 							if filename then
 								local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
 								if pbuf then
@@ -201,6 +225,7 @@ function update_shaders()
 				controls[k].widget = widget
 			end
 			if value ~= nil then
+				controls[k].value = value
 				controls[k].widget:get_child():set_filename(value)
 			end
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
@@ -252,6 +277,8 @@ function load_b2l_file(filename)
 			end
 		end
 	end
+	Gtk.main_iteration()
+	save_toolbutton.sensitive = false
 end
 
 b2l_file_button = Gtk.FileChooserButton {
@@ -287,12 +314,16 @@ fs_edit_button = Gtk.Button {
 			end,
 		}
 
+fs_filename = nil
 fs_chooser = Gtk.FileChooserButton {
 		title = "Fragment shader",
 		action = "OPEN",
 		filter = frag_glsl_filter,
 		on_selection_changed = function(chooser)
 			local filename = chooser:get_filename()
+			if fs_filename ~= filename then
+				setting_changed()
+			end
 			reload_fs(filename)
 			update_shaders()
 			if filename then
@@ -327,13 +358,16 @@ vs_edit_button = Gtk.Button {
 	end,
 }
 
-
+vs_filename = nil
 vs_chooser = Gtk.FileChooserButton {
 	title = "Vertex shader",
 	action = "OPEN",
 	filter = vert_glsl_filter,
 	on_selection_changed = function(chooser)
 		local filename = chooser:get_filename()
+		if vs_filename ~= filename then
+			setting_changed()
+		end
 		reload_vs(filename)
 		update_shaders()
 		if filename then
@@ -341,6 +375,7 @@ vs_chooser = Gtk.FileChooserButton {
 		else
 			vs_edit_button.sensitive = false
 		end
+		vs_filename = filename
 	end,
 }
 
@@ -363,6 +398,36 @@ function open_b2l_chooser_dialog()
 		b2l_file_button:set_filename(filename)
 	end
 end
+
+save_toolbutton = Gtk.ToolButton {
+	icon_name = "document-save",
+	sensitive = false,
+	on_clicked = function(button)
+		local params = {}
+		local shaders = {}
+		local material = {
+			['shaders'] = shaders,
+			['params'] = params
+		}
+		shaders['vs_filename'] = vs_chooser:get_filename()
+		shaders['fs_filename'] = fs_chooser:get_filename()
+		str = "return "
+		local printer = function(s)
+			str = str .. s
+		end
+		for k,v in pairs(controls) do
+			if v.widget then
+				params[k] = {
+					datatype = v.datatype,
+					value = v.value
+				}
+			end
+		end
+		pprint.pformat(material, {}, printer)
+		GLib.file_set_contents(b2l_file_button:get_filename() .. ".mat", str)
+		button.sensitive = false
+	end,
+}
 
 -- Pack everything into the window.
 local vbox_main = Gtk.VBox {
@@ -397,33 +462,7 @@ local vbox_main = Gtk.VBox {
 					open_b2l_chooser_dialog()
 				end,
 			},
-			Gtk.ToolButton {
-				icon_name = "document-save",
-				on_clicked = function()
-					local params = {}
-					local shaders = {}
-					local material = {
-						['shaders'] = shaders,
-						['params'] = params
-					}
-					shaders['vs_filename'] = vs_chooser:get_filename()
-					shaders['fs_filename'] = fs_chooser:get_filename()
-					str = "return "
-					local printer = function(s)
-						str = str .. s
-					end
-					for k,v in pairs(controls) do
-						if v.widget then
-							params[k] = {
-								datatype = v.datatype,
-								value = v.value
-							}
-						end
-					end
-					pprint.pformat(material, {}, printer)
-					GLib.file_set_contents(b2l_file_button:get_filename() .. ".mat", str)
-				end,
-			},
+			save_toolbutton,
 			Gtk.ToolButton {
 				icon_name = "view-refresh",
 				on_clicked = function()
