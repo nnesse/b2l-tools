@@ -102,7 +102,7 @@ function update_shaders()
 			end
 		end
 		if v == "float" then
-			if controls[k].value == nil then
+			if not value and controls[k].value == nil then
 				value = 0.5
 			end
 			if not controls[k].widget then
@@ -130,7 +130,7 @@ function update_shaders()
 			controls[k].widget:get_child():set_value(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "vec3" then
-			if controls[k].value == nil then
+			if not value and controls[k].value == nil then
 				value = {1, 1, 1}
 			end
 			if not controls[k].widget then
@@ -159,7 +159,7 @@ function update_shaders()
 			controls[k].widget:get_child():set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "bool" then
-			if controls[k].value == nil then
+			if controls[k].value == nil and not value then
 				value = false
 			end
 			if not controls[k].widget then
@@ -180,7 +180,7 @@ function update_shaders()
 			controls[k].widget:set_active(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif v == "sampler2D" then
-			if controls[k].value == nil then
+			if controls[k].value == nil and not value then
 				value = nil
 			end
 			if not controls[k].widget then
