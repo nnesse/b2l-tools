@@ -2,6 +2,7 @@ local b2l_gl = require 'b2l_material_editor'
 local lgi = require 'lgi'
 local Gtk = lgi.require('Gtk')
 local Gdk = lgi.require('Gdk')
+local GObject = lgi.require('GObject')
 local GLib = lgi.require('GLib')
 local GdkPixbuf = lgi.require('GdkPixbuf')
 local pprint = require 'pprint'
@@ -249,13 +250,44 @@ frag_glsl_filter = Gtk.FileFilter {}
 frag_glsl_filter:set_name("OpenGL fragment shader")
 frag_glsl_filter:add_pattern("*.frag.glsl")
 
+objects_store = Gtk.ListStore.new {
+	[1] = GObject.Type.STRING
+}
+
 function load_b2l_file(filename)
 	local lua_name = filename
+
 	if lua_name then
 		local bin_name = lua_name .. ".bin"
 		local mat_name = lua_name .. ".mat"
 		scene = (loadfile(lua_name))()
+
+		objects_store:clear()
+
+		objects = {}
+		for k, v in pairs(scene.scene.objects) do
+			local object = {}
+			objects[k] = object
+			if v.nla_tracks then
+				local actions = {}
+				object.actions = actions
+				for i, track in ipairs(v.nla_tracks) do
+					for j, action in ipairs(track) do
+						actions[action.name] = action
+					end
+				end
+			end
+			if v.type == 'MESH' then
+				objects_store:append {
+					[1] = k
+				}
+			end
+		end
+
 		b2l_gl.parse_scene(scene, bin_name)
+
+		object_combo:set_active_iter(objects_store:get_iter_first())
+
 		local material_fn = loadfile(mat_name)
 		if material_fn then
 			local material = material_fn()
@@ -430,6 +462,23 @@ save_toolbutton = Gtk.ToolButton {
 	end,
 }
 
+object_combo = Gtk.ComboBox {
+	id = "Object",
+	model = objects_store,
+	active = 0,
+	cells = {
+		{
+			Gtk.CellRendererText(),
+			{ text = 1 }
+		}
+	},
+	on_changed = function (combo)
+		local row = objects_store[combo:get_active_iter()]
+		print("setting object " .. row[1])
+		b2l_gl.set_object(row[1])
+	end
+}
+
 -- Pack everything into the window.
 local vbox_main = Gtk.VBox {
 	{
@@ -487,6 +536,18 @@ local vbox_main = Gtk.VBox {
 		b2l_file_button,
 		expand = false,
 		fill = false,
+	},
+	{
+		Gtk.Label {
+			label = "Object"
+		},
+		expand = false,
+		fill = false,
+	},
+	{
+		object_combo,
+		expand = false,
+		fill = false
 	},
 	{
 		Gtk.Label {

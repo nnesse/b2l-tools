@@ -25,9 +25,11 @@
 static int parse_scene(lua_State *L);
 static int need_redraw(lua_State *L);
 static int set_shaders(lua_State *L);
+static int set_object(lua_State *L);
 
 luaL_Reg lua_b2l_material_editor[] = {
 	{ "parse_scene", parse_scene },
+	{ "set_object", set_object },
 	{ "need_redraw", need_redraw},
 	{ "set_shaders", set_shaders },
 	{ NULL, NULL }
@@ -35,8 +37,7 @@ luaL_Reg lua_b2l_material_editor[] = {
 
 static GLuint g_texture_names[MAX_TEXTURE_UNITS];
 
-static struct mesh *g_mesh;
-static struct object *g_obj;
+static struct object *g_obj = NULL;
 static GLXContext g_ctx;
 static struct glwin *g_win;
 static lua_State *g_L;
@@ -220,7 +221,7 @@ static void on_mouse_button_up(struct glwin *win, int button, int x, int y)
 		q_delta.y = 0;
 		q_delta.z = 0;
 		q_delta.w = 1;
-		g_need_redraw = 1;
+		need_redraw(g_L);
 	}
 	if (g_mouse_down[2] && button == 3) {
 		g_offset[0] += g_offset_next[0];
@@ -229,7 +230,7 @@ static void on_mouse_button_up(struct glwin *win, int button, int x, int y)
 		g_offset_next[0] = 0;
 		g_offset_next[1] = 0;
 		g_offset_next[2] = 0;
-		g_need_redraw = 1;
+		need_redraw(g_L);
 	}
 	g_mouse_down[button -1] = false;
 	on_mouse_move(win, x, y);
@@ -724,7 +725,7 @@ static void redraw(struct glwin *win)
 	glwin_manager_make_current(win, g_ctx);
 
 	lua_State *L = g_L;
-	struct mesh *m = g_mesh;
+	struct mesh *m;
 	struct scene *s;
 
 	static bool gl_init_attempted = false;
@@ -743,6 +744,11 @@ static void redraw(struct glwin *win)
 	glClearColor(0, 0, 0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
+	if (!g_obj)
+		goto end;
+
+	m = g_obj->mesh;
+
 	if (!m)
 		goto end;
 
@@ -856,7 +862,7 @@ static void redraw(struct glwin *win)
 	mat4_mul(&M1, &M2, &M3);
 	glUniformMatrix4fv(glGetUniformLocation(s->program, "mvp"), 1, GL_FALSE, (GLfloat *)&M3);
 
-	if (g_mesh->weights_per_vertex > 0) {
+	if (m->weights_per_vertex > 0) {
 		static int render_count = 0;
 		render_count++;
 		int frame = (render_count/3) % g_obj->num_frames;
@@ -880,6 +886,19 @@ end:
 	glXMakeContextCurrent(display, write_draw, read_draw, prev_ctx);
 	g_need_redraw = false;
 	return;
+}
+
+static int set_object(lua_State *L)
+{
+	const char *name = lua_tostring(L, -1);
+	struct object *o = find_obj(name);
+
+	g_obj = o;
+
+	need_redraw(L);
+
+	lua_pop(L, 1);
+	return 0;
 }
 
 static int parse_scene(lua_State *L)
@@ -912,7 +931,6 @@ static int parse_scene(lua_State *L)
 	lua_pushnil(L);
 	while (lua_next(L, meshes_index)) {
 		struct mesh *m = NEW_STRUCT(mesh);
-		g_mesh = m;
 		m->name = strdup(lua_tostring(L, -2));
 		m->scene = s;
 		m->vao = 0;
@@ -1006,9 +1024,6 @@ static int parse_scene(lua_State *L)
 			lua_getfield(L, obj_index, "data");
 			obj->mesh = find_mesh(lua_tostring(L, -1));
 			lua_pop(L, 1);
-			if (obj->mesh == g_mesh) {
-				g_obj = obj;
-			}
 		} else {
 			obj->mesh = NULL;
 		}
@@ -1037,6 +1052,8 @@ static int parse_scene(lua_State *L)
 
 		lua_pushlightuserdata(L, obj);
 		lua_setfield(L, obj_index, "userdata");
+
+		add_obj(obj);
 
 		lua_pop(L, 1);
 	}
