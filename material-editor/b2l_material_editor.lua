@@ -254,6 +254,10 @@ objects_store = Gtk.ListStore.new {
 	[1] = GObject.Type.STRING
 }
 
+materials_store = Gtk.ListStore.new {
+	[1] = GObject.Type.STRING
+}
+
 function load_b2l_file(filename)
 	local lua_name = filename
 
@@ -263,6 +267,7 @@ function load_b2l_file(filename)
 		scene = (loadfile(lua_name))()
 
 		objects_store:clear()
+		materials_store:clear()
 
 		objects = {}
 		for k, v in pairs(scene.scene.objects) do
@@ -284,9 +289,16 @@ function load_b2l_file(filename)
 			end
 		end
 
+		for i, v in ipairs(scene.materials) do
+			materials_store:append {
+				[1] = v
+			}
+		end
+
 		b2l_gl.parse_scene(scene, bin_name)
 
 		object_combo:set_active_iter(objects_store:get_iter_first())
+		material_combo:set_active_iter(materials_store:get_iter_first())
 
 		local material_fn = loadfile(mat_name)
 		if material_fn then
@@ -474,10 +486,25 @@ object_combo = Gtk.ComboBox {
 	},
 	on_changed = function (combo)
 		local row = objects_store[combo:get_active_iter()]
-		print("setting object " .. row[1])
 		b2l_gl.set_object(row[1])
 	end
 }
+
+material_combo = Gtk.ComboBox {
+	id = "Material",
+	model = materials_store,
+	active = 0,
+	cells = {
+		{
+			Gtk.CellRendererText(),
+			{ text = 1 }
+		}
+	},
+	--on_changed = function (combo)
+	--	local row = objects_store[combo:get_active_iter()]
+	--end
+}
+
 
 -- Pack everything into the window.
 local vbox_main = Gtk.VBox {
@@ -546,6 +573,18 @@ local vbox_main = Gtk.VBox {
 	},
 	{
 		object_combo,
+		expand = false,
+		fill = false
+	},
+	{
+		Gtk.Label {
+			label = "Material"
+		},
+		expand = false,
+		fill = false,
+	},
+	{
+		material_combo,
 		expand = false,
 		fill = false
 	},
