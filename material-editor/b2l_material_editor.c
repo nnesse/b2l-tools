@@ -342,6 +342,12 @@ struct scene {
 	GLint groups_index;
 };
 
+struct submesh {
+	const char *material_name;
+	uint32_t triangle_no;
+	uint32_t triangle_count;
+};
+
 struct mesh {
 	char *name;
 	struct mesh *next;
@@ -359,6 +365,10 @@ struct mesh {
 	int index_array_offset;
 	int weights_array_offset;
 	int tangent_array_offset;
+
+	int num_submesh;
+	struct submesh *submesh_array;
+
 	GLuint vao;
 };
 
@@ -775,88 +785,7 @@ static void redraw(struct glwin *win)
 	s->recompile_shaders = false;
 
 	glUseProgram(s->program);
-	lua_getglobal(L, "controls");
-	int controls = lua_gettop(L);
-	lua_getglobal(L, "active_material");
-	lua_getfield(L, -1, "params");
 
-	lua_pushnil(L);  /* first key */
-	while (lua_next(L, -2) != 0) {
-		int variable = lua_gettop(L);
-		const char *variable_name = lua_tostring(L, variable - 1);
-		int uniform_loc = glGetUniformLocation(s->program, variable_name);
-		if (uniform_loc == -1) {
-			lua_pop(L, 1);
-			continue;
-		}
-		lua_getfield(L, variable, "value");
-		int value = variable + 1;
-		lua_getfield(L, variable, "datatype");
-		const char *datatype = strdup(lua_tostring(L, -1));
-		lua_pop(L, 1);
-		if (!strcmp(datatype, "bool")) {
-			int bool_value = lua_toboolean(L, value);
-			glUniform1i(uniform_loc, bool_value);
-		} else if (!strcmp(datatype, "vec3")) {
-			lua_rawgeti(L, value, 1);
-			lua_rawgeti(L, value, 2);
-			lua_rawgeti(L, value, 3);
-			float val[3];
-			val[0] = (float)lua_tonumber(L, -3);
-			val[1] = (float)lua_tonumber(L, -2);
-			val[2] = (float)lua_tonumber(L, -1);
-			glUniform3fv(uniform_loc, 1, val);
-			lua_pop(L, 3);
-		} else if (!strcmp(datatype, "float")) {
-			float fval = lua_tonumber(L, value);
-			glUniform1f(uniform_loc, fval);
-		} else if (!strcmp(datatype, "sampler2D")) {
-			lua_getfield(L, controls, variable_name);
-			int control = lua_gettop(L);
-			lua_getfield(L, control, "needs_upload");
-			int needs_upload = lua_toboolean(L, -1);
-			lua_pop(L, 1);
-			if (needs_upload) {
-				int texunit;
-				GdkPixbuf *pbuf;
-				lua_getfield(L, control, "texunit");
-				texunit = lua_tointeger(L, -1) - 1;
-				lua_pop(L, 1);
-
-				lua_getfield(L, control, "pbuf");
-				lua_getfield(L, -1, "_native");
-				pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
-				lua_pop(L, 2);
-				glActiveTexture(GL_TEXTURE0 + texunit);
-				glBindTexture(GL_TEXTURE_2D, g_texture_names[texunit]);
-				int width = gdk_pixbuf_get_width(pbuf);
-				int height = gdk_pixbuf_get_height(pbuf);
-				int n_chan = gdk_pixbuf_get_n_channels(pbuf);
-				glPixelStorei(GL_UNPACK_ROW_LENGTH, gdk_pixbuf_get_rowstride(pbuf)/ n_chan);
-				glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-				glTexImage2D(GL_TEXTURE_2D,
-					0, /* level */
-					n_chan > 3 ? GL_RGBA : GL_RGB,
-					width,
-					height,
-					0, /* border */
-					n_chan > 3 ? GL_RGBA : GL_RGB,
-					GL_UNSIGNED_BYTE,
-					gdk_pixbuf_get_pixels(pbuf));
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glGenerateMipmap(GL_TEXTURE_2D);
-				glUniform1i(uniform_loc, texunit);
-
-				lua_pushboolean(L, 0);
-				lua_setfield(L, control, "needs_upload");
-			}
-			lua_pop(L, 1);
-		}
-		free((void *)datatype);
-		lua_pop(L, 2);
-	}
-	lua_pop(L, 3);
 	struct mat4 M1;
 	struct mat4 M2;
 	struct mat4 M3;
@@ -888,7 +817,101 @@ static void redraw(struct glwin *win)
 				(GLfloat *)(s->blob + offset));
 	}
 
-	glDrawElements(GL_TRIANGLES, 3 * m->num_triangles, GL_UNSIGNED_SHORT, (void *)((int64_t)m->index_array_offset));
+	lua_getglobal(L, "controls");
+	int controls = lua_gettop(L);
+	lua_getglobal(L, "materials");
+	int materials = lua_gettop(L);
+
+	int i;
+	for (i = 0; i < m->num_submesh; i++) {
+		lua_getfield(L, materials, m->submesh_array[i].material_name);
+		lua_getfield(L, -1, "params");
+		lua_pushnil(L);  /* first key */
+		while (lua_next(L, -2) != 0) {
+			int variable = lua_gettop(L);
+			const char *variable_name = lua_tostring(L, variable - 1);
+			int uniform_loc = glGetUniformLocation(s->program, variable_name);
+			if (uniform_loc == -1) {
+				lua_pop(L, 1);
+				continue;
+			}
+			lua_getfield(L, variable, "value");
+			int value = variable + 1;
+			lua_getfield(L, variable, "datatype");
+			const char *datatype = strdup(lua_tostring(L, -1));
+			lua_pop(L, 1);
+			if (!strcmp(datatype, "bool")) {
+				int bool_value = lua_toboolean(L, value);
+				glUniform1i(uniform_loc, bool_value);
+			} else if (!strcmp(datatype, "vec3")) {
+				lua_rawgeti(L, value, 1);
+				lua_rawgeti(L, value, 2);
+				lua_rawgeti(L, value, 3);
+				float val[3];
+				val[0] = (float)lua_tonumber(L, -3);
+				val[1] = (float)lua_tonumber(L, -2);
+				val[2] = (float)lua_tonumber(L, -1);
+				glUniform3fv(uniform_loc, 1, val);
+				lua_pop(L, 3);
+			} else if (!strcmp(datatype, "float")) {
+				float fval = lua_tonumber(L, value);
+				glUniform1f(uniform_loc, fval);
+			} else if (!strcmp(datatype, "sampler2D")) {
+				lua_getfield(L, controls, variable_name);
+				int control = lua_gettop(L);
+				lua_getfield(L, control, "needs_upload");
+				int needs_upload = lua_toboolean(L, -1);
+				lua_pop(L, 1);
+				if (needs_upload) {
+					int texunit;
+					GdkPixbuf *pbuf;
+					lua_getfield(L, control, "texunit");
+					texunit = lua_tointeger(L, -1) - 1;
+					lua_pop(L, 1);
+
+					lua_getfield(L, control, "pbuf");
+					lua_getfield(L, -1, "_native");
+					pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
+					lua_pop(L, 2);
+					glActiveTexture(GL_TEXTURE0 + texunit);
+					glBindTexture(GL_TEXTURE_2D, g_texture_names[texunit]);
+					int width = gdk_pixbuf_get_width(pbuf);
+					int height = gdk_pixbuf_get_height(pbuf);
+					int n_chan = gdk_pixbuf_get_n_channels(pbuf);
+					glPixelStorei(GL_UNPACK_ROW_LENGTH, gdk_pixbuf_get_rowstride(pbuf)/ n_chan);
+					glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+					glTexImage2D(GL_TEXTURE_2D,
+						0, /* level */
+						n_chan > 3 ? GL_RGBA : GL_RGB,
+						width,
+						height,
+						0, /* border */
+						n_chan > 3 ? GL_RGBA : GL_RGB,
+						GL_UNSIGNED_BYTE,
+						gdk_pixbuf_get_pixels(pbuf));
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					glGenerateMipmap(GL_TEXTURE_2D);
+					glUniform1i(uniform_loc, texunit);
+
+					lua_pushboolean(L, 0);
+					lua_setfield(L, control, "needs_upload");
+				}
+				lua_pop(L, 1);
+			}
+			free((void *)datatype);
+			lua_pop(L, 2); //params[k], params[k].value
+		} //while (lua_next(L, -2) != 0)
+		glDrawElements(GL_TRIANGLES,
+				3 * m->submesh_array[i].triangle_count,
+				GL_UNSIGNED_SHORT,
+				(void *)((int64_t)m->index_array_offset) + 3 * 2 * m->submesh_array[i].triangle_no);
+		lua_pop(L, 2);  //lua_getfield(L, materials, m->submesh_array[i].material_name);
+				//lua_getfield(L, -1, "params");
+	}
+	lua_pop(L, 2);  //lua_getglobal(L, "controls");
+			//lua_getglobal(L, "materials");
+
 end:
 	{
 		GLenum err = glGetError();
@@ -943,6 +966,7 @@ static int parse_scene(lua_State *L)
 	int meshes_index = lua_gettop(L);
 	lua_pushnil(L);
 	while (lua_next(L, meshes_index)) {
+		int i;
 		struct mesh *m = NEW_STRUCT(mesh);
 		m->name = strdup(lua_tostring(L, -2));
 		m->scene = s;
@@ -997,12 +1021,36 @@ static int parse_scene(lua_State *L)
 			lua_pop(L, 1);
 		}
 
+		lua_getfield(L, mesh_index, "submeshes");
+		lua_len(L, -1);
+		m->num_submesh = lua_tointeger(L, -1);
+		lua_pop(L, 1); //lua_len(L, -1)
+
+		m->submesh_array = (struct submesh *)malloc(sizeof(struct submesh) * m->num_submesh);
+		for (i = 0; i < m->num_submesh; i++) {
+			lua_rawgeti(L, -1, i + 1);
+			lua_getfield(L, -1, "material_name");
+			m->submesh_array[i].material_name = strdup(lua_tostring(L, -1));
+			lua_pop(L, 1); //lua_getfield(L, -1, "material_name")
+
+			lua_getfield(L, -1, "triangle_no");
+			m->submesh_array[i].triangle_no = lua_tointeger(L, -1);
+			lua_pop(L, 1); //lua_getfield(L, -1, "triangle_no")
+
+			lua_getfield(L, -1, "triangle_count");
+			m->submesh_array[i].triangle_count = lua_tointeger(L, -1);
+			lua_pop(L, 2);  //lua_getfield(L, -1, "triangle_count")
+					//lua_rawgeti(L, -1, i)
+		}
+
+		lua_pop(L, 1); //lua_getfield(L, mesh_index, "submeshes")
+
 		add_mesh(m);
 
 		lua_pushlightuserdata(L, m);
 		lua_setfield(L, mesh_index, "userdata");
 
-		lua_pop(L, 1); /* Pop value */
+		lua_pop(L, 1);
 	}
 	lua_pop(L, 2);
 
