@@ -89,23 +89,26 @@ function update_shaders()
 		end
 	end
 	for i, k in ipairs(uniforms) do
-		local v = uniforms[k]
-		local value = false
+		local datatype = uniforms[k]
+		if not active_material.params[k] then
+			active_material.params[k] = {}
+		end
+
+		if active_material.params[k].datatype ~= datatype then
+			active_material.params[k].datatype = datatype
+			active_material.params[k].value = nil
+		end
+
 		if not controls[k] then
-			controls[k] = {}
+			controls[k] = {datatype = v}
 		end
-		if controls[k].datatype == v then
-			if controls[k].mat_value ~= nil then
-				value = controls[k].mat_value
-				controls[k].mat_value = nil
-			else
-				value = controls[k].value
-			end
-		end
-		if v == "float" then
-			if not value and controls[k].value == nil then
+
+		local value = active_material.params[k].value
+		if datatype == "float" then
+			if not value then
 				value = 0.5
 			end
+			active_material.params[k].value = value
 			if not controls[k].widget then
 				local widget = Gtk.Expander {
 					label = k,
@@ -117,72 +120,70 @@ function update_shaders()
 							upper = 1,
 						},
 						on_value_changed = function(self)
-							if controls[k].value ~= self:get_value() then
+							if active_material.params[k].value ~= self:get_value() then
 								setting_changed()
 							end
-							controls[k].value = self:get_value()
+							active_material.params[k].value = self:get_value()
 							queue_render()
 						end
 					}
 				}
 				controls[k].widget = widget
 			end
-			controls[k].value = value
 			controls[k].widget:get_child():set_value(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
-		elseif v == "vec3" then
-			if not value and controls[k].value == nil then
+		elseif datatype == "vec3" then
+			if not value then
 				value = {1, 1, 1}
 			end
+			active_material.params[k].value = value
 			if not controls[k].widget then
-				controls[k] = {}
 				local widget = Gtk.Expander {
 					label = k,
 					expanded = true,
 					Gtk.ColorButton {
 						use_alpha = false,
 						on_color_set = function(self)
-							save_toolbutton.sensitive = true
 							local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
-							if value[1] ~= controls[k].value[1] or
-								value[2] ~= controls[k].value[2] or
-								value[3] ~= controls[k].value[3] then
+							if (not active_material.params[k].value) or
+								value[1] ~= active_material.params[k].value[1] or
+								value[2] ~= active_material.params[k].value[2] or
+								value[3] ~= active_material.params[k].value[3] then
 								setting_changed()
 							end
-							controls[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
+							active_material.params[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
 							queue_render()
 						end
 					}
 				}
 				controls[k].widget = widget
 			end
-			controls[k].value = value
 			controls[k].widget:get_child():set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
-		elseif v == "bool" then
-			if controls[k].value == nil and not value then
+		elseif datatype == "bool" then
+			if value == nil then
 				value = false
 			end
+			active_material.params[k].value = value
 			if not controls[k].widget then
 				controls[k] = {}
 				local widget = Gtk.CheckButton {
 					label = k,
 					on_toggled = function(self)
-						if controls[k].value ~= self.active then
+						if active_material.params[k].value ~= self.active then
 							setting_changed()
 						end
-						controls[k].value = self.active
+						active_material.params[k].value = self.active
 						queue_render()
 					end
 				}
 				controls[k].widget = widget
 			end
-			controls[k].value = value
 			controls[k].widget:set_active(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
-		elseif v == "sampler2D" then
-			if controls[k].value == nil and not value then
-				value = nil
+		elseif datatype == "sampler2D" then
+			if value ~= nil then
+				active_material.params[k].value = value
 			end
 			if not controls[k].widget then
 				local t = 1;
@@ -198,15 +199,14 @@ function update_shaders()
 						title = k,
 						action = "OPEN",
 						on_selection_changed = function(chooser)
-							save_toolbutton.sensitive = true
 							local filename = chooser:get_filename()
-							if controls[k].value ~= filename then
+							if active_material.params[k].value ~= filename then
 								setting_changed()
 							end
 							if filename then
 								local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
 								if pbuf then
-									controls[k].value = filename
+									active_material.params[k].value = filename
 									controls[k].pbuf = pbuf
 									controls[k].needs_upload = true
 									queue_render()
@@ -226,13 +226,10 @@ function update_shaders()
 				controls[k].widget = widget
 			end
 			if value ~= nil then
-				controls[k].value = value
 				controls[k].widget:get_child():set_filename(value)
 			end
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		end
-		controls[k].value = value
-		controls[k].datatype = v
 	end
 	vbox_settings:show_all()
 	queue_render()
@@ -297,32 +294,17 @@ function load_b2l_file(filename)
 
 		b2l_gl.parse_scene(scene, bin_name)
 
-		object_combo:set_active_iter(objects_store:get_iter_first())
-		material_combo:set_active_iter(materials_store:get_iter_first())
-
 		local material_fn = loadfile(mat_name)
 		if material_fn then
-			local material = material_fn()
-			if material then
-				for k, v in pairs(controls) do
-					v.mat_value = nil
-				end
-				for k, v in pairs(material.params) do
-					if k ~= 'vs_filename' and k ~= 'fs_filename' then
-						if controls[k] and controls[k].datatype == v.datatype then
-							controls[k].mat_value = v.value
-						else
-							controls[k] = { ['mat_value'] = v.value, ['datatype'] = v.datatype }
-						end
-					end
-				end
-				vs_chooser:set_filename(material.shaders['vs_filename'])
-				fs_chooser:set_filename(material.shaders['fs_filename'])
-			end
+			materials = material_fn()
+		else
+			materials = {}
 		end
+	
+		save_toolbutton.sensitive = false
+		object_combo:set_active_iter(objects_store:get_iter_first())
+		material_combo:set_active_iter(materials_store:get_iter_first())
 	end
-	Gtk.main_iteration()
-	save_toolbutton.sensitive = false
 end
 
 b2l_file_button = Gtk.FileChooserButton {
@@ -358,14 +340,13 @@ fs_edit_button = Gtk.Button {
 			end,
 		}
 
-fs_filename = nil
 fs_chooser = Gtk.FileChooserButton {
 		title = "Fragment shader",
 		action = "OPEN",
 		filter = frag_glsl_filter,
 		on_selection_changed = function(chooser)
 			local filename = chooser:get_filename()
-			if fs_filename ~= filename then
+			if filename and active_material.shaders['fs_filename'] ~= filename then
 				setting_changed()
 			end
 			reload_fs(filename)
@@ -375,7 +356,9 @@ fs_chooser = Gtk.FileChooserButton {
 			else
 				fs_edit_button.sensitive = false
 			end
-			fs_filename = filename
+			if filename then
+				active_material.shaders['fs_filename'] = filename
+			end
 		end,
 	}
 
@@ -403,14 +386,13 @@ vs_edit_button = Gtk.Button {
 	end,
 }
 
-vs_filename = nil
 vs_chooser = Gtk.FileChooserButton {
 	title = "Vertex shader",
 	action = "OPEN",
 	filter = vert_glsl_filter,
 	on_selection_changed = function(chooser)
 		local filename = chooser:get_filename()
-		if vs_filename ~= filename then
+		if filename and filename ~= active_material.shaders['vs_filename'] then
 			setting_changed()
 		end
 		reload_vs(filename)
@@ -420,7 +402,9 @@ vs_chooser = Gtk.FileChooserButton {
 		else
 			vs_edit_button.sensitive = false
 		end
-		vs_filename = filename
+		if filename then
+			active_material.shaders.vs_filename = filename
+		end
 	end,
 }
 
@@ -448,27 +432,11 @@ save_toolbutton = Gtk.ToolButton {
 	icon_name = "document-save",
 	sensitive = false,
 	on_clicked = function(button)
-		local params = {}
-		local shaders = {}
-		local material = {
-			['shaders'] = shaders,
-			['params'] = params
-		}
-		shaders['vs_filename'] = vs_chooser:get_filename()
-		shaders['fs_filename'] = fs_chooser:get_filename()
 		str = "return "
 		local printer = function(s)
 			str = str .. s
 		end
-		for k,v in pairs(controls) do
-			if v.widget then
-				params[k] = {
-					datatype = v.datatype,
-					value = v.value
-				}
-			end
-		end
-		pprint.pformat(material, {}, printer)
+		pprint.pformat(materials, {}, printer)
 		GLib.file_set_contents(b2l_file_button:get_filename() .. ".mat", str)
 		button.sensitive = false
 	end,
@@ -500,9 +468,23 @@ material_combo = Gtk.ComboBox {
 			{ text = 1 }
 		}
 	},
-	--on_changed = function (combo)
-	--	local row = objects_store[combo:get_active_iter()]
-	--end
+	on_changed = function (combo)
+		local row = materials_store[combo:get_active_iter()]
+		local material_name = row[1]
+		if materials and material_name then
+			active_material = materials[material_name]
+			if not active_material then
+				active_material = { params = {}, shaders = {}}
+				materials[material_name] = active_material
+			end
+			if active_material.shaders['vs_filename'] then
+				vs_chooser:set_filename(active_material.shaders['vs_filename'])
+			end
+			if active_material.shaders['fs_filename'] then
+				fs_chooser:set_filename(active_material.shaders['fs_filename'])
+			end
+		end
+	end
 }
 
 

@@ -776,17 +776,27 @@ static void redraw(struct glwin *win)
 
 	glUseProgram(s->program);
 	lua_getglobal(L, "controls");
+	int controls = lua_gettop(L);
+	lua_getglobal(L, "active_material");
+	lua_getfield(L, -1, "params");
+
 	lua_pushnil(L);  /* first key */
 	while (lua_next(L, -2) != 0) {
 		int variable = lua_gettop(L);
-		int uniform_loc = glGetUniformLocation(s->program, lua_tostring(L, variable - 1));
+		const char *variable_name = lua_tostring(L, variable - 1);
+		int uniform_loc = glGetUniformLocation(s->program, variable_name);
+		if (uniform_loc == -1) {
+			lua_pop(L, 1);
+			continue;
+		}
 		lua_getfield(L, variable, "value");
 		int value = variable + 1;
 		lua_getfield(L, variable, "datatype");
 		const char *datatype = strdup(lua_tostring(L, -1));
 		lua_pop(L, 1);
 		if (!strcmp(datatype, "bool")) {
-			glUniform1i(uniform_loc, lua_toboolean(L, value));
+			int bool_value = lua_toboolean(L, value);
+			glUniform1i(uniform_loc, bool_value);
 		} else if (!strcmp(datatype, "vec3")) {
 			lua_rawgeti(L, value, 1);
 			lua_rawgeti(L, value, 2);
@@ -801,17 +811,19 @@ static void redraw(struct glwin *win)
 			float fval = lua_tonumber(L, value);
 			glUniform1f(uniform_loc, fval);
 		} else if (!strcmp(datatype, "sampler2D")) {
-			lua_getfield(L, variable, "needs_upload");
+			lua_getfield(L, controls, variable_name);
+			int control = lua_gettop(L);
+			lua_getfield(L, control, "needs_upload");
 			int needs_upload = lua_toboolean(L, -1);
 			lua_pop(L, 1);
 			if (needs_upload) {
 				int texunit;
 				GdkPixbuf *pbuf;
-				lua_getfield(L, variable, "texunit");
+				lua_getfield(L, control, "texunit");
 				texunit = lua_tointeger(L, -1) - 1;
 				lua_pop(L, 1);
 
-				lua_getfield(L, variable, "pbuf");
+				lua_getfield(L, control, "pbuf");
 				lua_getfield(L, -1, "_native");
 				pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
 				lua_pop(L, 2);
@@ -837,13 +849,14 @@ static void redraw(struct glwin *win)
 				glUniform1i(uniform_loc, texunit);
 
 				lua_pushboolean(L, 0);
-				lua_setfield(L, variable, "needs_upload");
+				lua_setfield(L, control, "needs_upload");
 			}
+			lua_pop(L, 1);
 		}
 		free((void *)datatype);
 		lua_pop(L, 2);
 	}
-	lua_pop(L, 1);
+	lua_pop(L, 3);
 	struct mat4 M1;
 	struct mat4 M2;
 	struct mat4 M3;
