@@ -9,6 +9,9 @@
 
 #include "glsl_common.h"
 
+void yyerror(const char *s);
+int yylex (void);
+
 int8_t *buffer = NULL;
 int8_t *buffer_end = NULL;
 int remaining = 0;
@@ -35,7 +38,7 @@ static int8_t *myalloc(size_t size, int align)
 static char *mystrdup(const char *c)
 {
 	int len = strlen(c);
-	char *ret = myalloc(len + 1, 1);
+	char *ret = (char *)myalloc(len + 1, 1);
 	strcpy(ret, c);
 	return ret;
 }
