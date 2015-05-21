@@ -255,6 +255,12 @@ materials_store = Gtk.ListStore.new {
 	[1] = GObject.Type.STRING
 }
 
+actions_store = Gtk.ListStore.new {
+	[1] = GObject.Type.STRING,
+	[2] = GObject.Type.INT,
+	[3] = GObject.Type.INT,
+}
+
 function load_b2l_file(filename)
 	local lua_name = filename
 
@@ -265,6 +271,7 @@ function load_b2l_file(filename)
 
 		objects_store:clear()
 		materials_store:clear()
+		actions_store:clear()
 
 		objects = {}
 		for k, v in pairs(scene.scene.objects) do
@@ -300,7 +307,7 @@ function load_b2l_file(filename)
 		else
 			materials = {}
 		end
-	
+
 		save_toolbutton.sensitive = false
 		object_combo:set_active_iter(objects_store:get_iter_first())
 		material_combo:set_active_iter(materials_store:get_iter_first())
@@ -454,7 +461,27 @@ object_combo = Gtk.ComboBox {
 	},
 	on_changed = function (combo)
 		local row = objects_store[combo:get_active_iter()]
-		b2l_gl.set_object(row[1])
+		local object_name = row[1]
+		b2l_gl.set_object(object_name)
+
+		actions_store:clear()
+
+		local armature_name = scene.scene.objects[object_name].armature_deform
+		if armature_name then
+			local armature_obj = scene.scene.objects[armature_name]
+			if armature_obj.nla_tracks then
+				for i, track in ipairs(armature_obj.nla_tracks) do
+					for j, action in ipairs(track) do
+						actions_store:append {
+							[1] = action.name,
+							[2] = action.frame_start,
+							[3] = action.frame_end
+						}
+					end
+				end
+			end
+		end
+		action_combo:set_active_iter(actions_store:get_iter_first())
 	end
 }
 
@@ -487,6 +514,44 @@ material_combo = Gtk.ComboBox {
 	end
 }
 
+frame_start = 1
+frame_delta = 1
+frame_end = 1
+
+action_combo = Gtk.ComboBox {
+	id = "Action",
+	model = actions_store,
+	active = 0,
+	cells = {
+		{
+			Gtk.CellRendererText(),
+			{ text = 1 }
+		}
+	},
+	on_changed = function (combo)
+		local row = actions_store[combo:get_active_iter()]
+		local action_name = row[1]
+		frame_start = row[2]
+		frame_end = row[3]
+		frame_delta = 1
+		action_scale.adjustment.lower = 1
+		action_scale.adjustment.upper = (frame_end - frame_start)
+		action_scale:set_value(1)
+	end
+}
+
+action_scale = Gtk.Scale {
+	adjustment = Gtk.Adjustment {
+		lower = 1,
+		upper = 100,
+		step_increment = 1,
+		page_increment = 1,
+	},
+	digits = 0,
+	on_value_changed = function(self)
+		frame_delta = self:get_value()
+	end,
+}
 
 -- Pack everything into the window.
 local vbox_main = Gtk.VBox {
@@ -567,6 +632,23 @@ local vbox_main = Gtk.VBox {
 	},
 	{
 		material_combo,
+		expand = false,
+		fill = false
+	},
+	{
+		Gtk.Label {
+			label = "Action"
+		},
+		expand = false,
+		fill = false,
+	},
+	{
+		action_combo,
+		expand = false,
+		fill = false
+	},
+	{
+		action_scale,
 		expand = false,
 		fill = false
 	},

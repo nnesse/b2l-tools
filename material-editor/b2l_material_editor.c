@@ -807,7 +807,15 @@ static void redraw(struct glwin *win)
 	if (m->weights_per_vertex > 0) {
 		static int render_count = 0;
 		render_count++;
-		int frame = (render_count/3) % g_obj->num_frames;
+		int frame;
+		lua_getglobal(g_L, "frame_start");
+		frame = lua_tointeger(g_L, -1);
+		lua_pop(g_L, 1);
+
+		lua_getglobal(g_L, "frame_delta");
+		frame += lua_tointeger(g_L, -1);
+		lua_pop(g_L, 1);
+
 		int offset = g_obj->vertex_group_transform_array_offset;
 		offset += frame * sizeof(float) * 4 * 4 * g_obj->num_vertex_groups;
 
