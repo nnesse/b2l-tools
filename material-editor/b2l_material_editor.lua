@@ -110,27 +110,40 @@ function update_shaders()
 			end
 			active_material.params[k].value = value
 			if not controls[k].widget then
-				local widget = Gtk.Expander {
-					label = k,
-					expanded = true,
-					Gtk.Scrollbar {
-						orientation = "HORIZONTAL",
-						adjustment = Gtk.Adjustment {
-							lower = 0,
-							upper = 1,
-						},
-						on_value_changed = function(self)
-							if active_material.params[k].value ~= self:get_value() then
-								setting_changed()
-							end
-							active_material.params[k].value = self:get_value()
-							queue_render()
+				local control = Gtk.Scrollbar {
+					orientation = "HORIZONTAL",
+					adjustment = Gtk.Adjustment {
+						lower = 0,
+						upper = 1,
+					},
+					on_value_changed = function(self)
+						if active_material.params[k].value ~= self:get_value() then
+							setting_changed()
 						end
-					}
+						active_material.params[k].value = self:get_value()
+						queue_render()
+					end
+				}
+				local widget = Gtk.HBox {
+					{
+						Gtk.Label {
+							label = k,
+							hexpand = false
+						},
+						expand = false,
+						fill = false
+					},
+					{
+						control,
+						expand = true,
+						fill = true
+					},
+					spacing = 10,
 				}
 				controls[k].widget = widget
+				controls[k].control = control
 			end
-			controls[k].widget:get_child():set_value(value)
+			controls[k].control:set_value(value)
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif datatype == "vec3" then
 			if not value then
@@ -138,27 +151,40 @@ function update_shaders()
 			end
 			active_material.params[k].value = value
 			if not controls[k].widget then
-				local widget = Gtk.Expander {
-					label = k,
-					expanded = true,
-					Gtk.ColorButton {
-						use_alpha = false,
-						on_color_set = function(self)
-							local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
-							if (not active_material.params[k].value) or
-								value[1] ~= active_material.params[k].value[1] or
-								value[2] ~= active_material.params[k].value[2] or
-								value[3] ~= active_material.params[k].value[3] then
-								setting_changed()
-							end
-							active_material.params[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
-							queue_render()
+				local control = Gtk.ColorButton {
+					use_alpha = false,
+					on_color_set = function(self)
+						local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
+						if (not active_material.params[k].value) or
+							value[1] ~= active_material.params[k].value[1] or
+							value[2] ~= active_material.params[k].value[2] or
+							value[3] ~= active_material.params[k].value[3] then
+							setting_changed()
 						end
-					}
+						active_material.params[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
+						queue_render()
+					end
+				}
+				local widget = Gtk.HBox {
+					{
+						Gtk.Label {
+							label = k,
+							hexpand = false
+						},
+						expand = false,
+						fill = false
+					},
+					{
+						control,
+						expand = true,
+						fill = true
+					},
+					spacing = 10,
 				}
 				controls[k].widget = widget
+				controls[k].control = control
 			end
-			controls[k].widget:get_child():set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
+			controls[k].control:set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif datatype == "bool" then
 			if value == nil then
@@ -192,41 +218,54 @@ function update_shaders()
 				end
 				texture_units[t] = true
 				controls[k] = { texunit= t }
-				local widget = Gtk.Expander {
-					label = k,
-					expanded = true,
-					Gtk.FileChooserButton {
-						title = k,
-						action = "OPEN",
-						on_selection_changed = function(chooser)
-							local filename = chooser:get_filename()
-							if active_material.params[k].value ~= filename then
-								setting_changed()
+				local control = Gtk.FileChooserButton {
+					title = k,
+					action = "OPEN",
+					on_selection_changed = function(chooser)
+						local filename = chooser:get_filename()
+						if active_material.params[k].value ~= filename then
+							setting_changed()
+						end
+						if filename then
+							local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
+							if pbuf then
+								active_material.params[k].value = filename
+								controls[k].pbuf = pbuf
+								controls[k].needs_upload = true
+								queue_render()
+							else
+								local dialog = Gtk.MessageDialog {
+									parent = window,
+									message_type = 'ERROR', buttons = 'CLOSE',
+									text = ("Failed to open image file: %s"):format(err),
+									on_response = Gtk.Widget.destroy
+								}
+								dialog:show_all()
 							end
-							if filename then
-								local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
-								if pbuf then
-									active_material.params[k].value = filename
-									controls[k].pbuf = pbuf
-									controls[k].needs_upload = true
-									queue_render()
-								else
-									local dialog = Gtk.MessageDialog {
-										parent = window,
-										message_type = 'ERROR', buttons = 'CLOSE',
-										text = ("Failed to open image file: %s"):format(err),
-										on_response = Gtk.Widget.destroy
-									}
-									dialog:show_all()
-								end
-							end
-						end,
-					}
+						end
+					end,
+				}
+				local widget = Gtk.HBox {
+					{
+						Gtk.Label {
+							label = k,
+							hexpand = false
+						},
+						expand = false,
+						fill = false
+					},
+					{
+						control,
+						expand = true,
+						fill = true
+					},
+					spacing = 10,
 				}
 				controls[k].widget = widget
+				controls[k].control = control
 			end
 			if value ~= nil then
-				controls[k].widget:get_child():set_filename(value)
+				controls[k].control:set_filename(value)
 			end
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		end
@@ -318,6 +357,7 @@ b2l_file_button = Gtk.FileChooserButton {
 	title = "BRT File",
 	action = "OPEN",
 	filter = b2l_filter,
+	hexpand = true,
 	on_selection_changed = function(chooser)
 	 	local filename = chooser:get_filename()
 		load_b2l_file(filename)
@@ -600,95 +640,116 @@ local vbox_main = Gtk.VBox {
 		fill = false
 	},
 	{
-		Gtk.Label {
-			label = "B2L File"
-		},
-		expand = false,
-		fill = false,
-	},
-	{
-		b2l_file_button,
-		expand = false,
-		fill = false,
-	},
-	{
-		Gtk.Label {
-			label = "Object"
-		},
-		expand = false,
-		fill = false,
-	},
-	{
-		object_combo,
-		expand = false,
-		fill = false
-	},
-	{
-		Gtk.Label {
-			label = "Material"
-		},
-		expand = false,
-		fill = false,
-	},
-	{
-		material_combo,
-		expand = false,
-		fill = false
-	},
-	{
-		Gtk.Label {
-			label = "Action"
-		},
-		expand = false,
-		fill = false,
-	},
-	{
-		action_combo,
-		expand = false,
-		fill = false
-	},
-	{
-		action_scale,
-		expand = false,
-		fill = false
-	},
-	{
-		Gtk.Label {
-			label = "Vertex Shader"
-		},
-		expand = false,
-		fill = false,
-	},
-	{
-		Gtk.HBox {
-			vs_chooser,
+		Gtk.Grid {
+			column_spacing = 20,
 			{
-				vs_edit_button,
-				expand = false,
-				fill = false
+				Gtk.Label {
+					label = "B2L File"
+				},
+				left_attach = 0,
+				top_attach = 0,
+			},
+			{
+				b2l_file_button,
+				left_attach = 1,
+				top_attach = 0,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Object"
+				},
+				left_attach = 0,
+				top_attach = 1,
+			},
+			{
+				object_combo,
+				left_attach = 1,
+				top_attach = 1,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Material"
+				},
+				left_attach = 0,
+				top_attach = 2,
+			},
+			{
+				material_combo,
+				left_attach = 1,
+				top_attach = 2,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Action"
+				},
+				left_attach = 0,
+				top_attach = 3,
+			},
+			{
+				action_combo,
+				left_attach = 1,
+				top_attach = 3,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Frame"
+				},
+				left_attach = 0,
+				top_attach = 4,
+			},
+			{
+				action_scale,
+				left_attach = 1,
+				top_attach = 4,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Vertex Shader"
+				},
+				left_attach = 0,
+				top_attach = 5,
+			},
+			{
+				Gtk.HBox {
+					vs_chooser,
+					{
+						vs_edit_button,
+						expand = false,
+						fill = false
+					},
+				},
+				left_attach = 1,
+				top_attach = 5,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Fragment Shader"
+				},
+				left_attach = 0,
+				top_attach = 6,
+			},
+			{
+				Gtk.HBox {
+					fs_chooser,
+					{
+						fs_edit_button,
+						expand = false,
+						fill = false
+					},
+				},
+				left_attach = 1,
+				top_attach = 6,
+				width = 2,
 			},
 		},
 		expand = false,
-		fill = false,
-	},
-	{
-		Gtk.Label {
-			label = "Fragment Shader"
-		},
-		expand = false,
-		fill = false,
-	},
-	{
-		Gtk.HBox {
-			fs_chooser,
-			{
-				fs_edit_button,
-				expand = false,
-				fill = false
-			},
-		},
-		expand = false,
-		fill = false,
+		fill = false
 	},
 	{
 		vbox_settings,
