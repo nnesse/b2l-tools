@@ -21,5 +21,5 @@ PKG_CHECK_MODULES(GDKPIXBUF2,gdk-pixbuf-2.0)
 
 AC_PROG_CC
 
-AC_CONFIG_FILES([Makefile] [b2l-material-editor.sh])
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

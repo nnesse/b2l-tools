@@ -6,16 +6,14 @@ export datadir=@datarootdir@/b2l
 export dataluadir=${datadir}/lua
 export datalibluadir=${datadir}/lib/lua
 export bindir=@bindir@
-export libdir=@libdir@
 VPATH=$(srcdir)
 
 CFLAGS:= -g -O0 -Wall -Wno-unused-function -fPIC -shared
 CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/../lua-5.2.3/src
-CFLAGS+= @CFLAGS@ @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@
+CFLAGS+= @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@ @CFLAGS@
 
-#LDFLAGS:= -Wl,-rpath=$(libdir)
 LDFLAGS:= -lglwin -lglb-glcore -lGL
-LDFLAGS+= @LDFLAGS@ @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@
+LDFLAGS+= @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@ @LDFLAGS@
 
 FLEX = @FLEX@
 BISON = @BISON@
@@ -38,11 +36,9 @@ b2l_material_editor.so: b2l_material_editor.c glsl.yy.c glsl.tab.c glsl_common.h
 clean:
 	-rm b2l_material_editor.so glsl.yy.c glsl.tab.c glsl.tab.h
 
-install: b2l_material_editor.so b2l-material-editor.sh $(srcdir)/b2l_material_editor.lua
-	$(INSTALL) -d $(datadir)
-	$(INSTALL) -d $(dataluadir)
-	$(INSTALL) -d $(datalibluadir)
-	$(INSTALL_PROGRAM) b2l_material_editor.so $(datalibluadir)
-	$(INSTALL_DATA) $(srcdir)/b2l_material_editor.lua $(datadir)
-	$(INSTALL_DATA) $(srcdir)/pprint.lua $(dataluadir)
-	$(INSTALL_PROGRAM) b2l-material-editor.sh $(bindir)
+install: b2l_material_editor.so $(srcdir)/b2l_material_editor.lua
+	$(INSTALL) -d $(DESTDIR)$(dataluadir)
+	$(INSTALL) -d $(DESTDIR)$(datalibluadir)
+	$(INSTALL_PROGRAM) b2l_material_editor.so $(DESTDIR)$(datalibluadir)
+	$(INSTALL_DATA) $(srcdir)/b2l_material_editor.lua $(DESTDIR)$(datadir)
+	$(INSTALL_DATA) $(srcdir)/pprint.lua $(DESTDIR)$(dataluadir)
