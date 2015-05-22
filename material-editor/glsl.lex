@@ -6,11 +6,7 @@
 #include "glsl_common.h"
 #include "glsl.tab.h"
 
-YYSTYPE yylval;
-
-#define YY_INPUT(buf, result, max_size) do { \
-	result = YY_NULL; \
-} while (0)
+GLSLSTYPE glsllval;
 
 %}
 
@@ -21,7 +17,9 @@ identifier		{nondigit}({nondigit}|{digit})*
 integer_constant	{digit}+
 floating_constant	{digit}+.{digit}+
 
-%x IN_COMMENT
+%x COMMENT
+%x META
+%x META_COMMENT
 
 %%
 
@@ -31,9 +29,16 @@ floating_constant	{digit}+.{digit}+
 
 \/\/.*\n
 
-<INITIAL>"/*" BEGIN(IN_COMMENT);
-<IN_COMMENT>"*/" BEGIN(INITIAL);
-<IN_COMMENT>[^*\n]+ { }
+<INITIAL>@ BEGIN(META);
+<META>@ BEGIN(INITIAL);
+<META>"/*" BEGIN(META_COMMENT);
+<META_COMMENT>"*/" BEGIN(META);
+<META_COMMENT>[^*\n]+ { }
+<META>[^@\n]+ { }
+
+<INITIAL>"/*" BEGIN(COMMENT);
+<COMMENT>"*/" BEGIN(INITIAL);
+<COMMENT>[^*\n]+ { }
 
 const		return CONST;
 uniform		return UNIFORM;
@@ -241,21 +246,21 @@ struct			return STRUCT;
 \& return AMPERSAND;
 \? return QUESTION;
 
-true			{ yylval.BOOLCONSTANT = true; return BOOLCONSTANT; }
-false			{ yylval.BOOLCONSTANT = false; return BOOLCONSTANT; }
+true			{ glsllval.BOOLCONSTANT = true; return BOOLCONSTANT; }
+false			{ glsllval.BOOLCONSTANT = false; return BOOLCONSTANT; }
 
-{identifier}		{ yylval.IDENTIFIER = strdup(yytext); return IDENTIFIER; }
-{integer_constant}	{ yylval.INTCONSTANT = atoi(yytext); return INTCONSTANT; }
-{floating_constant}	{ yylval.FLOATCONSTANT = atof(yytext); return FLOATCONSTANT; }
+{identifier}		{ glsllval.IDENTIFIER = strdup(yytext); return IDENTIFIER; }
+{integer_constant}	{ glsllval.INTCONSTANT = atoi(yytext); return INTCONSTANT; }
+{floating_constant}	{ glsllval.FLOATCONSTANT = atof(yytext); return FLOATCONSTANT; }
 
 %%
 
-int yywrap()
+int glslwrap()
 {
 	return 1;
 }
 
-void yyerror(const char *s)
+void glslerror(const char *s)
 {
-	printf("error: %s\n", s);
+	fprintf(stderr, "GLSL parse error: %s\n", s);
 }

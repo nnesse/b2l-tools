@@ -9,8 +9,9 @@
 
 #include "glsl_common.h"
 
-void yyerror(const char *s);
-int yylex (void);
+#include "lex.glsl.h"
+void glslerror(const char *s);
+int glsllex (void);
 
 int8_t *buffer = NULL;
 int8_t *buffer_end = NULL;
@@ -171,6 +172,7 @@ struct declaration *g_decls = NULL;
 %defines
 
 %define api.value.type union
+%define api.prefix glsl
 
 %type <struct function *> function_declarator
 %type <struct function *> function_header_with_parameters

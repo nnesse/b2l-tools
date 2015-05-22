@@ -24,14 +24,17 @@ INSTALL_DATA?=$(INSTALL) -m 644
 
 all: b2l_material_editor.so
 
-glsl.yy.c: glsl.lex
-	$(FLEX) -o $@ $<
+lex.glsl.c lex.glsl.h: glsl.lex
+	$(FLEX) --header-file=lex.glsl.h -P glsl -o $@ $<
+
+lex.meta.c lex.meta.h: glsl_meta_filter.lex
+	$(FLEX) --header-file=lex.meta.h -P meta -o $@ $<
 
 glsl.tab.c glsl.tab.h: glsl.y
 	$(BISON) $<
 
-b2l_material_editor.so: b2l_material_editor.c glsl.yy.c glsl.tab.c glsl_common.h
-	$(CC) $(CFLAGS) glsl.tab.c $< $(LDFLAGS) -o $@
+b2l_material_editor.so: b2l_material_editor.c lex.meta.c lex.meta.h lex.glsl.c lex.glsl.h glsl.tab.c glsl_common.h
+	$(CC) $(CFLAGS) glsl.tab.c lex.meta.c lex.glsl.c $< $(LDFLAGS) -o $@
 
 clean:
 	-rm b2l_material_editor.so glsl.yy.c glsl.tab.c glsl.tab.h

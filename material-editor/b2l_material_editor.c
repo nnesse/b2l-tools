@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 #include "lua.h"
 #include "lualib.h"
@@ -12,7 +13,10 @@
 #include "glsl.tab.h"
 #include "glsl_common.h"
 
-#include "glsl.yy.c"
+#include "lex.glsl.h"
+#include "lex.meta.h"
+
+extern char *metalval;
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
 
@@ -558,16 +562,14 @@ static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
 	char *text;
 	int sz;
 	int rc;
-	YY_BUFFER_STATE bs;
 	g_decls = NULL;
 	const char *temp = lua_tostring(L, text_idx);
 	sz = strlen(temp);
 	text = malloc(sz + 2);
 	strcpy(text, temp);
 	text[sz + 1] = 0;
-	bs = yy_scan_buffer(text, sz + 2);
-	yy_switch_to_buffer(bs);
-	rc = yyparse();
+	glsl_scan_buffer(text, sz + 2);
+	rc = glslparse();
 	if (rc) {
 		free(text);
 		return NULL;
@@ -577,7 +579,25 @@ static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
 		process_declaration(L, uniform_text_idx, d);
 		d = d->next;
 	}
-	return text;
+	meta_scan_buffer(text, sz + 2);
+	int filtered_sz = 0;
+	while(metalex()) {
+		filtered_sz += strlen(metalval);
+	}
+	metalex_destroy();
+
+	char *out_text = malloc(filtered_sz + 1);
+	char *c = out_text;
+	meta_scan_buffer(text, sz + 2);
+	while(metalex()) {
+		int s = strlen(metalval);
+		memcpy(c, metalval, s);
+		c += s;
+	}
+	*c = 0;
+	metalex_destroy();
+	free(text);
+	return out_text;
 }
 
 static int set_shaders(lua_State *L)
