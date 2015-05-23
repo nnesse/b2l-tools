@@ -33,11 +33,13 @@ lex.meta.c lex.meta.h: glsl_meta_filter.lex
 glsl.tab.c glsl.tab.h: glsl.y
 	$(BISON) $<
 
-b2l_material_editor.so: b2l_material_editor.c lex.meta.c lex.meta.h lex.glsl.c lex.glsl.h glsl.tab.c glsl_common.h
+GENERATED=lex.glsl.c lex.glsl.h lex.meta.c lex.meta.h glsl.tab.c glsl.tab.h
+
+b2l_material_editor.so: b2l_material_editor.c $(GENERATED) glsl_common.h
 	$(CC) $(CFLAGS) glsl.tab.c lex.meta.c lex.glsl.c $< $(LDFLAGS) -o $@
 
 clean:
-	-rm b2l_material_editor.so glsl.yy.c glsl.tab.c glsl.tab.h
+	-rm b2l_material_editor.so $(GENERATED)
 
 install: b2l_material_editor.so $(srcdir)/b2l_material_editor.lua
 	$(INSTALL) -d $(DESTDIR)$(dataluadir)
