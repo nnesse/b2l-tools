@@ -3,13 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <X11/Xlib.h>
-
-#define GLB_ENABLE_GLX_ARB_create_context
-#define GLB_ENABLE_GLX_ARB_create_context_profile
-#include "glb-glx.h"
 
 struct glwin;
+
+typedef void * glwin_context_t;
 
 struct glwin_callbacks {
 	void (*on_create)(struct glwin *win);
@@ -27,13 +24,12 @@ struct glwin_callbacks {
 };
 
 struct glwin {
-	Window window;
-	GLXFBConfig fb_config;
-	GLXWindow glx_window;
+	uint32_t window; //Window
+	void *fb_config; //GLXFBConfig
+	uint32_t glx_window; //GLXWindow
 	struct glwin_callbacks callbacks;
 	int width;
 	int height;
-	XEvent current_event;
 	int x_state_mask;
 	struct glwin *next;
 	struct glwin **pprev;
@@ -47,14 +43,14 @@ struct glwin *glwin_manager_create_window(const char *title,
 		int width,
 		int height);
 
-void glwin_manager_make_current(struct glwin *win, GLXContext context);
+void glwin_manager_make_current(struct glwin *win, glwin_context_t context);
 bool glwin_manager_process_events();
 int glwin_manager_get_events(bool block);
 void glwin_manager_destroy_window(struct glwin *win);
 void glwin_manager_fd_bind(int fd, struct glwin *win);
 void glwin_manager_fd_unbind(int fd);
 
-GLXContext glwin_create_context(struct glwin *win, int maj_ver, int min_ver);
+glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver);
 void glwin_swap_buffers(struct glwin *win);
 void glwin_show_window(struct glwin *win);
 

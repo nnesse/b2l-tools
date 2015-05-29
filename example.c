@@ -27,7 +27,7 @@ int main()
 		exit(-1);
 
 	glwin_show_window(win);
-	GLXContext ctx = glwin_create_context(win, 3, 3);
+	glwin_context_t ctx = glwin_create_context(win, 3, 3);
 	if (!ctx)
 		exit(-1);
 	glwin_manager_make_current(win, ctx);

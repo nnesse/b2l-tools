@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <errno.h>
 
+#define GLB_ENABLE_GLX_ARB_create_context
+#define GLB_ENABLE_GLX_ARB_create_context_profile
+#include "glb-glx.h"
+
 int glwin_epoll_fd;
 static int g_x11_fd;
 static int g_event_count;
@@ -315,12 +319,12 @@ struct glwin *glwin_manager_create_window(const char *title, struct glwin_callba
 	return win;
 }
 
-void glwin_manager_make_current(struct glwin *win, GLXContext context)
+void glwin_manager_make_current(struct glwin *win, glwin_context_t context)
 {
 	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
 }
 
-GLXContext glwin_create_context(struct glwin *win, int maj_ver, int min_ver)
+glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver)
 {
 	int attribList[] = {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
