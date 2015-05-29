@@ -35,20 +35,20 @@ struct glwin {
 	struct glwin **pprev;
 };
 
-bool glwin_manager_init();
-void glwin_manager_shutdown();
+bool glwin_init();
+void glwin_shutdown();
 
-struct glwin *glwin_manager_create_window(const char *title,
+struct glwin *glwin_create_window(const char *title,
 		struct glwin_callbacks *callbacks,
 		int width,
 		int height);
 
-void glwin_manager_make_current(struct glwin *win, glwin_context_t context);
-bool glwin_manager_process_events();
-int glwin_manager_get_events(bool block);
-void glwin_manager_destroy_window(struct glwin *win);
-void glwin_manager_fd_bind(int fd, struct glwin *win);
-void glwin_manager_fd_unbind(int fd);
+void glwin_make_current(struct glwin *win, glwin_context_t context);
+bool glwin_process_events();
+int glwin_get_events(bool block);
+void glwin_destroy_window(struct glwin *win);
+void glwin_fd_bind(int fd, struct glwin *win);
+void glwin_fd_unbind(int fd);
 
 glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver);
 void glwin_swap_buffers(struct glwin *win);

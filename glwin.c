@@ -203,7 +203,7 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 	return 0;
 }
 
-bool glwin_manager_init()
+bool glwin_init()
 {
 	g_event_count = 0;
 	glwin_epoll_fd = epoll_create1(0);
@@ -226,12 +226,12 @@ bool glwin_manager_init()
 	g_delete_atom = XInternAtom(g_display, "WM_DELETE_WINDOW", True);
 }
 
-void glwin_manager_shutdown()
+void glwin_shutdown()
 {
 	XCloseDisplay(g_display);
 }
 
-struct glwin *glwin_manager_create_window(const char *title, struct glwin_callbacks *callbacks, int width, int height)
+struct glwin *glwin_create_window(const char *title, struct glwin_callbacks *callbacks, int width, int height)
 {
 	GLXFBConfig fb_config;
 	Window window;
@@ -320,7 +320,7 @@ struct glwin *glwin_manager_create_window(const char *title, struct glwin_callba
 	return win;
 }
 
-void glwin_manager_make_current(struct glwin *win, glwin_context_t context)
+void glwin_make_current(struct glwin *win, glwin_context_t context)
 {
 	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
 }
@@ -384,13 +384,13 @@ static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
 	return True;
 }
 
-int glwin_manager_get_events(bool block)
+int glwin_get_events(bool block)
 {
 	int rc = 0;
 	if (g_event_count < 100) {
 		rc = epoll_wait(glwin_epoll_fd, g_events + g_event_count, 100 - g_event_count, block ? -1 : 0);
 		if (rc == -1) {
-			fprintf(stderr, "glwin_manager_get_events(): epoll_wait() failed: %s", strerror(errno));
+			fprintf(stderr, "glwin_get_events(): epoll_wait() failed: %s", strerror(errno));
 		} else {
 			g_event_count += rc;
 		}
@@ -398,7 +398,7 @@ int glwin_manager_get_events(bool block)
 	return rc;
 }
 
-bool glwin_manager_process_events()
+bool glwin_process_events()
 {
 	XEvent event;
 	int i;
@@ -425,7 +425,7 @@ void glwin_swap_buffers(struct glwin *win)
 	XSync(g_display, 0);
 }
 
-void glwin_manager_destroy_window(struct glwin *win)
+void glwin_destroy_window(struct glwin *win)
 {
 	glXMakeContextCurrent(g_display, None, None, NULL);
 	glXDestroyWindow(g_display, win->glx_window);
@@ -434,7 +434,7 @@ void glwin_manager_destroy_window(struct glwin *win)
 	retire_glwin(win);
 }
 
-void glwin_manager_fd_bind(int fd, struct glwin *win)
+void glwin_fd_bind(int fd, struct glwin *win)
 {
 	struct epoll_event ev;
 	ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
@@ -443,7 +443,7 @@ void glwin_manager_fd_bind(int fd, struct glwin *win)
 	g_fd_binding[fd] = win;
 }
 
-void glwin_manager_fd_unbind(int fd)
+void glwin_fd_unbind(int fd)
 {
 	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	g_fd_binding[fd] = NULL;
