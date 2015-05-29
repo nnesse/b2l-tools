@@ -53,6 +53,7 @@ void glwin_manager_fd_unbind(int fd);
 glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver);
 void glwin_swap_buffers(struct glwin *win);
 void glwin_show_window(struct glwin *win);
+void glwin_fullscreen(struct glwin *win, bool fullscreen);
 
 bool glwin_is_button_pressed(struct glwin *win, int button_no);
 

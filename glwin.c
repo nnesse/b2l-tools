@@ -3,6 +3,7 @@
 #include "glwin.h"
 
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <sys/epoll.h>
 #include <sys/resource.h>
 #include <stdlib.h>
@@ -333,6 +334,49 @@ glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver
 		0
 	};
 	return glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
+}
+
+void glwin_fullscreen(struct glwin *win, bool fullscreen)
+{
+	XWindowAttributes attr;
+	bool mapped;
+
+	Atom net_wm_state = XInternAtom(g_display, "_NET_WM_STATE", False);
+	Atom net_wm_state_fullscreen = XInternAtom(g_display, "_NET_WM_STATE_FULLSCREEN", False);
+
+	XGetWindowAttributes(g_display, win->window, &attr);
+	mapped = (attr.map_state == IsUnmapped) ? false : true;
+
+	if (mapped) {
+		XEvent e;
+		e.xany.type = ClientMessage;
+		e.xclient.message_type = net_wm_state;
+		e.xclient.format = 32;
+		e.xclient.window = win->window;
+		e.xclient.data.l[0] = fullscreen ? 1 : 0;
+		e.xclient.data.l[1] = net_wm_state_fullscreen;
+		e.xclient.data.l[3] = 0;
+		XSendEvent(g_display,
+				RootWindow(g_display, g_screen),
+				0,
+				SubstructureNotifyMask |
+				SubstructureRedirectMask, &e);
+		XFlush(g_display);
+
+	} else {
+		Atom atoms[2] = {
+			net_wm_state_fullscreen,
+			None
+		};
+		XChangeProperty(g_display,
+			win->window,
+			net_wm_state,
+			XA_ATOM,
+			32,
+			PropModeReplace,
+			(const unsigned char *)atoms,
+			fullscreen ? 1 : 0);
+	}
 }
 
 static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
