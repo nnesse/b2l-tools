@@ -9,6 +9,7 @@ local pprint = require 'pprint'
 
 b2l_data = false
 current_scene = false
+current_object = false
 
 local window_main = Gtk.Window {
    title = 'B2L Material Editor',
@@ -65,7 +66,7 @@ function update_shaders()
 	if not b2l_data then
 		return
 	end
-	local uniforms = b2l_gl.set_shaders(b2l_data.userdata, vs_text, fs_text)
+	local uniforms = b2l_gl.set_shaders(vs_text, fs_text)
 	if not uniforms then
 		local dialog = Gtk.MessageDialog {
 			parent = window,
@@ -343,7 +344,7 @@ function load_b2l_file(filename)
 			}
 		end
 
-		b2l_gl.parse_b2l_data(b2l_data, bin_name)
+		b2l_gl.parse_b2l_data(bin_name)
 
 		local material_fn = loadfile(mat_name)
 		if material_fn then
@@ -507,8 +508,7 @@ object_combo = Gtk.ComboBox {
 	on_changed = function (combo)
 		local row = objects_store[combo:get_active_iter()]
 		local object_name = row[1]
-		b2l_gl.set_object(object_name)
-
+		current_object = object_name
 		actions_store:clear()
 
 		local armature_name = b2l_data.objects[object_name].armature_deform
@@ -527,6 +527,7 @@ object_combo = Gtk.ComboBox {
 			end
 		end
 		action_combo:set_active_iter(actions_store:get_iter_first())
+		queue_render()
 	end
 }
 
