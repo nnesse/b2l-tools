@@ -7,7 +7,7 @@ local GLib = lgi.require('GLib')
 local GdkPixbuf = lgi.require('GdkPixbuf')
 local pprint = require 'pprint'
 
-scene = false
+b2l_data = false
 
 local window_main = Gtk.Window {
    title = 'B2L Material Editor',
@@ -61,10 +61,10 @@ function setting_changed()
 end
 
 function update_shaders()
-	if not scene then
+	if not b2l_data then
 		return
 	end
-	local uniforms = b2l_gl.set_shaders(scene.userdata, vs_text, fs_text)
+	local uniforms = b2l_gl.set_shaders(b2l_data.userdata, vs_text, fs_text)
 	if not uniforms then
 		local dialog = Gtk.MessageDialog {
 			parent = window,
@@ -306,14 +306,14 @@ function load_b2l_file(filename)
 	if lua_name then
 		local bin_name = lua_name .. ".bin"
 		local mat_name = lua_name .. ".mat"
-		scene = (loadfile(lua_name))()
+		b2l_data = (loadfile(lua_name))()
 
 		objects_store:clear()
 		materials_store:clear()
 		actions_store:clear()
 
 		objects = {}
-		for k, v in pairs(scene.scene.objects) do
+		for k, v in pairs(b2l_data.objects) do
 			local object = {}
 			objects[k] = object
 			if v.nla_tracks then
@@ -332,13 +332,13 @@ function load_b2l_file(filename)
 			end
 		end
 
-		for i, v in ipairs(scene.materials) do
+		for i, v in ipairs(b2l_data.materials) do
 			materials_store:append {
 				[1] = v
 			}
 		end
 
-		b2l_gl.parse_scene(scene, bin_name)
+		b2l_gl.parse_b2l_data(b2l_data, bin_name)
 
 		local material_fn = loadfile(mat_name)
 		if material_fn then
@@ -506,9 +506,9 @@ object_combo = Gtk.ComboBox {
 
 		actions_store:clear()
 
-		local armature_name = scene.scene.objects[object_name].armature_deform
+		local armature_name = b2l_data.objects[object_name].armature_deform
 		if armature_name then
-			local armature_obj = scene.scene.objects[armature_name]
+			local armature_obj = b2l_data.objects[armature_name]
 			if armature_obj.nla_tracks then
 				for i, track in ipairs(armature_obj.nla_tracks) do
 					for j, action in ipairs(track) do

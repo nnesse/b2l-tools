@@ -26,13 +26,13 @@ extern char *metalval;
 
 #define MAX_TEXTURE_UNITS 8
 
-static int parse_scene(lua_State *L);
+static int parse_b2l_data(lua_State *L);
 static int need_redraw(lua_State *L);
 static int set_shaders(lua_State *L);
 static int set_object(lua_State *L);
 
 luaL_Reg lua_b2l_material_editor[] = {
-	{ "parse_scene", parse_scene },
+	{ "parse_b2l_data", parse_b2l_data},
 	{ "set_object", set_object },
 	{ "need_redraw", need_redraw},
 	{ "set_shaders", set_shaders },
@@ -42,7 +42,7 @@ luaL_Reg lua_b2l_material_editor[] = {
 static GLuint g_texture_names[MAX_TEXTURE_UNITS];
 
 static struct object *g_obj = NULL;
-static GLXContext g_ctx;
+static glwin_context_t g_ctx;
 static struct glwin *g_win;
 static lua_State *g_L;
 static bool g_need_redraw = true;
@@ -301,7 +301,7 @@ static void on_resize(struct glwin *win)
 
 static void on_destroy(struct glwin *win)
 {
-	glwin_manager_destroy_window(win);
+	glwin_destroy_window(win);
 }
 
 struct glwin_callbacks cb;
@@ -449,8 +449,8 @@ static void init_scene(struct scene *s);
 
 static int event_process()
 {
-	glwin_manager_get_events(false);
-	bool ret = glwin_manager_process_events();
+	glwin_get_events(false);
+	bool ret = glwin_process_events();
 	redraw(g_win);
 	return ret;
 }
@@ -479,8 +479,8 @@ int luaopen_b2l_material_editor(lua_State *L)
 	cb.on_mouse_move = on_mouse_move;
 	cb.on_mouse_wheel = on_mouse_wheel;
 	cb.on_resize = on_resize;
-	glwin_manager_init();
-	g_win = glwin_manager_create_window("B2L 3D View", &cb, 512, 512);
+	glwin_init();
+	g_win = glwin_create_window("B2L 3D View", &cb, 512, 512);
 	if (!g_win)
 		exit(-1);
 
@@ -488,7 +488,7 @@ int luaopen_b2l_material_editor(lua_State *L)
 	g_ctx = glwin_create_context(g_win, 3, 3);
 	if (!g_ctx)
 		exit(-1);
-	glwin_manager_make_current(g_win, g_ctx);
+	glwin_make_current(g_win, g_ctx);
 	glb_glcore_init(3, 3);
 	GMainContext *ctx = g_main_context_default();
 	g_src = g_unix_fd_source_new(glwin_epoll_fd, G_IO_IN);
@@ -748,11 +748,9 @@ static void setup_vao(struct scene *s, struct mesh *m)
 
 static void redraw(struct glwin *win)
 {
-	GLXDrawable write_draw = glXGetCurrentDrawable();
-	GLXDrawable read_draw = glXGetCurrentDrawable();
-	Display *display = glXGetCurrentDisplay();
-	GLXContext prev_ctx = glXGetCurrentContext();
-	glwin_manager_make_current(win, g_ctx);
+	struct glwin_thread_state thread_state;
+	glwin_get_thread_state(&thread_state);
+	glwin_make_current(win, g_ctx);
 
 	lua_State *L = g_L;
 	struct mesh *m;
@@ -947,7 +945,7 @@ end:
 			printf("render_scene GL error = %d\n", err);
 	}
 	glwin_swap_buffers(g_win);
-	glXMakeContextCurrent(display, write_draw, read_draw, prev_ctx);
+	glwin_set_thread_state(&thread_state);
 	g_need_redraw = false;
 	return;
 }
@@ -965,9 +963,9 @@ static int set_object(lua_State *L)
 	return 0;
 }
 
-static int parse_scene(lua_State *L)
+static int parse_b2l_data(lua_State *L)
 {
-	int scene_index = lua_gettop(L) - 1;
+	int root_index = lua_gettop(L) - 1;
 	int filename_index = lua_gettop(L);
 
 	size_t blob_size;
@@ -988,9 +986,9 @@ static int parse_scene(lua_State *L)
 	s->recompile_shaders = false;
 
 	lua_pushlightuserdata(L, s);
-	lua_setfield(L, scene_index, "userdata");
+	lua_setfield(L, root_index, "userdata");
 
-	lua_getfield(L, scene_index, "meshes");
+	lua_getfield(L, root_index, "meshes");
 	int meshes_index = lua_gettop(L);
 	lua_pushnil(L);
 	while (lua_next(L, meshes_index)) {
@@ -1082,8 +1080,7 @@ static int parse_scene(lua_State *L)
 	}
 	lua_pop(L, 2);
 
-	lua_getfield(L, scene_index, "scene");
-	lua_getfield(L, -1, "objects");
+	lua_getfield(L, root_index, "objects");
 	int objects_index = lua_gettop(L);
 	lua_pushnil(L);
 	while (lua_next(L, objects_index)) {
@@ -1146,6 +1143,6 @@ static int parse_scene(lua_State *L)
 
 		lua_pop(L, 1);
 	}
-	lua_pop(L, 3);
+	lua_pop(L, 2);
 	return 0;
 }
