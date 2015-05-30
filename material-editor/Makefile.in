@@ -39,7 +39,7 @@ b2l_material_editor.so: b2l_material_editor.c $(GENERATED) glsl_common.h
 	$(CC) $(CFLAGS) glsl.tab.c lex.meta.c lex.glsl.c $< $(LDFLAGS) -o $@
 
 clean:
-	-rm b2l_material_editor.so $(GENERATED)
+	@-rm b2l_material_editor.so $(GENERATED)
 
 install: b2l_material_editor.so $(srcdir)/b2l_material_editor.lua
 	$(INSTALL) -d $(DESTDIR)$(dataluadir)
