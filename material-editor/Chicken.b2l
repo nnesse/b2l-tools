@@ -1,89 +1,105 @@
 return {
 scenes = {
-['Scene'] = {
-	frame_start = 1.000000,
-	frame_end= 250.000000,
-	frame_step = 1.000000,
-	objects = {
-		'Armature_chicken',
-		'Chicken',
-		'Lamp.001',
-		'Lamp',
-		'Point',
-		'Camera.001',
-		'Camera',
+	['Scene'] = {
+		frame_start = 1.000000,
+		frame_end= 250.000000,
+		frame_step = 1.000000,
+		objects = {
+			['Armature_chicken'] = {
+				num_frames = 249,
+				object_transform_array_offset = 0,
+			},
+			['Chicken'] = {
+				num_frames = 249,
+				object_transform_array_offset = 15936,
+				vertex_group_transform_array_offset = 31872,
+			},
+			['Lamp.001'] = {
+				num_frames = 249,
+				object_transform_array_offset = 430272,
+			},
+			['Lamp'] = {
+				num_frames = 249,
+				object_transform_array_offset = 446208,
+			},
+			['Point'] = {
+				num_frames = 249,
+				object_transform_array_offset = 462144,
+			},
+			['Camera.001'] = {
+				num_frames = 249,
+				object_transform_array_offset = 478080,
+			},
+			['Camera'] = {
+				num_frames = 249,
+				object_transform_array_offset = 494016,
+			},
+		},
 	},
-}
 },
 objects = {
-		['Armature_chicken'] = {
-			type = 'ARMATURE',
-			data = 'Armature_chicken',
-			num_frames = 249,
-			nla_tracks = {
+	['Armature_chicken'] = {
+		type = 'ARMATURE',
+		data = 'Armature_chicken',
+		nla_tracks = {
+			{
+				name = 'NlaTrack.003',
 				{
-					name = 'NlaTrack.003',
-					{
-						name = 'Walk',
-						frame_start = 33,
-						frame_end = 58,
-					},
-					{
-						name = 'Idle',
-						frame_start = 106,
-						frame_end = 169,
-					},
+					name = 'Walk',
+					frame_start = 33,
+					frame_end = 58,
 				},
 				{
-					name = 'NlaTrack',
-					{
-						name = 'Paw',
-						frame_start = 16,
-						frame_end = 31,
-					},
-				},
-				{
-					name = 'NlaTrack.004',
-					{
-						name = 'Pick',
-						frame_start = 1,
-						frame_end = 15,
-					},
-				},
-				{
-					name = 'NlaTrack.001',
-					{
-						name = 'Die',
-						frame_start = 59,
-						frame_end = 82,
-					},
-					{
-						name = 'Sleep',
-						frame_start = 82,
-						frame_end = 106,
-					},
+					name = 'Idle',
+					frame_start = 106,
+					frame_end = 169,
 				},
 			},
-			object_transform_array_offset = 0,
+			{
+				name = 'NlaTrack',
+				{
+					name = 'Paw',
+					frame_start = 16,
+					frame_end = 31,
+				},
+			},
+			{
+				name = 'NlaTrack.004',
+				{
+					name = 'Pick',
+					frame_start = 1,
+					frame_end = 15,
+				},
+			},
+			{
+				name = 'NlaTrack.001',
+				{
+					name = 'Die',
+					frame_start = 59,
+					frame_end = 82,
+				},
+				{
+					name = 'Sleep',
+					frame_start = 82,
+					frame_end = 106,
+				},
+			},
 		},
-		['Camera'] = {
-			type = 'CAMERA',
-			data = 'Camera.001',
-			num_frames = 249,
-			object_transform_array_offset = 16000,
-		},
-		['Camera.001'] = {
-			type = 'CAMERA',
-			data = 'Camera.002',
-			num_frames = 249,
-			object_transform_array_offset = 32000,
-		},
-		['Chicken'] = {
-			parent = 'Armature_chicken',
-			parent_type = 'OBJECT',
-			type = 'MESH',
-			data = 'Chicken',
-			vertex_groups = {
+	},
+	['Camera'] = {
+		type = 'CAMERA',
+		data = 'Camera.001',
+	},
+	['Camera.001'] = {
+		type = 'CAMERA',
+		data = 'Camera.002',
+	},
+	['Chicken'] = {
+		parent = 'Armature_chicken',
+		parent_type = 'OBJECT',
+		type = 'MESH',
+		data = 'Chicken',
+		vertex_groups = {
 				'Wishbone',
 				'NeckBone',
 				'Head',
@@ -109,30 +125,21 @@ objects = {
 				'Breast_R',
 				'LegIK_L',
 				'LegIK_R',
-			},
-			armature_deform = 'Armature_chicken',
-			num_frames = 249,
-			object_transform_array_offset = 48000,
-			vertex_group_transform_array_offset = 64000,
 		},
-		['Lamp'] = {
-			type = 'LAMP',
-			data = 'Spot.004',
-			num_frames = 249,
-			object_transform_array_offset = 464000,
-		},
-		['Lamp.001'] = {
-			type = 'LAMP',
-			data = 'Spot.005',
-			num_frames = 249,
-			object_transform_array_offset = 480000,
-		},
-		['Point'] = {
-			type = 'LAMP',
-			data = 'Point.005',
-			num_frames = 249,
-			object_transform_array_offset = 496000,
-		},
+		armature_deform = 'Armature_chicken',
+	},
+	['Lamp'] = {
+		type = 'LAMP',
+		data = 'Spot.004',
+	},
+	['Lamp.001'] = {
+		type = 'LAMP',
+		data = 'Spot.005',
+	},
+	['Point'] = {
+		type = 'LAMP',
+		data = 'Point.005',
+	},
 },
 meshes={
 	['Chicken'] = {
@@ -147,12 +154,12 @@ meshes={
 				triangle_count = 430,
 			},
 		},
-		index_array_offset = 512000,
-		vertex_co_array_offset = 514580,
-		vertex_normal_array_offset = 518264,
-		uv_array_offset = 521948,
-		weights_array_offset = 524404,
-		tangent_array_offset = 537912,
+		index_array_offset = 509952,
+		vertex_co_array_offset = 512532,
+		vertex_normal_array_offset = 516216,
+		uv_array_offset = 519900,
+		weights_array_offset = 522356,
+		tangent_array_offset = 535864,
 	},
 },
 armatures={
@@ -244,8 +251,8 @@ armatures={
 			name = 'Head',
 			parent='NeckBone',
 		},
-		tail_array_offset = 542824,
-		transform_array_offset = 543088,
+		tail_array_offset = 540776,
+		transform_array_offset = 541040,
 	}
 },
 materials={

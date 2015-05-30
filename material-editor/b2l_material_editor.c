@@ -389,7 +389,6 @@ struct object {
 		struct object *ref;
 	} armature_deform;
 	bool is_mesh;
-	int num_frames;
 	int num_vertex_groups;
 	struct mesh *mesh;
 };
@@ -834,7 +833,12 @@ static void redraw(struct glwin *win)
 		frame += lua_tointeger(g_L, -1);
 		lua_pop(g_L, 1);
 
-		int offset = g_obj->vertex_group_transform_array_offset;
+		lua_getglobal(g_L, "current_scene");
+		lua_getfield(g_L, -1, "objects");
+		lua_getfield(g_L, -1, g_obj->name);
+		lua_getfield(g_L, -1, "vertex_group_transform_array_offset");
+		int offset = lua_tointeger(L, -1);
+		lua_pop(L, 4);
 		offset += frame * sizeof(float) * 4 * 4 * g_obj->num_vertex_groups;
 
 		glUniformMatrix4fv(s->groups_index,
@@ -1094,10 +1098,6 @@ static int parse_b2l_data(lua_State *L)
 		is_mesh = !strcmp(lua_tostring(L, -1),"MESH");
 		lua_pop(L, 1);
 
-		lua_getfield(L, obj_index, "num_frames");
-		obj->num_frames = lua_tointeger(L, -1);
-		lua_pop(L, 1);
-
 		lua_getfield(L, obj_index, "armature_deform");
 		if (lua_isstring(L, -1)) {
 			obj->armature_deform.str = strdup(lua_tostring(L, -1));
@@ -1114,10 +1114,6 @@ static int parse_b2l_data(lua_State *L)
 			obj->mesh = NULL;
 		}
 
-		lua_getfield(L, obj_index, "object_transform_array_offset");
-		obj->object_transform_array_offset = lua_tointeger(L, -1);
-		lua_pop(L, 1);
-
 		lua_getfield(L, obj_index, "vertex_groups");
 		if (lua_isnil(L, -1)) {
 			obj->num_vertex_groups = 0;
@@ -1125,14 +1121,6 @@ static int parse_b2l_data(lua_State *L)
 			lua_len(L, -1);
 			obj->num_vertex_groups = lua_tointeger(L, -1);
 			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		lua_getfield(L, obj_index, "vertex_group_transform_array_offset");
-		if (lua_isnumber(L, -1)) {
-			obj->vertex_group_transform_array_offset = lua_tointeger(L, -1);
-		} else {
-			obj->vertex_group_transform_array_offset = -1;
 		}
 		lua_pop(L, 1);
 

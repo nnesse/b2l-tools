@@ -8,6 +8,7 @@ local GdkPixbuf = lgi.require('GdkPixbuf')
 local pprint = require 'pprint'
 
 b2l_data = false
+current_scene = false
 
 local window_main = Gtk.Window {
    title = 'B2L Material Editor',
@@ -330,6 +331,10 @@ function load_b2l_file(filename)
 					[1] = k
 				}
 			end
+		end
+
+		for k, v in pairs(b2l_data.scenes) do
+			current_scene = v
 		end
 
 		for i, v in ipairs(b2l_data.materials) do
