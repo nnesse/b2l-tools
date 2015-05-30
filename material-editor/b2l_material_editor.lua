@@ -344,7 +344,7 @@ function load_b2l_file(filename)
 			}
 		end
 
-		b2l_gl.parse_b2l_data(bin_name)
+		b2l_gl.set_b2l_file(bin_name)
 
 		local material_fn = loadfile(mat_name)
 		if material_fn then

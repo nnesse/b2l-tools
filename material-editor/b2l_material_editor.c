@@ -26,12 +26,12 @@ extern char *metalval;
 
 #define MAX_TEXTURE_UNITS 8
 
-static int parse_b2l_data(lua_State *L);
+static int set_b2l_file(lua_State *L);
 static int need_redraw(lua_State *L);
 static int set_shaders(lua_State *L);
 
 luaL_Reg lua_b2l_material_editor[] = {
-	{ "parse_b2l_data", parse_b2l_data},
+	{ "set_b2l_file", set_b2l_file},
 	{ "need_redraw", need_redraw},
 	{ "set_shaders", set_shaders },
 	{ NULL, NULL }
@@ -323,11 +323,11 @@ static uint8_t *get_file_buffer(const char *fname, size_t *size)
 
 struct gl_state {
 	uint8_t *blob;
-	GLuint blob_buffer;
 	size_t blob_size;
 	bool initialized;
 	bool recompile_shaders;
 	bool program_valid;
+	bool blob_updated;
 	const char *fragment_shader_text;
 	const char *vertex_shader_text;
 	GLuint vertex_shader;
@@ -592,10 +592,8 @@ static void init_gl_state()
 	g_gl_state.fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 	glAttachShader(g_gl_state.program, g_gl_state.vertex_shader);
 	glAttachShader(g_gl_state.program, g_gl_state.fragment_shader);
-
 	glGenBuffers(1, &g_gl_state.vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, g_gl_state.vbo);
-	glBufferData(GL_ARRAY_BUFFER, g_gl_state.blob_size, g_gl_state.blob, GL_STATIC_DRAW);
 
 	g_gl_state.initialized = true;
 }
@@ -672,6 +670,11 @@ static void redraw(struct glwin *win)
 
 	glUseProgram(g_gl_state.program);
 	glBindVertexArray(g_gl_state.vao);
+
+	if (g_gl_state.blob_updated)  {
+		glBufferData(GL_ARRAY_BUFFER, g_gl_state.blob_size, g_gl_state.blob ,GL_STATIC_DRAW);
+		g_gl_state.blob_updated = false;
+	}
 
 	lua_getfield(L, -1, "vertex_normal_array_offset"); //9
 	int vertex_normal_array_offset = lua_tointeger(L, -1);
@@ -918,23 +921,19 @@ end:
 	return;
 }
 
-static int parse_b2l_data(lua_State *L)
+static int set_b2l_file(lua_State *L)
 {
-	int filename_index = lua_gettop(L);
-
 	size_t blob_size;
-	uint8_t *blob = get_file_buffer(lua_tostring(L, filename_index), &blob_size);
+	uint8_t *blob = get_file_buffer(lua_tostring(L, -1), &blob_size);
 	if (blob == NULL) {
-		printf("failed to load blob file %s\n",lua_tostring(L, filename_index));
+		printf("failed to load blob file %s\n",lua_tostring(L, -1));
 		return -1;
 	}
 	g_gl_state.blob = blob;
 	g_gl_state.blob_size = blob_size;
-	g_gl_state.initialized = false;
-	g_gl_state.blob_buffer = 0;
+	g_gl_state.blob_updated = true;
 	g_gl_state.fragment_shader_text = NULL;
 	g_gl_state.vertex_shader_text = NULL;
 	g_gl_state.program_valid = false;
-	g_gl_state.recompile_shaders = false;
 	return 0;
 }
