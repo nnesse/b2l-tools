@@ -780,20 +780,23 @@ static void redraw(struct glwin *win)
 		static int render_count = 0;
 		render_count++;
 		int frame;
-		lua_getglobal(L, "frame_start");
-		frame = lua_tointeger(g_L, -1);
-		lua_pop(g_L, 1);
+		lua_getglobal(L, "frame_start"); //16
+		frame = lua_tointeger(L, -1);
+		lua_getglobal(L, "frame_delta"); //17
+		frame += lua_tointeger(L, -1);
 
-		lua_getglobal(L, "frame_delta");
-		frame += lua_tointeger(g_L, -1);
-		lua_pop(g_L, 1);
-
-		lua_getglobal(g_L, "current_scene");
-		lua_getfield(g_L, -1, "objects");
-		lua_getfield(g_L, -1, current_object);
-		lua_getfield(g_L, -1, "vertex_group_transform_array_offset");
+		lua_getfield(L, -17, "scenes"); //18
+		lua_getglobal(L, "current_scene"); //19
+		lua_getfield(L, -2, lua_tostring(L, -1)); //20
+		if (!lua_istable(L, -1)) {
+			lua_pop(L, 20);
+			goto end;
+		}
+		lua_getfield(L, -1, "objects");
+		lua_getfield(L, -1, current_object);
+		lua_getfield(L, -1, "vertex_group_transform_array_offset");
 		int offset = lua_tointeger(L, -1);
-		lua_pop(L, 4);
+		lua_pop(L, 8);
 		offset += frame * sizeof(float) * 4 * 4 * num_vertex_groups;
 
 		glUniformMatrix4fv(g_gl_state.groups_index,

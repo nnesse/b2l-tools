@@ -288,6 +288,10 @@ frag_glsl_filter = Gtk.FileFilter {}
 frag_glsl_filter:set_name("OpenGL fragment shader")
 frag_glsl_filter:add_pattern("*.frag.glsl")
 
+scenes_store = Gtk.ListStore.new {
+	[1] = GObject.Type.STRING
+}
+
 objects_store = Gtk.ListStore.new {
 	[1] = GObject.Type.STRING
 }
@@ -310,6 +314,7 @@ function load_b2l_file(filename)
 		local mat_name = lua_name .. ".mat"
 		b2l_data = (loadfile(lua_name))()
 
+		scenes_store:clear()
 		objects_store:clear()
 		materials_store:clear()
 		actions_store:clear()
@@ -335,7 +340,9 @@ function load_b2l_file(filename)
 		end
 
 		for k, v in pairs(b2l_data.scenes) do
-			current_scene = v
+			scenes_store:append {
+				[1] = k
+			}
 		end
 
 		for i, v in ipairs(b2l_data.materials) do
@@ -356,6 +363,7 @@ function load_b2l_file(filename)
 		save_toolbutton.sensitive = false
 		object_combo:set_active_iter(objects_store:get_iter_first())
 		material_combo:set_active_iter(materials_store:get_iter_first())
+		scene_combo:set_active_iter(scenes_store:get_iter_first())
 	end
 end
 
@@ -531,6 +539,23 @@ object_combo = Gtk.ComboBox {
 	end
 }
 
+scene_combo = Gtk.ComboBox {
+	id = "Scene",
+	model = scenes_store,
+	active = 0,
+	cells = {
+		{
+			Gtk.CellRendererText(),
+			{ text = 1 }
+		}
+	},
+	on_changed = function (combo)
+		local row = scenes_store[combo:get_active_iter()]
+		current_scene = row[1]
+		queue_render()
+	end
+}
+
 material_combo = Gtk.ComboBox {
 	id = "Material",
 	model = materials_store,
@@ -663,15 +688,28 @@ local vbox_main = Gtk.VBox {
 			},
 			{
 				Gtk.Label {
-					label = "Object"
+					label = "Scene"
 				},
 				left_attach = 0,
 				top_attach = 1,
 			},
 			{
-				object_combo,
+				scene_combo,
 				left_attach = 1,
 				top_attach = 1,
+				width = 2,
+			},
+			{
+				Gtk.Label {
+					label = "Object"
+				},
+				left_attach = 0,
+				top_attach = 2,
+			},
+			{
+				object_combo,
+				left_attach = 1,
+				top_attach = 2,
 				width = 2,
 			},
 			{
@@ -679,12 +717,12 @@ local vbox_main = Gtk.VBox {
 					label = "Material"
 				},
 				left_attach = 0,
-				top_attach = 2,
+				top_attach = 3,
 			},
 			{
 				material_combo,
 				left_attach = 1,
-				top_attach = 2,
+				top_attach = 3,
 				width = 2,
 			},
 			{
@@ -692,12 +730,12 @@ local vbox_main = Gtk.VBox {
 					label = "Action"
 				},
 				left_attach = 0,
-				top_attach = 3,
+				top_attach = 4,
 			},
 			{
 				action_combo,
 				left_attach = 1,
-				top_attach = 3,
+				top_attach = 4,
 				width = 2,
 			},
 			{
@@ -705,12 +743,12 @@ local vbox_main = Gtk.VBox {
 					label = "Frame"
 				},
 				left_attach = 0,
-				top_attach = 4,
+				top_attach = 5,
 			},
 			{
 				action_scale,
 				left_attach = 1,
-				top_attach = 4,
+				top_attach = 5,
 				width = 2,
 			},
 			{
@@ -718,7 +756,7 @@ local vbox_main = Gtk.VBox {
 					label = "Vertex Shader"
 				},
 				left_attach = 0,
-				top_attach = 5,
+				top_attach = 6,
 			},
 			{
 				Gtk.HBox {
@@ -730,7 +768,7 @@ local vbox_main = Gtk.VBox {
 					},
 				},
 				left_attach = 1,
-				top_attach = 5,
+				top_attach = 6,
 				width = 2,
 			},
 			{
@@ -738,7 +776,7 @@ local vbox_main = Gtk.VBox {
 					label = "Fragment Shader"
 				},
 				left_attach = 0,
-				top_attach = 6,
+				top_attach = 7,
 			},
 			{
 				Gtk.HBox {
@@ -750,7 +788,7 @@ local vbox_main = Gtk.VBox {
 					},
 				},
 				left_attach = 1,
-				top_attach = 6,
+				top_attach = 7,
 				width = 2,
 			},
 		},
