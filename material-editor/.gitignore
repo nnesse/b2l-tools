@@ -1,9 +1,5 @@
 ignore
 
-#lua
-lua
-luac
-
 #bison
 glsl.tab.?
 

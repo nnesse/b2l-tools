@@ -940,3 +940,36 @@ static int set_b2l_file(lua_State *L)
 	g_gl_state.program_valid = false;
 	return 0;
 }
+
+static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
+{
+	(void)ud;
+	(void)osize;  /* not used */
+	if (nsize == 0) {
+		free(ptr);
+		return NULL;
+	} else {
+	   return realloc(ptr, nsize);
+	}
+}
+
+int main()
+{
+	lua_State *L = lua_newstate(l_alloc, NULL);
+	luaL_openlibs(L);
+
+	lua_getglobal(L, "package"); //1
+	lua_getfield(L, -1, "preload"); //2
+	lua_pushcfunction(L, luaopen_b2l_material_editor);
+	lua_setfield(L, -2, "b2l_material_editor");
+
+	lua_pushstring(L, DATA_LUA_DIR "/?.lua");
+	lua_setfield(L, -3, "path");
+
+	lua_pushstring(L, DATA_LUALIB_DIR "/?.so");
+	lua_setfield(L, -3, "cpath");
+
+	luaL_loadfile(L, DATA_DIR "/b2l_material_editor.lua");
+	lua_pcall(L, 0, 0, 0);
+	return 0;
+}
