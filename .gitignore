@@ -1,9 +1,13 @@
-#lua
-lua-5.2.3/src/lua
-lua-5.2.3/src/luac
-lua-5.2.3/src/liblua.a
+ignore
+
+#bison
+glsl.tab.?
+
+#flex
+glsl.lex.c
 
 #vim
+
 *.swp
 *.swo
 *.swn
