@@ -606,7 +606,7 @@ action_combo = Gtk.ComboBox {
 		frame_end = row[3]
 		frame_delta = 1
 		action_scale.adjustment.lower = 1
-		action_scale.adjustment.upper = (frame_end - frame_start)
+		action_scale.adjustment.upper = (frame_end - frame_start - 1)
 		action_scale:set_value(1)
 	end
 }
