@@ -10,11 +10,11 @@ VPATH=$(srcdir)
 
 CFLAGS:= -g -O0 -Wall -Wno-unused-function -DLUA_USE_LINUX -DLUA_COMPAT_ALL
 CFLAGS+= -DDATA_DIR=\"$(datadir)\" -DDATA_LUA_DIR=\"$(dataluadir)\" -DDATA_LUALIB_DIR=\"$(datalualibdir)\"
-CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/lua/src
-CFLAGS+= @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@ @CFLAGS@
+CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/lua/src -I${srcdir}/lgi/lgi
+CFLAGS+= @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@ @GMODULE2_CFLAGS@ @LIBFFI_CFLAGS@ @GOBJECT_INTROSPECTION_CFLAGS@ @CFLAGS@
 
-LDFLAGS:= -lglwin -lglb-glcore -lGL -Wl,-E
-LDFLAGS+= @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@ @LDFLAGS@
+LDFLAGS:= -lglwin -lglb-glcore -lGL
+LDFLAGS+= @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@ @GMODULE2_LIBS@ @LIBFFI_LIBS@ @GOBJECT_INTROSPECTION_LIBS@ @LDFLAGS@
 
 FLEX = @FLEX@
 BISON = @BISON@
@@ -42,19 +42,29 @@ LUA_O = $(addprefix lua/src/,lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfun
 	lcorolib.o ldblib.o liolib.o lmathlib.o loslib.o lstrlib.o ltablib.o \
 	loadlib.o linit.o)
 
-lua/src/%.o: lua/src/%.c
-	@mkdir -p lua/src
+LGI_O = $(addprefix lgi/lgi/,buffer.o callable.o core.o gi.o marshal.o object.o record.o)
+
+%.o: %.c
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
-b2l_material_editor: b2l_material_editor.c $(GENERATED) glsl_common.h $(LUA_O)
-	$(CC) $(CFLAGS) $(LUA_O) glsl.tab.c lex.meta.c lex.glsl.c $< $(LDFLAGS) -ldl -lm -o $@
+b2l_material_editor: b2l_material_editor.c $(GENERATED) glsl_common.h $(LUA_O) $(LGI_O)
+	$(CC) $(CFLAGS) $(LUA_O) $(LGI_O) glsl.tab.c lex.meta.c lex.glsl.c $< $(LDFLAGS) -ldl -lm -o $@
 
 clean:
 	@-rm b2l_material_editor $(GENERATED)
+	@-rm $(LUA_O) $(LGI_O)
+
+
+LGI_CORESOURCES = $(wildcard $(srcdir)/lgi/lgi/*.lua)
+LGI_OVERRIDES = $(wildcard $(srcdir)/lgi/lgi/override/*.lua)
 
 install: b2l_material_editor $(srcdir)/b2l_material_editor.lua
-	$(INSTALL) -d $(DESTDIR)$(dataluadir)
+	$(INSTALL) -d $(DESTDIR)$(dataluadir)/lgi/override
 	$(INSTALL) -d $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) b2l_material_editor $(DESTDIR)$(bindir)
 	$(INSTALL_DATA) $(srcdir)/b2l_material_editor.lua $(DESTDIR)$(datadir)
 	$(INSTALL_DATA) $(srcdir)/pprint.lua $(DESTDIR)$(dataluadir)
+	$(INSTALL_DATA) $(srcdir)/lgi/lgi.lua $(DESTDIR)$(dataluadir)
+	$(INSTALL_DATA) $(LGI_CORESOURCES) $(DESTDIR)$(dataluadir)/lgi
+	$(INSTALL_DATA) $(LGI_OVERRIDES) $(DESTDIR)$(dataluadir)/lgi/override

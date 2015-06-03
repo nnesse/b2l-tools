@@ -953,6 +953,8 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
 	}
 }
 
+int luaopen_lgi_corelgilua51 (lua_State* L);
+
 int main()
 {
 	lua_State *L = lua_newstate(l_alloc, NULL);
@@ -962,6 +964,9 @@ int main()
 	lua_getfield(L, -1, "preload"); //2
 	lua_pushcfunction(L, luaopen_b2l_material_editor);
 	lua_setfield(L, -2, "b2l_material_editor");
+
+	lua_pushcfunction(L, luaopen_lgi_corelgilua51);
+	lua_setfield(L, -2, "lgi.corelgilua51");
 
 	lua_pushstring(L, DATA_LUA_DIR "/?.lua");
 	lua_setfield(L, -3, "path");
