@@ -225,7 +225,7 @@ function update_shaders()
 					action = "OPEN",
 					on_selection_changed = function(chooser)
 						local filename = chooser:get_filename()
-						if active_material.params[k].value ~= filename then
+						if filename and active_material.params[k].value ~= filename then
 							setting_changed()
 						end
 						if filename then
