@@ -1,0 +1,49 @@
+return { 
+  Chicken = { 
+    params = { 
+      ambient_light = { 
+        datatype = 'float',
+        value = 0.1 
+      },
+      bump = { 
+        datatype = 'bool',
+        value = true 
+      },
+      bump_depth = { 
+        datatype = 'float',
+        value = 0.21428571428571 
+      },
+      diffuse_texture = { 
+        datatype = 'sampler2D',
+        value = 'ChickenE.png' 
+      },
+      light_angle_a = { 
+        datatype = 'float',
+        value = 0.83739837398374 
+      },
+      light_angle_b = { 
+        datatype = 'float',
+        value = 0.5 
+      },
+      light_color = { 
+        datatype = 'vec3',
+        value = { 1, 1, 1 } 
+      },
+      light_intensity = { 
+        datatype = 'float',
+        value = 0.5 
+      },
+      mvp = { 
+        datatype = 'mat4' 
+      },
+      normal_texture = { 
+        datatype = 'sampler2D',
+        value = 'ChickenE_nor.png' 
+      } 
+    },
+    shaders = { 
+      fs_filename = 'test.frag.glsl',
+      vs_filename = 'test.vert.glsl' 
+    } 
+  } 
+}
