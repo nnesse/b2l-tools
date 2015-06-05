@@ -637,6 +637,7 @@ action_scale = Gtk.Scale {
 	digits = 0,
 	on_value_changed = function(self)
 		frame_delta = self:get_value()
+		queue_render()
 	end,
 }
 
