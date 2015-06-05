@@ -295,6 +295,16 @@ static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
 {
 }
 
+static void print_lua_backtrace(lua_State *L)
+{
+	static lua_Debug ar;
+	int i = 0;
+	while (lua_getstack(L, i++, &ar)) {
+		lua_getinfo(L, "Sl", &ar);
+		printf("%s:%d\n", ar.source, ar.currentline);
+	}
+}
+
 static int make_path_relative(lua_State *L)
 {
 	if (!lua_isstring(L, -1) || !lua_isstring(L, -2)) {
