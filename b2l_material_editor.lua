@@ -513,6 +513,7 @@ save_toolbutton = Gtk.ToolButton {
 			str = str .. s
 		end
 		pprint.pformat(materials, {}, printer)
+		str = str .. "\n"
 		GLib.file_set_contents(b2l_filename .. ".mat", str)
 		button.sensitive = false
 	end,
