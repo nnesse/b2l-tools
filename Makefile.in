@@ -1,4 +1,5 @@
 srcdir=@srcdir@
+abs_builddir=@abs_builddir@
 export prefix=@prefix@
 export exec_prefix=@exec_prefix@
 export includedir=@includedir@
@@ -23,13 +24,13 @@ INSTALL?=install
 INSTALL_PROGRAM?=$(INSTALL)
 INSTALL_DATA?=$(INSTALL) -m 644
 
-all: b2l_material_editor
+all: b2l_material_editor links
 
 lex.glsl.c lex.glsl.h: glsl.lex
-	$(FLEX) --header-file=lex.glsl.h -P glsl -o $@ $<
+	$(FLEX) --header-file=lex.glsl.h -P glsl -o lex.glsl.c $<
 
 lex.meta.c lex.meta.h: glsl_meta_filter.lex
-	$(FLEX) --header-file=lex.meta.h -P meta -o $@ $<
+	$(FLEX) --header-file=lex.meta.h -P meta -o lex.meta.c $<
 
 glsl.tab.c glsl.tab.h: glsl.y
 	$(BISON) $<
@@ -55,16 +56,29 @@ clean:
 	@-rm b2l_material_editor $(GENERATED)
 	@-rm $(LUA_O) $(LGI_O)
 
+.PHONY: links
 
-LGI_CORESOURCES = $(wildcard $(srcdir)/lgi/lgi/*.lua)
-LGI_OVERRIDES = $(wildcard $(srcdir)/lgi/lgi/override/*.lua)
+links: @abs_builddir@/data/lgi.lua \
+	@abs_builddir@/data/pprint.lua \
+	@abs_builddir@/data/lgi
 
-install: b2l_material_editor $(srcdir)/b2l_material_editor.lua
+data:
+	mkdir -p data
+
+@abs_builddir@/data/lgi.lua: | data
+	ln -s $$(realpath ../lgi/lgi.lua) $@
+
+@abs_builddir@/data/pprint.lua: | data
+	ln -s $$(realpath ../pprint.lua) $@
+
+@abs_builddir@/data/lgi: | data
+	ln -s $$(realpath ../lgi/lgi) $@
+
+install: b2l_material_editor $(srcdir)/b2l_material_editor.lua links
 	$(INSTALL) -d $(DESTDIR)$(dataluadir)/lgi/override
 	$(INSTALL) -d $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) b2l_material_editor $(DESTDIR)$(bindir)
 	$(INSTALL_DATA) $(srcdir)/b2l_material_editor.lua $(DESTDIR)$(datadir)
-	$(INSTALL_DATA) $(srcdir)/pprint.lua $(DESTDIR)$(dataluadir)
-	$(INSTALL_DATA) $(srcdir)/lgi/lgi.lua $(DESTDIR)$(dataluadir)
-	$(INSTALL_DATA) $(LGI_CORESOURCES) $(DESTDIR)$(dataluadir)/lgi
-	$(INSTALL_DATA) $(LGI_OVERRIDES) $(DESTDIR)$(dataluadir)/lgi/override
+	$(INSTALL_DATA) data/*.lua $(DESTDIR)$(dataluadir)
+	$(INSTALL_DATA) data/lgi/*.lua $(DESTDIR)$(dataluadir)/lgi
+	$(INSTALL_DATA) data/lgi/override/*.lua $(DESTDIR)$(dataluadir)/lgi/override

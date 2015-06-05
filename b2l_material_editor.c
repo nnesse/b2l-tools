@@ -329,23 +329,27 @@ static int make_path_relative(lua_State *L)
 	return 1;
 }
 
-static int directory_name(lua_State *L)
+static void truncate_to_dirname(char *str)
 {
-	char *x = strdup(lua_tostring(L, -1));
-	char *all = x;
+	char *x = str;
 	char *y = NULL;
 	while (*x) {
 		if (*x == '/')
 			y = x;
 		x++;
 	}
-	if (y) {
+	if (y)
 		*(++y) = 0;
-		lua_pushstring(L, all);
-	} else {
-		lua_pushstring(L, "");
-	}
-	free(all);
+	else
+		*str = 0;
+}
+
+static int directory_name(lua_State *L)
+{
+	char *filename = strdup(lua_tostring(L, -1));
+	truncate_to_dirname(filename);
+	lua_pushstring(L, filename);
+	free(filename);
 	return 1;
 }
 
@@ -1015,6 +1019,19 @@ int luaopen_lgi_corelgilua51 (lua_State* L);
 
 int main()
 {
+	/*
+	char exe_path[200];
+	ssize_t sz = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+
+	if (sz < 0)
+		return -1;
+
+	exe_path[sz] = '\0';
+
+	truncate_to_dirname(exe_path);
+	*/
+
+	const char *b2l_data = getenv("B2L_DATA_DIR");
 	lua_State *L = lua_newstate(l_alloc, NULL);
 	luaL_openlibs(L);
 
@@ -1026,7 +1043,13 @@ int main()
 	lua_pushcfunction(L, luaopen_lgi_corelgilua51);
 	lua_setfield(L, -2, "lgi.corelgilua51");
 
-	lua_pushstring(L, DATA_LUA_DIR "/?.lua");
+	if (b2l_data) {
+		lua_pushstring(L, b2l_data);
+		lua_pushstring(L, "/?.lua");
+		lua_concat(L, 2);
+	} else {
+		lua_pushstring(L, DATA_LUA_DIR "/?.lua");
+	}
 	lua_setfield(L, -3, "path");
 
 	lua_pushstring(L, DATA_LUALIB_DIR "/?.so");
