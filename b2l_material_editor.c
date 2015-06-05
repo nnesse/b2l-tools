@@ -29,8 +29,12 @@ extern char *metalval;
 static int set_b2l_file(lua_State *L);
 static int need_redraw(lua_State *L);
 static int set_shaders(lua_State *L);
+static int make_path_relative(lua_State *L);
+static int directory_name(lua_State *L);
 
 luaL_Reg lua_b2l_material_editor[] = {
+	{ "directory_name", directory_name },
+	{ "make_path_relative", make_path_relative },
 	{ "set_b2l_file", set_b2l_file},
 	{ "need_redraw", need_redraw},
 	{ "set_shaders", set_shaders },
@@ -289,6 +293,50 @@ static void on_expose(struct glwin *win)
 
 static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
 {
+}
+
+static int make_path_relative(lua_State *L)
+{
+	if (!lua_isstring(L, -1) || !lua_isstring(L, -2)) {
+		lua_pushnil(L);
+		return 1;
+	}
+	const char *x = lua_tostring(L, -1); //file
+	const char *y = lua_tostring(L, -2); //origin path (with trailing '/')
+	int strings = 1;
+	while (*x && *x == *y) {
+		x++;
+		y++;
+	}
+	while (*y) {
+		if (*(y++) == '/') {
+			lua_pushstring(L, "../");
+			strings++;
+		}
+	}
+	lua_pushstring(L, x);
+	lua_concat(L, strings);
+	return 1;
+}
+
+static int directory_name(lua_State *L)
+{
+	char *x = strdup(lua_tostring(L, -1));
+	char *all = x;
+	char *y = NULL;
+	while (*x) {
+		if (*x == '/')
+			y = x;
+		x++;
+	}
+	if (y) {
+		*(++y) = 0;
+		lua_pushstring(L, all);
+	} else {
+		lua_pushstring(L, "");
+	}
+	free(all);
+	return 1;
 }
 
 static void on_resize(struct glwin *win)

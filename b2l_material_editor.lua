@@ -224,12 +224,13 @@ function update_shaders()
 					title = k,
 					action = "OPEN",
 					on_selection_changed = function(chooser)
-						local filename = chooser:get_filename()
+						local abs_filename = chooser:get_filename()
+						local filename = b2l_relative_path(chooser:get_filename())
 						if filename and active_material.params[k].value ~= filename then
 							setting_changed()
 						end
 						if filename then
-							local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(filename)
+							local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(abs_filename)
 							if pbuf then
 								active_material.params[k].value = filename
 								controls[k].pbuf = pbuf
@@ -267,13 +268,25 @@ function update_shaders()
 				controls[k].control = control
 			end
 			if value ~= nil then
-				controls[k].control:set_filename(value)
+				controls[k].control:set_filename(b2l_absolute_path(value))
 			end
 			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		end
 	end
 	vbox_settings:show_all()
 	queue_render()
+end
+
+function b2l_dir()
+	return b2l_gl.directory_name(b2l_filename)
+end
+
+function b2l_relative_path(file)
+	return b2l_gl.make_path_relative(b2l_dir(), file)
+end
+
+function b2l_absolute_path(file)
+	return b2l_dir() .. file
 end
 
 b2l_filter = Gtk.FileFilter {}
@@ -373,8 +386,8 @@ b2l_file_button = Gtk.FileChooserButton {
 	filter = b2l_filter,
 	hexpand = true,
 	on_selection_changed = function(chooser)
-	 	local filename = chooser:get_filename()
-		load_b2l_file(filename)
+		b2l_filename = chooser:get_filename()
+		load_b2l_file(b2l_filename)
 	end,
 }
 
@@ -406,11 +419,12 @@ fs_chooser = Gtk.FileChooserButton {
 		action = "OPEN",
 		filter = frag_glsl_filter,
 		on_selection_changed = function(chooser)
-			local filename = chooser:get_filename()
+			local abs_filename = chooser:get_filename()
+			local filename = b2l_relative_path(chooser:get_filename())
 			if filename and active_material.shaders['fs_filename'] ~= filename then
 				setting_changed()
 			end
-			reload_fs(filename)
+			reload_fs(abs_filename)
 			update_shaders()
 			if filename then
 				fs_edit_button.sensitive = true
@@ -452,11 +466,12 @@ vs_chooser = Gtk.FileChooserButton {
 	action = "OPEN",
 	filter = vert_glsl_filter,
 	on_selection_changed = function(chooser)
-		local filename = chooser:get_filename()
+		local abs_filename = chooser:get_filename()
+		filename = b2l_relative_path(chooser:get_filename())
 		if filename and filename ~= active_material.shaders['vs_filename'] then
 			setting_changed()
 		end
-		reload_vs(filename)
+		reload_vs(abs_filename)
 		update_shaders()
 		if filename then
 			vs_edit_button.sensitive = true
@@ -483,9 +498,9 @@ function open_b2l_chooser_dialog()
 	chooser:add_filter(b2l_filter)
 	local res = chooser:run()
 	if res == Gtk.ResponseType.ACCEPT then
-		local filename = chooser:get_filename()
-		load_b2l_file(filename)
-		b2l_file_button:set_filename(filename)
+		b2l_filename = chooser:get_filename()
+		load_b2l_file(b2l_filename)
+		b2l_file_button:set_filename(b2l_filename)
 	end
 end
 
@@ -498,7 +513,7 @@ save_toolbutton = Gtk.ToolButton {
 			str = str .. s
 		end
 		pprint.pformat(materials, {}, printer)
-		GLib.file_set_contents(b2l_file_button:get_filename() .. ".mat", str)
+		GLib.file_set_contents(b2l_filename .. ".mat", str)
 		button.sensitive = false
 	end,
 }
@@ -576,10 +591,10 @@ material_combo = Gtk.ComboBox {
 				materials[material_name] = active_material
 			end
 			if active_material.shaders['vs_filename'] then
-				vs_chooser:set_filename(active_material.shaders['vs_filename'])
+				vs_chooser:set_filename(b2l_absolute_path(active_material.shaders['vs_filename']))
 			end
 			if active_material.shaders['fs_filename'] then
-				fs_chooser:set_filename(active_material.shaders['fs_filename'])
+				fs_chooser:set_filename(b2l_absolute_path(active_material.shaders['fs_filename']))
 			end
 		end
 	end
