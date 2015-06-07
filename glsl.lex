@@ -29,13 +29,6 @@ floating_constant	{digit}+.{digit}+
 
 \/\/.*\n
 
-<INITIAL>@ BEGIN(META);
-<META>@ BEGIN(INITIAL);
-<META>"/*" BEGIN(META_COMMENT);
-<META_COMMENT>"*/" BEGIN(META);
-<META_COMMENT>[^*\n]+ { }
-<META>[^@\n]+ { }
-
 <INITIAL>"/*" BEGIN(COMMENT);
 <COMMENT>"*/" BEGIN(INITIAL);
 <COMMENT>[^*\n]+ { }
@@ -220,6 +213,7 @@ struct			return STRUCT;
 \^\= return XOR_ASSIGN;
 \|\= return OR_ASSIGN;
 \-\= return SUB_ASSIGN;
+\@ return AT;
 
 \+ return PLUS;
 \- return DASH;

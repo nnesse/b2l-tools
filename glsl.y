@@ -74,6 +74,7 @@ static void init_declaration(struct declaration *d, const char *name, struct typ
 	d->next = NULL;
 	d->name = name;
 	d->type = type;
+	d->tag = NULL;
 }
 
 static struct declaration *new_declaration(const char *name, struct type *type)
@@ -220,6 +221,7 @@ struct declaration *g_decls = NULL;
 %type <char *>                     param_name
 %type <char *>                     function_name
 %type <char *>                     field_selection
+%type <char *>                     end_declaration
 %type <struct type_specifier *>    parameter_type_specifier
 %type <struct array_specifier *>   array_specifier
 %type <struct parameter_declaration *> parameter_declaration
@@ -436,6 +438,7 @@ struct declaration *g_decls = NULL;
 %token PRECISION
 %token FUNCTION_NODE
 %token DECLARATION_NODE
+%token AT
 
 %%
 
@@ -472,6 +475,7 @@ external_declaration	: function_definition { $$ = &$1->decl; }
 			;
 
 function_definition	: function_prototype compound_statement_no_new_scope { $$ = $1; }
+			| function_prototype { $$ = $1; }
 			;
 
 compound_statement_no_new_scope : LEFT_BRACE RIGHT_BRACE
@@ -502,8 +506,12 @@ simple_statement	: declaration_statement
 declaration_statement	: declaration
 			;
 
+end_declaration		: AT IDENTIFIER AT SEMICOLON { $$ = $2; }
+			| SEMICOLON { $$ = ""; }
+			;
+
 declaration		: function_prototype SEMICOLON { $$ = NULL; }
-			| init_declarator_list SEMICOLON { $$ = $1; }
+			| init_declarator_list end_declaration { $$ = $1; if ($1) $1->tag = $2; }
 			| PRECISION precision_qualifier type_specifier SEMICOLON { $$ = NULL; }
 			| type_qualifier block_identifier LEFT_BRACE struct_declaration_list RIGHT_BRACE SEMICOLON { $$ = NULL; }
 			| type_qualifier block_identifier LEFT_BRACE struct_declaration_list RIGHT_BRACE decl_identifier SEMICOLON { $$ = NULL; }

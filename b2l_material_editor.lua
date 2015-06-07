@@ -91,7 +91,12 @@ function update_shaders()
 		end
 	end
 	for i, k in ipairs(uniforms) do
-		local datatype = uniforms[k]
+		local datatype = uniforms[k].datatype
+		local tag = uniforms[k].tag
+		if not tag then
+			tag = ""
+		end
+		local id = k
 		if not active_material.params[k] then
 			active_material.params[k] = {}
 		end
@@ -129,7 +134,7 @@ function update_shaders()
 				local widget = Gtk.HBox {
 					{
 						Gtk.Label {
-							label = k,
+							label = id,
 							hexpand = false
 						},
 						expand = false,
@@ -170,7 +175,7 @@ function update_shaders()
 				local widget = Gtk.HBox {
 					{
 						Gtk.Label {
-							label = k,
+							label = id,
 							hexpand = false
 						},
 						expand = false,
@@ -196,7 +201,7 @@ function update_shaders()
 			if not controls[k].widget then
 				controls[k] = {}
 				local widget = Gtk.CheckButton {
-					label = k,
+					label = id,
 					on_toggled = function(self)
 						if active_material.params[k].value ~= self.active then
 							setting_changed()
@@ -221,7 +226,7 @@ function update_shaders()
 				texture_units[t] = true
 				controls[k] = { texunit= t }
 				local control = Gtk.FileChooserButton {
-					title = k,
+					title = id,
 					action = "OPEN",
 					on_selection_changed = function(chooser)
 						local abs_filename = chooser:get_filename()
@@ -251,7 +256,7 @@ function update_shaders()
 				local widget = Gtk.HBox {
 					{
 						Gtk.Label {
-							label = k,
+							label = id,
 							hexpand = false
 						},
 						expand = false,

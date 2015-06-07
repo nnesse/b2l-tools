@@ -10,6 +10,7 @@ struct declaration {
 	const char *name;
 	struct declaration *next;
 	struct type *type;
+	const char *tag;
 };
 
 struct block_declaration {
