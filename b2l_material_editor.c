@@ -32,7 +32,7 @@ static int set_shaders(lua_State *L);
 static int make_path_relative(lua_State *L);
 static int directory_name(lua_State *L);
 
-luaL_Reg lua_b2l_material_editor[] = {
+luaL_Reg lua_b2l_material_editor_capi[] = {
 	{ "directory_name", directory_name },
 	{ "make_path_relative", make_path_relative },
 	{ "set_b2l_file", set_b2l_file},
@@ -427,10 +427,10 @@ static gboolean idle(gpointer user_data)
 	return false;
 }
 
-int luaopen_b2l_material_editor(lua_State *L)
+int luaopen_material_editor_capi(lua_State *L)
 {
 	lua_newtable(L);
-	luaL_setfuncs(L, lua_b2l_material_editor, 0);
+	luaL_setfuncs(L, lua_b2l_material_editor_capi, 0);
 	g_L = L;
 	cb.on_expose = on_expose;
 	cb.on_destroy = on_destroy;
@@ -1037,31 +1037,36 @@ int main()
 	truncate_to_dirname(exe_path);
 	*/
 
-	const char *b2l_data = getenv("B2L_DATA_DIR");
+	const char *b2l_data_dir = getenv("B2L_DATA_DIR");
+	if (!b2l_data_dir) {
+		b2l_data_dir = DATA_DIR;
+	}
+
 	lua_State *L = lua_newstate(l_alloc, NULL);
 	luaL_openlibs(L);
 
 	lua_getglobal(L, "package"); //1
 	lua_getfield(L, -1, "preload"); //2
-	lua_pushcfunction(L, luaopen_b2l_material_editor);
-	lua_setfield(L, -2, "b2l_material_editor");
+	lua_pushcfunction(L, luaopen_material_editor_capi);
+	lua_setfield(L, -2, "material_editor_capi");
 
 	lua_pushcfunction(L, luaopen_lgi_corelgilua);
-	lua_setfield(L, -2, "lgi.corelgilua51");
+	lua_setfield(L, -2, "lgi.corelgilua");
 
-	if (b2l_data) {
-		lua_pushstring(L, b2l_data);
-		lua_pushstring(L, "/?.lua");
-		lua_concat(L, 2);
-	} else {
-		lua_pushstring(L, DATA_LUA_DIR "/?.lua");
-	}
+	lua_pushstring(L, b2l_data_dir);
+	lua_pushstring(L, "/lua/?.lua");
+	lua_concat(L, 2);
 	lua_setfield(L, -3, "path");
 
-	lua_pushstring(L, DATA_LUALIB_DIR "/?.so");
+	lua_pushstring(L, b2l_data_dir);
+	lua_pushstring(L, "/lua/lib/?.so");
+	lua_concat(L, 2);
 	lua_setfield(L, -3, "cpath");
 
-	luaL_loadfile(L, DATA_DIR "/b2l_material_editor.lua");
+	lua_pushstring(L, b2l_data_dir);
+	lua_pushstring(L, "/lua/material_editor.lua");
+	lua_concat(L, 2);
+	luaL_loadfile(L, lua_tostring(L, -1));
 	lua_pcall(L, 0, 0, 0);
 	return 0;
 }

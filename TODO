@@ -1,7 +1,4 @@
 * Print LUA backtrace when an error is encountered
-* Stage the entire contents of "/share" not just "/share/lua
-	With this change setting B2L_DATA_DIR to the share staging
-	folder will enable testing without running the install target
 * Implement a real camera model
 * Add a mode to view an entire scene
 * Thread shader compilation to avoid UI lockup

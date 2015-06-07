@@ -4,13 +4,11 @@ export prefix=@prefix@
 export exec_prefix=@exec_prefix@
 export includedir=@includedir@
 export datadir=@datarootdir@/b2l
-export dataluadir=${datadir}/lua
-export datalualibdir=${datadir}/lib/lua
 export bindir=@bindir@
 VPATH=$(srcdir)
 
 CFLAGS:= -g -O0 -Wall -Wno-unused-function -DLUA_USE_LINUX -DLUA_COMPAT_ALL
-CFLAGS+= -DDATA_DIR=\"$(datadir)\" -DDATA_LUA_DIR=\"$(dataluadir)\" -DDATA_LUALIB_DIR=\"$(datalualibdir)\"
+CFLAGS+= -DDATA_DIR=\"$(datadir)\"
 CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/lua/src -I${srcdir}/lgi/lgi
 CFLAGS+= @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@ @GMODULE2_CFLAGS@ @LIBFFI_CFLAGS@ @GOBJECT_INTROSPECTION_CFLAGS@ @CFLAGS@
 
@@ -58,27 +56,30 @@ clean:
 
 .PHONY: links
 
-links: @abs_builddir@/data/lgi.lua \
-	@abs_builddir@/data/pprint.lua \
-	@abs_builddir@/data/lgi
+links: @abs_builddir@/data/lua/lgi.lua \
+	@abs_builddir@/data/lua/pprint.lua \
+	@abs_builddir@/data/lua/lgi \
+	@abs_builddir@/data/lua/material_editor.lua
 
-data:
-	mkdir -p data
+data/lua:
+	mkdir -p $@
 
-@abs_builddir@/data/lgi.lua: | data
+@abs_builddir@/data/lua/lgi.lua: | data/lua
 	ln -s $$(realpath ../lgi/lgi.lua) $@
 
-@abs_builddir@/data/pprint.lua: | data
+@abs_builddir@/data/lua/pprint.lua: | data/lua
 	ln -s $$(realpath ../pprint.lua) $@
 
-@abs_builddir@/data/lgi: | data
+@abs_builddir@/data/lua/lgi: | data/lua
 	ln -s $$(realpath ../lgi/lgi) $@
 
-install: b2l_material_editor $(srcdir)/b2l_material_editor.lua links
-	$(INSTALL) -d $(DESTDIR)$(dataluadir)/lgi/override
+@abs_builddir@/data/lua/material_editor.lua: | data/lua
+	ln -s $$(realpath ../material_editor.lua) $@
+
+install: b2l_material_editor material_editor.lua links
+	$(INSTALL) -d $(DESTDIR)$(datadir)/lua/lgi/override
 	$(INSTALL) -d $(DESTDIR)$(bindir)
 	$(INSTALL_PROGRAM) b2l_material_editor $(DESTDIR)$(bindir)
-	$(INSTALL_DATA) $(srcdir)/b2l_material_editor.lua $(DESTDIR)$(datadir)
-	$(INSTALL_DATA) data/*.lua $(DESTDIR)$(dataluadir)
-	$(INSTALL_DATA) data/lgi/*.lua $(DESTDIR)$(dataluadir)/lgi
-	$(INSTALL_DATA) data/lgi/override/*.lua $(DESTDIR)$(dataluadir)/lgi/override
+	$(INSTALL_DATA) data/lua/*.lua $(DESTDIR)$(datadir)/lua
+	$(INSTALL_DATA) data/lua/lgi/*.lua $(DESTDIR)$(datadir)/lua/lgi
+	$(INSTALL_DATA) data/lua/lgi/override/*.lua $(DESTDIR)$(datadir)/lua/lgi/override

@@ -1,4 +1,4 @@
-local b2l_gl = require 'b2l_material_editor'
+local capi = require 'material_editor_capi'
 local lgi = require 'lgi'
 local Gtk = lgi.require('Gtk')
 local Gdk = lgi.require('Gdk')
@@ -55,7 +55,7 @@ controls = {}
 texture_units = {}
 
 function queue_render()
-	b2l_gl:need_redraw()
+	capi:need_redraw()
 end
 
 function setting_changed()
@@ -66,7 +66,7 @@ function update_shaders()
 	if not b2l_data then
 		return
 	end
-	local uniforms = b2l_gl.set_shaders(vs_text, fs_text)
+	local uniforms = capi.set_shaders(vs_text, fs_text)
 	if not uniforms then
 		local dialog = Gtk.MessageDialog {
 			parent = window,
@@ -283,11 +283,11 @@ function update_shaders()
 end
 
 function b2l_dir()
-	return b2l_gl.directory_name(b2l_filename)
+	return capi.directory_name(b2l_filename)
 end
 
 function b2l_relative_path(file)
-	return b2l_gl.make_path_relative(b2l_dir(), file)
+	return capi.make_path_relative(b2l_dir(), file)
 end
 
 function b2l_absolute_path(file)
@@ -369,7 +369,7 @@ function load_b2l_file(filename)
 			}
 		end
 
-		b2l_gl.set_b2l_file(bin_name)
+		capi.set_b2l_file(bin_name)
 
 		local material_fn = loadfile(mat_name)
 		if material_fn then
