@@ -1021,7 +1021,7 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
 	}
 }
 
-int luaopen_lgi_corelgilua51 (lua_State* L);
+int luaopen_lgi_corelgilua (lua_State* L);
 
 int main()
 {
@@ -1046,7 +1046,7 @@ int main()
 	lua_pushcfunction(L, luaopen_b2l_material_editor);
 	lua_setfield(L, -2, "b2l_material_editor");
 
-	lua_pushcfunction(L, luaopen_lgi_corelgilua51);
+	lua_pushcfunction(L, luaopen_lgi_corelgilua);
 	lua_setfield(L, -2, "lgi.corelgilua51");
 
 	if (b2l_data) {

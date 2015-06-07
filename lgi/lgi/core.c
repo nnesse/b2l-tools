@@ -655,7 +655,7 @@ set_resident (lua_State *L)
 }
 
 G_MODULE_EXPORT int
-luaopen_lgi_corelgilua51 (lua_State* L)
+luaopen_lgi_corelgilua (lua_State* L)
 {
   LgiStateMutex *mutex;
   gint state_id;
