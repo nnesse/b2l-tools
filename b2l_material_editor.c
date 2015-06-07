@@ -295,14 +295,18 @@ static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
 {
 }
 
-static void print_lua_backtrace(lua_State *L)
+static int lua_backtrace_string(lua_State *L)
 {
 	static lua_Debug ar;
 	int i = 0;
 	while (lua_getstack(L, i++, &ar)) {
 		lua_getinfo(L, "Sl", &ar);
-		printf("%s:%d\n", ar.source, ar.currentline);
+		char *str = g_strdup_printf("%s:%d\n", ar.source, ar.currentline);
+		lua_pushstring(L, str);
+		g_free(str);
 	}
+	lua_concat(L, i -1);
+	return 1;
 }
 
 static int make_path_relative(lua_State *L)
@@ -573,6 +577,7 @@ static int set_shaders(lua_State *L)
 	int fragment_text_index = lua_gettop(L);
 	char *vertex_text;
 	char *fragment_text;
+
 	lua_newtable(L);
 
 	vertex_text = parse_shader(L, vertex_text_index, lua_gettop(L));
@@ -1023,6 +1028,25 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize)
 
 int luaopen_lgi_corelgilua (lua_State* L);
 
+int lua_message_handler (lua_State* L)
+{
+	lua_pushvalue(L, -1);
+	lua_pushstring(L, "\n");
+	lua_backtrace_string(L);
+	lua_concat(L, 3);
+	return 1;
+}
+
+int lua_panic_handler (lua_State* L)
+{
+	lua_pushvalue(L, -1);
+	lua_pushstring(L, "\n");
+	lua_backtrace_string(L);
+	lua_concat(L, 3);
+	fprintf(stderr, "%s\n", lua_tostring(L, -1));
+	return 1;
+}
+
 int main()
 {
 	/*
@@ -1045,6 +1069,8 @@ int main()
 	lua_State *L = lua_newstate(l_alloc, NULL);
 	luaL_openlibs(L);
 
+	lua_atpanic(L, lua_panic_handler);
+
 	lua_getglobal(L, "package"); //1
 	lua_getfield(L, -1, "preload"); //2
 	lua_pushcfunction(L, luaopen_material_editor_capi);
@@ -1063,10 +1089,29 @@ int main()
 	lua_concat(L, 2);
 	lua_setfield(L, -3, "cpath");
 
+	lua_pushcfunction(L, lua_message_handler);
+	int msgh = lua_gettop(L);
 	lua_pushstring(L, b2l_data_dir);
 	lua_pushstring(L, "/lua/material_editor.lua");
 	lua_concat(L, 2);
 	luaL_loadfile(L, lua_tostring(L, -1));
-	lua_pcall(L, 0, 0, 0);
+	int err = lua_pcall(L, 0, 0, msgh);
+	switch (err) {
+	case LUA_ERRRUN:
+		fprintf(stderr, "Lua runtime error: ");
+		break;
+	case LUA_ERRMEM:
+		fprintf(stderr, "Lua memory allocation error: ");
+		break;
+	case LUA_ERRERR:
+		fprintf(stderr, "Lua internal error: ");
+		break;
+	case LUA_ERRGCMM:
+		fprintf(stderr, "Lua garbage collection error: ");
+		break;
+	}
+	if (err != LUA_OK) {
+		fprintf(stderr, "%s", lua_tostring(L, -1));
+	}
 	return 0;
 }

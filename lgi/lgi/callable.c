@@ -1080,6 +1080,8 @@ static const struct luaL_Reg callable_reg[] = {
   { NULL, NULL }
 };
 
+int lua_message_handler(lua_State *L);
+
 /* Closure callback, called by libffi when C code wants to invoke Lua
    callback. */
 static void
@@ -1096,6 +1098,10 @@ closure_callback (ffi_cif *cif, void *ret, void **args, void *closure_arg)
 
   /* Get access to proper Lua context. */
   lua_State *L = block->callback.L;
+
+  lua_pushcfunction(L, lua_message_handler);
+  int msgh = lua_gettop(L);
+
   lgi_state_enter (block->callback.state_lock);
   lua_rawgeti (L, LUA_REGISTRYINDEX, block->callback.thread_ref);
   L = lua_tothread (L, -1);
@@ -1208,8 +1214,8 @@ closure_callback (ffi_cif *cif, void *ret, void **args, void *closure_arg)
   if (call)
     {
       if (callable->throws)
-        res = lua_pcall (L, npos, LUA_MULTRET, 0);
-      else if (lua_pcall (L, npos, LUA_MULTRET, 0) != 0)
+        res = lua_pcall (L, npos, LUA_MULTRET, msgh);
+      else if (lua_pcall (L, npos, LUA_MULTRET, msgh) != 0)
         {
           callable_describe (L, callable, closure);
           g_warning ("Error raised while calling '%s': %s",
