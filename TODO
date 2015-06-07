@@ -4,3 +4,5 @@
 	folder will enable testing without running the install target
 * Implement a real camera model
 * Add a mode to view an entire scene
+* Thread shader compilation to avoid UI lockup
+* Handle 3D window closing gracefully
