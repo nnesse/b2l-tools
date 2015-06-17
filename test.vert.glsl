@@ -7,7 +7,10 @@ in vec4 tangent;
 
 in ivec2 weights[6];
 
-uniform mat4 mvp;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 proj;
+
 uniform mat4 groups[52];
 
 out FS_IN {
@@ -41,8 +44,10 @@ void main()
 	v /= total_weight;
 	n /= total_weight;
 
-	vs_out.normal = n;
-	vs_out.pos = v;
-	vs_out.tangent = vec4(t, tangent.w);
-	gl_Position = mvp * vec4(v, 1);
+	mat4 modelview = view * model;
+
+	vs_out.normal = (modelview * vec4(n, 0)).xyz;
+	vs_out.pos = (modelview * vec4(v, 0)).xyz;
+	vs_out.tangent = vec4((modelview * vec4(t, 0)).xyz, tangent.w);
+	gl_Position = proj * view * model * vec4(v, 1);
 }

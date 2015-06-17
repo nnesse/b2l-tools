@@ -192,6 +192,15 @@ static void mat3_to_mat4(const struct quaternion *q, const struct mat3 *m1, stru
 	m2->v[2][3] = 0;
 }
 
+static void mat4_identity(struct mat4 *m)
+{
+	memset(m, 0, sizeof(*m));
+	m->v[0][0] = 1;
+	m->v[1][1] = 1;
+	m->v[2][2] = 1;
+	m->v[3][3] = 1;
+}
+
 static void quaternion_mul(const struct quaternion *q1, const struct quaternion *q2, struct quaternion *out)
 {
 	out->w = (q1->w * q2->w  - q1->x * q2->x - q1->y * q2->y - q1->z * q2->z);
@@ -847,7 +856,11 @@ static void redraw(struct glwin *win)
 	M2.v[3][1] = g_offset[1] + g_offset_next[1];
 	M2.v[3][2] = g_offset[2] + g_offset_next[2];
 	mat4_mul(&M1, &M2, &M3);
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "mvp"), 1, GL_FALSE, (GLfloat *)&M3);
+	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "model"), 1, GL_FALSE, (GLfloat *)&M3);
+	struct mat4 ident;
+	mat4_identity(&ident);
+	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "view"), 1, GL_FALSE, (GLfloat *)&ident);
+	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "proj"), 1, GL_FALSE, (GLfloat *)&ident);
 
 	if (weights_per_vertex > 0) {
 		static int render_count = 0;

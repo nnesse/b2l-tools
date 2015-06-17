@@ -11,7 +11,7 @@ return {
       },
       bump_depth = { 
         datatype = 'float',
-        value = 0.21428571428571 
+        value = 0.35714285714286 
       },
       diffuse_texture = { 
         datatype = 'sampler2D',
@@ -19,11 +19,11 @@ return {
       },
       light_angle_a = { 
         datatype = 'float',
-        value = 0.83739837398374 
+        value = 0.49593495934959 
       },
       light_angle_b = { 
         datatype = 'float',
-        value = 0.5 
+        value = 0.6260162601626 
       },
       light_color = { 
         datatype = 'vec3',
@@ -33,12 +33,18 @@ return {
         datatype = 'float',
         value = 0.5 
       },
-      mvp = { 
+      model = { 
         datatype = 'mat4' 
       },
       normal_texture = { 
         datatype = 'sampler2D',
         value = 'ChickenE_nor.png' 
+      },
+      proj = { 
+        datatype = 'mat4' 
+      },
+      view = { 
+        datatype = 'mat4' 
       } 
     },
     shaders = { 
