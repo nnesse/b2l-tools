@@ -49,5 +49,5 @@ void main()
 	vs_out.normal = (modelview * vec4(n, 0)).xyz;
 	vs_out.pos = (modelview * vec4(v, 0)).xyz;
 	vs_out.tangent = vec4((modelview * vec4(t, 0)).xyz, tangent.w);
-	gl_Position = proj * view * model * vec4(v, 1);
+	gl_Position = proj * modelview * vec4(v, 1);
 }

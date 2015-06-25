@@ -50,6 +50,7 @@ static bool g_need_redraw = true;
 static GSource *g_src;
 static int g_dx[3];
 static int g_dy[3];
+static float g_log_zoom = 0.3;
 static bool g_mouse_down[3] = {false, false, false};
 
 static void on_expose(struct glwin *win);
@@ -192,9 +193,14 @@ static void mat3_to_mat4(const struct quaternion *q, const struct mat3 *m1, stru
 	m2->v[2][3] = 0;
 }
 
-static void mat4_identity(struct mat4 *m)
+static void mat4_zero(struct mat4 *m)
 {
 	memset(m, 0, sizeof(*m));
+}
+
+static void mat4_identity(struct mat4 *m)
+{
+	mat4_zero(m);
 	m->v[0][0] = 1;
 	m->v[1][1] = 1;
 	m->v[2][2] = 1;
@@ -302,6 +308,7 @@ static void on_expose(struct glwin *win)
 
 static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
 {
+	g_log_zoom  += direction * 0.1;
 }
 
 static int lua_backtrace_string(lua_State *L)
@@ -840,27 +847,30 @@ static void redraw(struct glwin *win)
 		glVertexAttribBinding(g_gl_state.tangent_index, TANGENT);
 	}
 
-	struct mat4 M1;
-	struct mat4 M2;
-	struct mat4 M3;
+	struct mat4 view;
+	struct mat4 model;
 	struct quaternion next;
 	quaternion_mul(&q_delta, &q_cur, &next);
-	quaternion_to_mat4(&next, &M1);
-	M1.v[3][3] = 1;
-	memset(&M2, 0, sizeof(M2));
-	M2.v[0][0] = 1;
-	M2.v[1][1] = 1;
-	M2.v[2][2] = 1;
-	M2.v[3][3] = 1;
-	M2.v[3][0] = g_offset[0] + g_offset_next[0];
-	M2.v[3][1] = g_offset[1] + g_offset_next[1];
-	M2.v[3][2] = g_offset[2] + g_offset_next[2];
-	mat4_mul(&M1, &M2, &M3);
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "model"), 1, GL_FALSE, (GLfloat *)&M3);
+	quaternion_to_mat4(&next, &view);
+	view.v[3][3] = 1;
+	mat4_identity(&model);
+	model.v[3][0] = g_offset[0] + g_offset_next[0];
+	model.v[3][1] = g_offset[1] + g_offset_next[1];
+	model.v[3][2] = g_offset[2] + g_offset_next[2];
+	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "model"), 1, GL_FALSE, (GLfloat *)&model);
 	struct mat4 ident;
 	mat4_identity(&ident);
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "view"), 1, GL_FALSE, (GLfloat *)&ident);
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "proj"), 1, GL_FALSE, (GLfloat *)&ident);
+	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "view"), 1, GL_FALSE, (GLfloat *)&view);
+
+	float zoom = exp(g_log_zoom);
+	float zr = 100;
+	struct mat4 proj;
+	mat4_zero(&proj);
+	proj.v[0][0] = 1.0/zoom;
+	proj.v[1][1] = 1.0*win->width/(zoom*win->height);
+	proj.v[2][2] = 1.0/zr;
+	proj.v[3][3] = 1.0;
+	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
 
 	if (weights_per_vertex > 0) {
 		static int render_count = 0;
