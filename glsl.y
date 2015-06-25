@@ -166,6 +166,17 @@ static struct parameter_list *new_parameter_list(
 	return pl;
 }
 
+static struct declaration_tag *new_declaration_tag(
+	const char *name,
+	const char *value)
+{
+	struct declaration_tag *tag = NEW_STRUCT(declaration_tag);
+	tag->name = name;
+	tag->value = value;
+	tag->next = NULL;
+	return tag;
+}
+
 struct declaration *g_decls = NULL;
 
 %}
@@ -226,6 +237,8 @@ struct declaration *g_decls = NULL;
 %type <struct array_specifier *>   array_specifier
 %type <struct parameter_declaration *> parameter_declaration
 %type <struct parameter_declarator *> parameter_declarator
+%type <struct declaration_tag*> declaration_tag
+%type <struct declaration_tag*> declaration_tag_list
 
 %token CONST
 %token BOOL
@@ -506,8 +519,16 @@ simple_statement	: declaration_statement
 declaration_statement	: declaration
 			;
 
-end_declaration		: AT IDENTIFIER AT SEMICOLON { $$ = $2; }
-			| SEMICOLON { $$ = ""; }
+declaration_tag		: IDENTIFIER { $$ = new_declaration_tag($1, NULL); }
+			| IDENTIFIER EQUAL IDENTIFIER { $$ = new_declaration_tag($1, $3); }
+			;
+
+declaration_tag_list	: declaration_tag { $$ = $1; }
+			| declaration_tag_list COMMA declaration_tag { $$ = $1; $$->next = $3; }
+			;
+
+end_declaration		: AT declaration_tag_list AT SEMICOLON { $$ = $2; }
+			| SEMICOLON { $$ = NULL; }
 			;
 
 declaration		: function_prototype SEMICOLON { $$ = NULL; }

@@ -10,7 +10,7 @@ struct declaration {
 	const char *name;
 	struct declaration *next;
 	struct type *type;
-	const char *tag;
+	struct declaration_tag *tag;
 };
 
 struct block_declaration {
@@ -87,6 +87,12 @@ union rvalue {
 struct constant_value {
 	struct generic gen;
 	union rvalue val;
+};
+
+struct declaration_tag {
+	const char *name;
+	const char *value;
+	struct declaration_tag *next;
 };
 
 extern struct declaration *g_decls;

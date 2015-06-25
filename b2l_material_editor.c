@@ -529,7 +529,7 @@ static void process_declaration(lua_State *L, int uniform_table_idx, struct decl
 				lua_pushstring(L, type_string);
 				lua_setfield(L, -2, "datatype");
 				if (d->tag) {
-					lua_pushstring(L, d->tag);
+					lua_pushstring(L, d->tag->name);
 					lua_setfield(L, -2, "tag");
 				}
 				lua_setfield(L, uniform_table_idx, d->name);
