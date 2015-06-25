@@ -16,14 +16,14 @@ struct declaration {
 struct block_declaration {
 	struct declaration decl;
 	struct struct_declaration_list *struct_declaration;
-	struct generic_list *qualifiers;
+	struct generic *qualifiers;
 	const char *block_name;
 	struct array_specifier *array_specifier;
 };
 
 struct type {
-	struct type_specifier *specifier;
-	struct generic_list *qualifiers;
+	struct generic *specifier;
+	struct generic *qualifiers;
 };
 
 struct array_specifier {
@@ -31,6 +31,7 @@ struct array_specifier {
 };
 
 struct type_specifier {
+	struct generic gen;
 	struct generic *nonarray;
 	struct array_specifier *array;
 };
@@ -42,7 +43,7 @@ struct parameter_declarator {
 };
 
 struct parameter_declaration {
-	struct generic_list *qualifiers;
+	struct generic *qualifiers;
 	struct parameter_declarator *declarator;
 };
 
@@ -52,6 +53,7 @@ struct parameter_list {
 };
 
 struct generic_list {
+	struct generic gen;
 	struct generic *ent;
 	struct generic_list *next;
 };
@@ -91,8 +93,14 @@ struct constant_value {
 
 struct declaration_tag {
 	const char *name;
-	const char *value;
+	struct generic *value;
 	struct declaration_tag *next;
+};
+
+struct function_call {
+	struct generic gen;
+	struct generic *function_identifier;
+	struct generic *params;
 };
 
 extern struct declaration *g_decls;

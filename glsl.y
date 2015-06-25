@@ -46,19 +46,20 @@ static char *mystrdup(const char *c)
 
 #define NEW_STRUCT(TYPE) ((struct TYPE *)myalloc(sizeof(struct TYPE), sizeof(intptr_t)))
 
-static struct generic_list *new_generic_list(struct generic *first)
+static struct generic *new_generic_list(struct generic *first)
 {
 	struct generic_list *gl = NEW_STRUCT(generic_list);
+	gl->gen.code = GENERIC_LIST_NODE;
 	gl->ent = first;
 	gl->next = NULL;
-	return gl;
+	return &(gl->gen);
 }
 
-static struct generic_list *generic_list_add(struct generic_list *gl, struct generic *ent)
+static struct generic *generic_list_add(struct generic *gl, struct generic *ent)
 {
-	struct generic_list *nl = new_generic_list(ent);
-	nl->next = gl;
-	return nl;
+	struct generic_list *nl = (struct generic_list *)new_generic_list(ent);
+	nl->next = (struct generic_list *)gl;
+	return &(nl->gen);
 }
 
 static struct generic *new_generic(int code)
@@ -77,20 +78,20 @@ static void init_declaration(struct declaration *d, const char *name, struct typ
 	d->tag = NULL;
 }
 
-static struct declaration *new_declaration(const char *name, struct type *type)
+static struct generic *new_declaration(const char *name, struct type *type)
 {
 	struct declaration *d = NEW_STRUCT(declaration);
 	init_declaration(d, name, type);
-	return d;
+	return &(d->gen);
 }
 
-static struct function *new_function(const char *name, struct type *rtype, struct parameter_list *plist)
+static struct generic *new_function(const char *name, struct type *rtype, struct parameter_list *plist)
 {
 	struct function *f = NEW_STRUCT(function);
 	init_declaration(&f->decl, name, rtype);
 	f->decl.gen.code = FUNCTION_NODE;
 	f->plist = plist;
-	return f;
+	return &f->decl.gen;
 }
 
 static struct generic *new_binary_operator(int code, struct generic *left, struct generic *right)
@@ -118,7 +119,7 @@ static struct generic *new_constant_value(int code, union rvalue *r)
 	return &v->gen;
 }
 
-static struct type *new_type(struct type_specifier *specifier, struct generic_list *qualifiers)
+static struct type *new_type(struct generic *specifier, struct generic *qualifiers)
 {
 	struct type *type = NEW_STRUCT(type);
 	type->specifier = specifier;
@@ -126,28 +127,29 @@ static struct type *new_type(struct type_specifier *specifier, struct generic_li
 	return type;
 }
 
-static struct type_specifier *new_type_specifier(struct generic *nonarray, struct array_specifier *array)
+static struct generic *new_type_specifier(struct generic *nonarray, struct array_specifier *array)
 {
 	struct type_specifier *t = NEW_STRUCT(type_specifier);
+	t->gen.code = TYPE_SPECIFIER_NODE;
 	t->nonarray = nonarray;
 	t->array = array;
-	return t;
+	return &(t->gen);
 }
 
 static struct parameter_declarator *new_parameter_declarator(
-	struct type_specifier *specifier,
+	struct generic *specifier,
 	const char *name,
 	struct array_specifier *array)
 {
 	struct parameter_declarator *p = NEW_STRUCT(parameter_declarator);
-	p->type_specifier = specifier;
+	p->type_specifier = (struct type_specifier *)specifier;
 	p->name = name;
 	p->array_specifier = array;
 	return p;
 }
 
 static struct parameter_declaration *new_parameter_declaration(
-	struct generic_list *qualifiers,
+	struct generic *qualifiers,
 	struct parameter_declarator *declarator)
 {
 	struct parameter_declaration *pd = NEW_STRUCT(parameter_declaration);
@@ -168,13 +170,22 @@ static struct parameter_list *new_parameter_list(
 
 static struct declaration_tag *new_declaration_tag(
 	const char *name,
-	const char *value)
+	struct generic *value)
 {
 	struct declaration_tag *tag = NEW_STRUCT(declaration_tag);
 	tag->name = name;
 	tag->value = value;
 	tag->next = NULL;
 	return tag;
+}
+
+static struct function_call *new_function_call(struct generic *function_identifier)
+{
+	struct function_call *call = NEW_STRUCT(function_call);
+	call->gen.code = FUNCTION_CALL_NODE;
+	call->function_identifier = function_identifier;
+	call->params = NULL;
+	return call;
 }
 
 struct declaration *g_decls = NULL;
@@ -186,20 +197,20 @@ struct declaration *g_decls = NULL;
 %define api.value.type union
 %define api.prefix glsl
 
-%type <struct function *> function_declarator
-%type <struct function *> function_header_with_parameters
-%type <struct function *> function_prototype
-%type <struct function *> function_definition
-%type <struct function *> function_header
-%type <struct declaration *>       external_declaration
-%type <struct declaration *>       single_declaration
-%type <struct declaration *>       init_declarator_list
-%type <struct declaration *>       declaration
+%type <struct generic *> function_declarator
+%type <struct generic *> function_header_with_parameters
+%type <struct generic *> function_prototype
+%type <struct generic *> function_definition
+%type <struct generic *> function_header
+%type <struct generic *>       external_declaration
+%type <struct generic *>       single_declaration
+%type <struct generic *>       init_declarator_list
+%type <struct generic *>       declaration
 %type <struct type *>              fully_specified_type
-%type <struct generic_list *>      type_qualifier
+%type <struct generic *>      type_qualifier
 %type <struct generic *>           single_type_qualifier
 %type <struct generic *>           storage_qualifier
-%type <struct type_specifier *>    type_specifier
+%type <struct generic *>    type_specifier
 %type <struct generic *>           type_specifier_nonarray
 %type <struct generic *>           precision_qualifier
 %type <struct generic *>           interpolation_qualifier
@@ -220,10 +231,36 @@ struct declaration *g_decls = NULL;
 %type <struct generic *>           shift_expression
 %type <struct generic *>           additive_expression
 %type <struct generic *>           multiplicative_expression
+%type <struct generic *>           integer_expression
 %type <struct generic *>           unary_expression
 %type <struct generic *>           postfix_expression
 %type <struct generic *>           primary_expression
+%type <struct function_call *>	   function_call
+%type <struct function_call *>	   function_call_or_method
+%type <struct function_call *>	   function_call_generic
+%type <struct function_call *>	   function_call_header
+%type <struct generic *>	   function_identifier
+%type <struct function_call *>	   function_call_header_no_parameters
+%type <struct function_call *>	   function_call_header_with_parameters
+%type <struct generic *>	   initializer
+%type <struct generic *>	   initializer_list
+%type <struct generic *>	   expression_statement
+%type <struct generic *>	   statement
+%type <struct generic *>	   simple_statement
+%type <struct generic *>	   compound_statement
+%type <struct generic *>	   declaration_statement
+%type <struct generic *>	   selection_statement
+%type <struct generic *>	   statement_no_new_scope
+%type <struct generic *>	   for_init_statement
+%type <struct generic *>	   switch_statement
+%type <struct generic *>	   case_label
+%type <struct generic *>	   for_rest_statement
+%type <struct generic *>	   iteration_statement
+%type <struct generic *>	   jump_statement
+%type <struct generic *>	   compound_statement_no_new_scope
+%type <struct generic *>	   statement_list
 %type <int>                        unary_operator
+%type <int>                        assignment_operator
 %type <char *>                     variable_identifier
 %type <char *>                     decl_identifier
 %type <char *>                     block_identifier
@@ -231,9 +268,9 @@ struct declaration *g_decls = NULL;
 %type <char *>                     type_name
 %type <char *>                     param_name
 %type <char *>                     function_name
-%type <char *>                     field_selection
-%type <char *>                     end_declaration
-%type <struct type_specifier *>    parameter_type_specifier
+%type <struct generic *>        field_selection
+%type <struct declaration_tag *>   end_declaration
+%type <struct generic *>    parameter_type_specifier
 %type <struct array_specifier *>   array_specifier
 %type <struct parameter_declaration *> parameter_declaration
 %type <struct parameter_declarator *> parameter_declarator
@@ -451,12 +488,15 @@ struct declaration *g_decls = NULL;
 %token PRECISION
 %token FUNCTION_NODE
 %token DECLARATION_NODE
+%token FUNCTION_CALL_NODE
+%token TYPE_SPECIFIER_NODE
+%token GENERIC_LIST_NODE
 %token AT
 
 %%
 
-translation_unit	: external_declaration { if ($1) { $1->next = g_decls; g_decls = $1; } }
-			| translation_unit external_declaration { if ($2) { $2->next = g_decls; g_decls = $2; } }
+translation_unit	: external_declaration { if ($1) { ((struct declaration *)$1)->next = g_decls; g_decls = (struct declaration *)$1; } }
+			| translation_unit external_declaration { if ($2) { ((struct declaration *)$2)->next = g_decls; g_decls = (struct declaration *)$2; } }
 			;
 
 block_identifier	: IDENTIFIER { $$ = $1; }
@@ -477,13 +517,13 @@ param_name		: IDENTIFIER { $$ = $1; }
 function_name		: IDENTIFIER { $$ = $1; }
 			;
 
-field_selection		: IDENTIFIER { $$ = $1; }
+field_selection		: IDENTIFIER { $$ = new_identifier($1); }
 			;
 
 variable_identifier	: IDENTIFIER { $$ = $1; }
 			;
 
-external_declaration	: function_definition { $$ = &$1->decl; }
+external_declaration	: function_definition { $$ = $1; }
 			| declaration { $$ = $1; }
 			;
 
@@ -491,36 +531,36 @@ function_definition	: function_prototype compound_statement_no_new_scope { $$ = 
 			| function_prototype { $$ = $1; }
 			;
 
-compound_statement_no_new_scope : LEFT_BRACE RIGHT_BRACE
-			| LEFT_BRACE statement_list RIGHT_BRACE
+compound_statement_no_new_scope : LEFT_BRACE RIGHT_BRACE { $$ = NULL; }
+			| LEFT_BRACE statement_list RIGHT_BRACE { $$ = $2; }
 			;
 
-statement		: compound_statement
-			| simple_statement
+statement		: compound_statement { $$ = $1; }
+			| simple_statement { $$ = $1; }
 			;
 
-statement_list		: statement
-			| statement_list statement
+statement_list		: statement { $$ = new_generic_list($1); }
+			| statement_list statement { $$ = generic_list_add($$, $2); }
 			;
 
-compound_statement	: LEFT_BRACE RIGHT_BRACE
-			| LEFT_BRACE statement_list RIGHT_BRACE
+compound_statement	: LEFT_BRACE RIGHT_BRACE { $$ = NULL; }
+			| LEFT_BRACE statement_list RIGHT_BRACE { $$ = $2; }
 			;
 
-simple_statement	: declaration_statement
-			| expression_statement
-			| selection_statement
-			| switch_statement
-			| case_label
-			| iteration_statement
-			| jump_statement
+simple_statement	: declaration_statement { $$ = $1; }
+			| expression_statement { $$ = $1; }
+			| selection_statement { $$ = $1; }
+			| switch_statement { $$ = $1; }
+			| case_label { $$ = $1; }
+			| iteration_statement { $$ = $1; }
+			| jump_statement { $$ = $1; }
 			;
 
-declaration_statement	: declaration
+declaration_statement	: declaration { $$ = $1; }
 			;
 
 declaration_tag		: IDENTIFIER { $$ = new_declaration_tag($1, NULL); }
-			| IDENTIFIER EQUAL IDENTIFIER { $$ = new_declaration_tag($1, $3); }
+			| IDENTIFIER EQUAL primary_expression { $$ = new_declaration_tag($1, $3); }
 			;
 
 declaration_tag_list	: declaration_tag { $$ = $1; }
@@ -532,7 +572,7 @@ end_declaration		: AT declaration_tag_list AT SEMICOLON { $$ = $2; }
 			;
 
 declaration		: function_prototype SEMICOLON { $$ = NULL; }
-			| init_declarator_list end_declaration { $$ = $1; if ($1) $1->tag = $2; }
+			| init_declarator_list end_declaration { $$ = $1; if ($1) ((struct declaration *)$1)->tag = $2; }
 			| PRECISION precision_qualifier type_specifier SEMICOLON { $$ = NULL; }
 			| type_qualifier block_identifier LEFT_BRACE struct_declaration_list RIGHT_BRACE SEMICOLON { $$ = NULL; }
 			| type_qualifier block_identifier LEFT_BRACE struct_declaration_list RIGHT_BRACE decl_identifier SEMICOLON { $$ = NULL; }
@@ -560,45 +600,45 @@ single_declaration	: fully_specified_type { $$ = NULL; }
 			| fully_specified_type decl_identifier EQUAL initializer { $$ = NULL; }
 			;
 
-initializer		: assignment_expression
-			| LEFT_BRACE initializer_list RIGHT_BRACE
-			| LEFT_BRACE initializer_list COMMA RIGHT_BRACE
+initializer		: assignment_expression { $$ = $1; }
+			| LEFT_BRACE initializer_list RIGHT_BRACE { $$ = $2; }
+			| LEFT_BRACE initializer_list COMMA RIGHT_BRACE { $$ = $2; }
 			;
 
-initializer_list	: initializer
-			| initializer_list COMMA initializer
+initializer_list	: initializer { $$ = new_generic_list($1); }
+			| initializer_list COMMA initializer { $$ = generic_list_add($$, $3); }
 			;
 
-expression_statement	: SEMICOLON
-			| expression SEMICOLON
+expression_statement	: SEMICOLON { $$ = NULL; }
+			| expression SEMICOLON { $$ = $1; }
 			;
 
-selection_statement	: IF LEFT_PAREN expression RIGHT_PAREN statement
-			| IF LEFT_PAREN expression RIGHT_PAREN statement ELSE statement
+selection_statement	: IF LEFT_PAREN expression RIGHT_PAREN statement { $$ = NULL; }
+			| IF LEFT_PAREN expression RIGHT_PAREN statement ELSE statement { $$ = NULL; }
 			;
 
-switch_statement	: SWITCH LEFT_PAREN expression RIGHT_PAREN LEFT_BRACE switch_statement_list RIGHT_BRACE
+switch_statement	: SWITCH LEFT_PAREN expression RIGHT_PAREN LEFT_BRACE switch_statement_list RIGHT_BRACE { $$ = NULL; }
 			;
 
 switch_statement_list	:
 			| statement_list
 			;
 
-case_label		: CASE expression COLON
-			| DEFAULT COLON
+case_label		: CASE expression COLON { $$ = NULL; }
+			| DEFAULT COLON { $$ = NULL; }
 			;
 
-iteration_statement	: WHILE LEFT_PAREN condition RIGHT_PAREN statement_no_new_scope
-			| DO statement WHILE LEFT_PAREN expression RIGHT_PAREN SEMICOLON
-			| FOR LEFT_PAREN for_init_statement for_rest_statement RIGHT_PAREN statement_no_new_scope
+iteration_statement	: WHILE LEFT_PAREN condition RIGHT_PAREN statement_no_new_scope { $$ = NULL; }
+			| DO statement WHILE LEFT_PAREN expression RIGHT_PAREN SEMICOLON { $$ = NULL; }
+			| FOR LEFT_PAREN for_init_statement for_rest_statement RIGHT_PAREN statement_no_new_scope { $$ = NULL; }
 			;
 
-statement_no_new_scope	: compound_statement_no_new_scope
-			| simple_statement
+statement_no_new_scope	: compound_statement_no_new_scope { $$ = NULL; }
+			| simple_statement { $$ = NULL; }
 			;
 
-for_init_statement	: expression_statement
-			| declaration_statement
+for_init_statement	: expression_statement { $$ = NULL; }
+			| declaration_statement { $$ = NULL; }
 			;
 
 conditionopt		: condition
@@ -609,15 +649,15 @@ condition		: expression
 			| fully_specified_type variable_identifier EQUAL initializer
 			;
 
-for_rest_statement	: conditionopt SEMICOLON
-			| conditionopt SEMICOLON expression
+for_rest_statement	: conditionopt SEMICOLON { $$ = NULL; }
+			| conditionopt SEMICOLON expression { $$ = NULL; }
 			;
 
-jump_statement		: CONTINUE SEMICOLON
-			| BREAK SEMICOLON
-			| RETURN SEMICOLON
-			| RETURN expression SEMICOLON
-			| DISCARD SEMICOLON
+jump_statement		: CONTINUE SEMICOLON { $$ = NULL; }
+			| BREAK SEMICOLON { $$ = NULL; }
+			| RETURN SEMICOLON { $$ = NULL; }
+			| RETURN expression SEMICOLON { $$ = NULL; }
+			| DISCARD SEMICOLON { $$ = NULL; }
 			;
 
 function_prototype	: function_declarator RIGHT_PAREN { $$ = $1; }
@@ -627,8 +667,8 @@ function_declarator	: function_header { $$ = $1; }
 			| function_header_with_parameters { $$ = $1; }
 			;
 
-function_header_with_parameters : function_header parameter_declaration { $$ = $1; $1->plist = new_parameter_list($2, NULL);}
-			| function_header_with_parameters COMMA parameter_declaration { $$ = $1; $1->plist = new_parameter_list($3, $1->plist); }
+function_header_with_parameters : function_header parameter_declaration { $$ = $1; ((struct function *)$1)->plist = new_parameter_list($2, NULL);}
+			| function_header_with_parameters COMMA parameter_declaration { $$ = $1; ((struct function *)$1)->plist = new_parameter_list($3, ((struct function *)$1)->plist); }
 			;
 
 parameter_declaration	: type_qualifier parameter_declarator { $$ = new_parameter_declaration($1, $2); }
@@ -868,24 +908,24 @@ type_name_list		: type_name
 			;
 
 expression		: assignment_expression { $$ = $1; }
-			| expression COMMA assignment_expression { $$ = NULL; }
+			| expression COMMA assignment_expression { $$ = new_binary_operator(COMMA, $1, $3); }
 			;
 
 assignment_expression	: conditional_expression { $$ = $1; }
-			| unary_expression assignment_operator assignment_expression { $$ = NULL; }
+			| unary_expression assignment_operator assignment_expression { $$ = new_binary_operator($2, $1, $3); }
 			;
 
-assignment_operator	: EQUAL
-			| MUL_ASSIGN
-			| DIV_ASSIGN
-			| MOD_ASSIGN
-			| ADD_ASSIGN
-			| SUB_ASSIGN
-			| LEFT_ASSIGN
-			| RIGHT_ASSIGN
-			| AND_ASSIGN
-			| XOR_ASSIGN
-			| OR_ASSIGN
+assignment_operator	: EQUAL { $$ = EQUAL;}
+			| MUL_ASSIGN { $$ = MUL_ASSIGN;}
+			| DIV_ASSIGN { $$ = DIV_ASSIGN;}
+			| MOD_ASSIGN { $$ = MOD_ASSIGN;}
+			| ADD_ASSIGN { $$ = ADD_ASSIGN;}
+			| SUB_ASSIGN { $$ = SUB_ASSIGN;}
+			| LEFT_ASSIGN { $$ = LEFT_ASSIGN;}
+			| RIGHT_ASSIGN { $$ = RIGHT_ASSIGN;}
+			| AND_ASSIGN { $$ = AND_ASSIGN;}
+			| XOR_ASSIGN { $$ = XOR_ASSIGN;}
+			| OR_ASSIGN { $$ = OR_ASSIGN;}
 			;
 
 constant_expression	: conditional_expression { $$ = $1; }
@@ -962,37 +1002,38 @@ unary_operator		: PLUS { $$ = PLUS; }
 postfix_expression	: primary_expression { $$ = $1; }
 			| postfix_expression LEFT_BRACKET integer_expression RIGHT_BRACKET { $$ = NULL; }
 			| function_call { $$ = NULL; }
-			| postfix_expression DOT field_selection { $$ = NULL; }
+			| postfix_expression DOT field_selection { $$ = new_binary_operator(DOT, $1, $3); }
 			| postfix_expression INC_OP { $$ = new_binary_operator(INC_OP, $1, NULL); }
 			| postfix_expression DEC_OP { $$ = new_binary_operator(DEC_OP, $1, NULL); }
 			;
 
-integer_expression	: expression
+integer_expression	: expression { $$ = $1; }
 			;
 
-function_call		:function_call_or_method
+function_call		: function_call_or_method { $$ = $1; }
 			;
 
-function_call_or_method	: function_call_generic
+function_call_or_method	: function_call_generic { $$ = $1; }
 			;
 
-function_call_generic	: function_call_header_with_parameters RIGHT_PAREN
-			| function_call_header_no_parameters RIGHT_PAREN
+function_call_generic	: function_call_header_with_parameters RIGHT_PAREN { $$ = $1; }
+			| function_call_header_no_parameters RIGHT_PAREN { $$ = $1; }
 			;
 
-function_call_header_no_parameters: function_call_header VOID
-			| function_call_header
+function_call_header_no_parameters: function_call_header VOID { $$ = $1; }
+			| function_call_header { $$ = $1; }
 			;
 
-function_call_header_with_parameters: function_call_header assignment_expression
-			| function_call_header_with_parameters COMMA assignment_expression
+function_call_header_with_parameters: function_call_header assignment_expression { $$ = $1; $$->params = new_generic_list($2); }
+			| function_call_header_with_parameters COMMA assignment_expression { $$ = $1; $1->params = generic_list_add($1->params, $3); }
 			;
 
-function_call_header	: function_identifier LEFT_PAREN
+function_call_header	: function_identifier LEFT_PAREN { $$ = new_function_call($1); }
 			;
 
-function_identifier	: type_specifier
-			| postfix_expression
+function_identifier	: type_specifier { $$ = $1; }
+			| postfix_expression { $$ = $1; }
+			;
 
 primary_expression	: variable_identifier { $$ = new_identifier($1); }
 			| INTCONSTANT { union rvalue v; v.ival = $1; $$ = new_constant_value(INTCONSTANT, &v); }

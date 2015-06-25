@@ -492,7 +492,7 @@ static void process_declaration(lua_State *L, int uniform_table_idx, struct decl
 		const char *type_string = "";
 		int type_code;
 		if (d->type) {
-			struct generic_list *gl = d->type->qualifiers;
+			struct generic_list *gl = (struct generic_list *)d->type->qualifiers;
 			while(gl != NULL) {
 				switch(gl->ent->code) {
 				case UNIFORM:
@@ -501,8 +501,8 @@ static void process_declaration(lua_State *L, int uniform_table_idx, struct decl
 				}
 				gl = gl->next;
 			}
-			if (d->type->specifier && d->type->specifier->nonarray) {
-				type_code = d->type->specifier->nonarray->code;
+			if (d->type->specifier && ((struct type_specifier *)d->type->specifier)->nonarray) {
+				type_code = ((struct type_specifier *)d->type->specifier)->nonarray->code;
 				switch (type_code) {
 				case FLOAT:
 					type_string = "float";
