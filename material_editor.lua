@@ -54,7 +54,7 @@ void main()\
 controls = {}
 texture_units = {}
 settings_expanders = {}
-settings_boxes = {}
+settings_grids = {}
 
 function queue_render()
 	capi:need_redraw()
@@ -86,9 +86,6 @@ function update_shaders()
 				texture_units[controls[k].texunit] = false
 			end
 		end
-		if (v.widget) then
-			settings_boxes[controls[k].tag]:remove(w.widget)
-		end
 		if not uniforms[k] then
 			controls[k].widget = nil
 		end
@@ -98,8 +95,10 @@ function update_shaders()
 		vbox_settings:remove(v)
 	end
 
-	settings_boxes = {}
+	settings_grids = {}
 	settings_expanders = {}
+
+	local grids_pos = {}
 
 	for i, k in ipairs(uniforms) do
 		local datatype = uniforms[k].datatype
@@ -132,12 +131,13 @@ function update_shaders()
 			end
 			active_material.params[k].value = value
 			if not controls[k].widget then
-				local control = Gtk.Scrollbar {
+				local widget = Gtk.Scrollbar {
 					orientation = "HORIZONTAL",
 					adjustment = Gtk.Adjustment {
 						lower = 0,
 						upper = 1,
 					},
+					hexpand = true,
 					on_value_changed = function(self)
 						if active_material.params[k].value ~= self:get_value() then
 							setting_changed()
@@ -146,33 +146,16 @@ function update_shaders()
 						queue_render()
 					end
 				}
-				local widget = Gtk.HBox {
-					{
-						Gtk.Label {
-							label = id,
-							hexpand = false
-						},
-						expand = false,
-						fill = false
-					},
-					{
-						control,
-						expand = true,
-						fill = true
-					},
-					spacing = 10,
-				}
 				controls[k].widget = widget
-				controls[k].control = control
 			end
-			controls[k].control:set_value(value)
+			controls[k].widget:set_value(value)
 		elseif datatype == "vec3" then
 			if not value then
 				value = {1, 1, 1}
 			end
 			active_material.params[k].value = value
 			if not controls[k].widget then
-				local control = Gtk.ColorButton {
+				local widget = Gtk.ColorButton {
 					use_alpha = false,
 					on_color_set = function(self)
 						local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
@@ -186,26 +169,9 @@ function update_shaders()
 						queue_render()
 					end
 				}
-				local widget = Gtk.HBox {
-					{
-						Gtk.Label {
-							label = id,
-							hexpand = false
-						},
-						expand = false,
-						fill = false
-					},
-					{
-						control,
-						expand = true,
-						fill = true
-					},
-					spacing = 10,
-				}
 				controls[k].widget = widget
-				controls[k].control = control
 			end
-			controls[k].control:set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
+			controls[k].widget:set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 		elseif datatype == "bool" then
 			if value == nil then
 				value = false
@@ -237,7 +203,7 @@ function update_shaders()
 				end
 				texture_units[t] = true
 				controls[k] = { texunit= t }
-				local control = Gtk.FileChooserButton {
+				local widget = Gtk.FileChooserButton {
 					title = id,
 					action = "OPEN",
 					on_selection_changed = function(chooser)
@@ -265,46 +231,34 @@ function update_shaders()
 						end
 					end,
 				}
-				local widget = Gtk.HBox {
-					{
-						Gtk.Label {
-							label = id,
-							hexpand = false
-						},
-						expand = false,
-						fill = false
-					},
-					{
-						control,
-						expand = true,
-						fill = true
-					},
-					spacing = 10,
-				}
 				controls[k].widget = widget
-				controls[k].control = control
 			end
 			if value ~= nil then
-				controls[k].control:set_filename(b2l_absolute_path(value))
+				controls[k].widget:set_filename(b2l_absolute_path(value))
 			end
 		end
-		if controls[k].widget then
-			local box = settings_boxes[tag]
 
-			if not box then
-				box = Gtk.VBox {
-					hexpand = true,
+		if controls[k].widget then
+			local grid = settings_grids[tag]
+			if not grid then
+				grid = Gtk.Grid {
+					row_spacing = 5,
+					margin_left = 30,
 				}
 				local expander = Gtk.Expander {
 					label = tag,
 					expanded = true,
-					box
+					grid
 				}
 				vbox_settings:pack_end(expander, false, false, 5)
-				settings_boxes[tag] = box
+				settings_grids[tag] = grid
 				settings_expanders[tag] = expander
+				grids_pos[tag] = 0
 			end
-			box:pack_end(controls[k].widget, false, false, 5)
+			controls[k].widget.margin_left = 30
+			grid:attach( Gtk.Label { label = k, xalign = 0 } , 0, grids_pos[tag], 1, 1)
+			grid:attach(controls[k].widget, 1, grids_pos[tag], 1, 1)
+			grids_pos[tag] = grids_pos[tag] + 1
 		end
 
 	end
@@ -724,10 +678,13 @@ local vbox_main = Gtk.VBox {
 	},
 	{
 		Gtk.Grid {
-			column_spacing = 20,
+			margin_left= 30,
+			row_spacing = 3,
+			column_spacing = 30,
 			{
 				Gtk.Label {
-					label = "B2L File"
+					label = "B2L File",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 0,
@@ -736,11 +693,12 @@ local vbox_main = Gtk.VBox {
 				b2l_file_button,
 				left_attach = 1,
 				top_attach = 0,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Scene"
+					label = "Scene",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 1,
@@ -749,11 +707,12 @@ local vbox_main = Gtk.VBox {
 				scene_combo,
 				left_attach = 1,
 				top_attach = 1,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Object"
+					label = "Object",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 2,
@@ -762,11 +721,12 @@ local vbox_main = Gtk.VBox {
 				object_combo,
 				left_attach = 1,
 				top_attach = 2,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Material"
+					label = "Material",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 3,
@@ -775,11 +735,12 @@ local vbox_main = Gtk.VBox {
 				material_combo,
 				left_attach = 1,
 				top_attach = 3,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Action"
+					label = "Action",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 4,
@@ -788,11 +749,12 @@ local vbox_main = Gtk.VBox {
 				action_combo,
 				left_attach = 1,
 				top_attach = 4,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Frame"
+					label = "Frame",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 5,
@@ -801,11 +763,12 @@ local vbox_main = Gtk.VBox {
 				action_scale,
 				left_attach = 1,
 				top_attach = 5,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Vertex Shader"
+					label = "Vertex Shader",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 6,
@@ -821,11 +784,12 @@ local vbox_main = Gtk.VBox {
 				},
 				left_attach = 1,
 				top_attach = 6,
-				width = 2,
+				width = 1,
 			},
 			{
 				Gtk.Label {
-					label = "Fragment Shader"
+					label = "Fragment Shader",
+					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 7,
@@ -841,7 +805,7 @@ local vbox_main = Gtk.VBox {
 				},
 				left_attach = 1,
 				top_attach = 7,
-				width = 2,
+				width = 1,
 			},
 		},
 		expand = false,
