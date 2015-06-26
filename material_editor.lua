@@ -53,6 +53,8 @@ void main()\
 
 controls = {}
 texture_units = {}
+settings_expanders = {}
+settings_boxes = {}
 
 function queue_render()
 	capi:need_redraw()
@@ -77,6 +79,7 @@ function update_shaders()
 		dialog:show_all()
 		return
 	end
+
 	for k, v in pairs(controls) do
 		if not uniforms[k] then
 			if controls[k].datatype == "sampler2D" and controls[k].texunit then
@@ -84,17 +87,25 @@ function update_shaders()
 			end
 		end
 		if (v.widget) then
-			vbox_settings:remove(v.widget)
+			settings_boxes[controls[k].tag]:remove(w.widget)
 		end
 		if not uniforms[k] then
 			controls[k].widget = nil
 		end
 	end
+
+	for k, v in pairs(settings_expanders) do
+		vbox_settings:remove(v)
+	end
+
+	settings_boxes = {}
+	settings_expanders = {}
+
 	for i, k in ipairs(uniforms) do
 		local datatype = uniforms[k].datatype
 		local tag = uniforms[k].tag
 		if not tag then
-			tag = ""
+			tag = "Misc"
 		end
 		local id = k
 		if not active_material.params[k] then
@@ -106,9 +117,13 @@ function update_shaders()
 			active_material.params[k].value = nil
 		end
 
+		active_material.params[k].tag = tag
+
 		if not controls[k] then
 			controls[k] = {datatype = v}
 		end
+
+		controls[k].tag = tag
 
 		local value = active_material.params[k].value
 		if datatype == "float" then
@@ -151,7 +166,6 @@ function update_shaders()
 				controls[k].control = control
 			end
 			controls[k].control:set_value(value)
-			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif datatype == "vec3" then
 			if not value then
 				value = {1, 1, 1}
@@ -192,7 +206,6 @@ function update_shaders()
 				controls[k].control = control
 			end
 			controls[k].control:set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
-			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif datatype == "bool" then
 			if value == nil then
 				value = false
@@ -213,7 +226,6 @@ function update_shaders()
 				controls[k].widget = widget
 			end
 			controls[k].widget:set_active(value)
-			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		elseif datatype == "sampler2D" then
 			if value ~= nil then
 				active_material.params[k].value = value
@@ -275,8 +287,26 @@ function update_shaders()
 			if value ~= nil then
 				controls[k].control:set_filename(b2l_absolute_path(value))
 			end
-			vbox_settings:pack_end(controls[k].widget, false, false, 5)
 		end
+		if controls[k].widget then
+			local box = settings_boxes[tag]
+
+			if not box then
+				box = Gtk.VBox {
+					hexpand = true,
+				}
+				local expander = Gtk.Expander {
+					label = tag,
+					expanded = true,
+					box
+				}
+				vbox_settings:pack_end(expander, false, false, 5)
+				settings_boxes[tag] = box
+				settings_expanders[tag] = expander
+			end
+			box:pack_end(controls[k].widget, false, false, 5)
+		end
+
 	end
 	vbox_settings:show_all()
 	queue_render()
