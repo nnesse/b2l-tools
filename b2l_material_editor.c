@@ -1117,8 +1117,13 @@ int main()
 	lua_pushstring(L, b2l_data_dir);
 	lua_pushstring(L, "/lua/material_editor.lua");
 	lua_concat(L, 2);
-	luaL_loadfile(L, lua_tostring(L, -1));
-	int err = lua_pcall(L, 0, 0, msgh);
+	int err;
+	err = luaL_loadfile(L, lua_tostring(L, -1));
+	if (err != LUA_OK) {
+		fprintf(stderr, "Error loading script: %s\n", lua_tostring(L, -1));
+		return 0;
+	}
+	err = lua_pcall(L, 0, 0, msgh);
 	switch (err) {
 	case LUA_ERRRUN:
 		fprintf(stderr, "Lua runtime error: ");
