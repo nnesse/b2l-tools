@@ -55,6 +55,17 @@ void glwin_swap_buffers(struct glwin *win);
 void glwin_show_window(struct glwin *win);
 void glwin_fullscreen(struct glwin *win, bool fullscreen);
 
+struct glwin_thread_state {
+	void *display;
+	void *context;
+	uint32_t read_draw;
+	uint32_t write_draw;
+};
+
+void glwin_get_thread_state(struct glwin_thread_state *state);
+
+void glwin_set_thread_state(const struct glwin_thread_state *state);
+
 bool glwin_is_button_pressed(struct glwin *win, int button_no);
 
 bool glwin_is_modifier_pressed(struct glwin *win, int modifier_no);

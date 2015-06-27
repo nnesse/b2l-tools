@@ -454,3 +454,19 @@ void glwin_show_window(struct glwin *win)
 	XMapWindow(g_display, win->window);
 	XSync(g_display, 0);
 }
+
+void glwin_get_thread_state(struct glwin_thread_state *state)
+{
+	state->write_draw = glXGetCurrentDrawable();
+	state->read_draw = glXGetCurrentDrawable();
+	state->display = glXGetCurrentDisplay();
+	state->context = glXGetCurrentContext();
+}
+
+void glwin_set_thread_state(const struct glwin_thread_state *state)
+{
+	glXMakeContextCurrent(state->display,
+			state->write_draw,
+			state->read_draw,
+			state->context);
+}
