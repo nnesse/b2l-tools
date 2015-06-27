@@ -2,6 +2,7 @@ local capi = require 'material_editor_capi'
 local lgi = require 'lgi'
 local Gtk = lgi.require('Gtk')
 local Gdk = lgi.require('Gdk')
+local GdkX11 = lgi.require('GdkX11')
 local GObject = lgi.require('GObject')
 local GLib = lgi.require('GLib')
 local GdkPixbuf = lgi.require('GdkPixbuf')
@@ -15,6 +16,9 @@ local window_main = Gtk.Window {
    title = 'B2L Material Editor',
    on_destroy = Gtk.main_quit,
    width_request = 250,
+   on_realize = function (window)
+	   capi.create_glwin(window:get_window():get_xid())
+   end,
 }
 
 vbox_settings = Gtk.VBox {

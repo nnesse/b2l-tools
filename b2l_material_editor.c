@@ -31,6 +31,7 @@ static int need_redraw(lua_State *L);
 static int set_shaders(lua_State *L);
 static int make_path_relative(lua_State *L);
 static int directory_name(lua_State *L);
+static int create_glwin(lua_State *L);
 
 luaL_Reg lua_b2l_material_editor_capi[] = {
 	{ "directory_name", directory_name },
@@ -38,6 +39,7 @@ luaL_Reg lua_b2l_material_editor_capi[] = {
 	{ "set_b2l_file", set_b2l_file},
 	{ "need_redraw", need_redraw},
 	{ "set_shaders", set_shaders },
+	{ "create_glwin", create_glwin},
 	{ NULL, NULL }
 };
 
@@ -432,7 +434,8 @@ static int event_process()
 {
 	glwin_get_events(false);
 	bool ret = glwin_process_events();
-	redraw(g_win);
+	if (g_win)
+		redraw(g_win);
 	return ret;
 }
 
@@ -461,21 +464,34 @@ int luaopen_material_editor_capi(lua_State *L)
 	cb.on_mouse_wheel = on_mouse_wheel;
 	cb.on_resize = on_resize;
 	glwin_init();
-	g_win = glwin_create_window("B2L 3D View", &cb, 512, 512);
-	if (!g_win)
-		exit(-1);
-
-	glwin_show_window(g_win);
-	g_ctx = glwin_create_context(g_win, 3, 3);
-	if (!g_ctx)
-		exit(-1);
-	glwin_make_current(g_win, g_ctx);
-	glb_glcore_init(3, 3);
 	GMainContext *ctx = g_main_context_default();
 	g_src = g_unix_fd_source_new(glwin_epoll_fd, G_IO_IN);
 	g_source_attach(g_src, ctx);
 	g_source_set_callback(g_src, dispatch, NULL, NULL);
 	return 1;
+}
+
+static int create_glwin(lua_State *L)
+{
+	int xid = lua_tointeger(L, -1);
+	g_win = glwin_create_window("B2L 3D View", &cb, 512, 512);
+	if (!g_win)
+		exit(-1);
+
+	glwin_set_type(g_win, GLWIN_TOOLBAR);
+	glwin_set_transient_for(g_win, xid);
+
+	glwin_show_window(g_win);
+
+	g_ctx = glwin_create_context(g_win, 3, 3);
+	if (!g_ctx)
+		exit(-1);
+	glwin_make_current(g_win, g_ctx);
+	glb_glcore_init(3, 3);
+
+	need_redraw(L);
+
+	return 0;
 }
 
 static int need_redraw(lua_State *L)
