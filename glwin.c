@@ -317,7 +317,42 @@ struct glwin *glwin_create_window(const char *title, struct glwin_callbacks *cal
 	register_glwin(win);
 	if (win->callbacks.on_create)
 		win->callbacks.on_create(win);
+
 	return win;
+}
+
+void glwin_set_transient_for(struct glwin *win, intptr_t id)
+{
+	XSetTransientForHint(g_display, win->window, id);
+}
+
+void glwin_set_type(struct glwin *win, enum glwin_types type)
+{
+	Atom type_atom = 0;
+	switch (type) {
+	case GLWIN_POPUP:
+		type_atom = XInternAtom(g_display, "_NET_WM_WINDOW_TYPE_POPUP_MENU", False);
+		break;
+	case GLWIN_NORMAL:
+		type_atom = XInternAtom(g_display, "_NET_WM_WINDOW_TYPE_NORMAL", False);
+		break;
+	case GLWIN_DIALOG:
+		type_atom = XInternAtom(g_display, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+		break;
+	case GLWIN_TOOLBAR:
+		type_atom = XInternAtom(g_display, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
+		break;
+	default:
+		return;
+	}
+	XChangeProperty(g_display,
+		win->window,
+		XInternAtom(g_display, "_NET_WM_WINDOW_TYPE", False),
+		XA_ATOM,
+		32,
+		PropModeReplace,
+		(const unsigned char *)&type_atom,
+		1);
 }
 
 void glwin_make_current(struct glwin *win, glwin_context_t context)

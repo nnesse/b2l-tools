@@ -43,6 +43,17 @@ struct glwin *glwin_create_window(const char *title,
 		int width,
 		int height);
 
+enum glwin_types {
+	GLWIN_POPUP,
+	GLWIN_NORMAL,
+	GLWIN_DIALOG,
+	GLWIN_TOOLBAR
+};
+
+void glwin_set_type(struct glwin *win, enum glwin_types type);
+
+void glwin_set_transient_for(struct glwin *win, intptr_t id);
+
 void glwin_make_current(struct glwin *win, glwin_context_t context);
 bool glwin_process_events();
 int glwin_get_events(bool block);
