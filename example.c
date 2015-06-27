@@ -32,7 +32,9 @@ int main()
 		.on_destroy = on_destroy,
 		.on_key_down = on_key_down
 	};
-	glwin_init();
+	if (!glwin_init()) {
+		exit(-1);
+	}
 	struct glwin *win = glwin_create_window("Hello window", &cb, 512, 512);
 	if (!win)
 		exit(-1);
@@ -42,7 +44,9 @@ int main()
 	if (!ctx)
 		exit(-1);
 	glwin_make_current(win, ctx);
-	glb_glcore_init(3, 3);
+	if (!glb_glcore_init(3, 3)) {
+		exit(-1);
+	}
 	while (glwin_process_events()) {
 		if (glwin_get_events(true) < 0)
 			break;
