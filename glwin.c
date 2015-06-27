@@ -224,6 +224,7 @@ bool glwin_init()
 
 	g_screen = DefaultScreen(g_display);
 	g_delete_atom = XInternAtom(g_display, "WM_DELETE_WINDOW", True);
+	return true;
 }
 
 void glwin_shutdown()
