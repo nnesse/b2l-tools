@@ -5,6 +5,7 @@ export exec_prefix=@exec_prefix@
 export includedir=@includedir@
 export datadir=@datarootdir@/b2l
 export bindir=@bindir@
+export libdir=@libdir@
 VPATH=$(srcdir)
 
 CFLAGS:= -g -O0 -Wall -Wno-unused-function -DLUA_USE_LINUX -DLUA_COMPAT_ALL
@@ -12,7 +13,7 @@ CFLAGS+= -DDATA_DIR=\"$(datadir)\"
 CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/lua/src -I${srcdir}/lgi/lgi
 CFLAGS+= @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@ @GMODULE2_CFLAGS@ @LIBFFI_CFLAGS@ @GOBJECT_INTROSPECTION_CFLAGS@ @CFLAGS@
 
-LDFLAGS:= -lglwin -lglb-glcore -lGL
+LDFLAGS:= -lglwin -lglb-glcore -lGL -Wl,-rpath=@libdir@
 LDFLAGS+= @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@ @GMODULE2_LIBS@ @LIBFFI_LIBS@ @GOBJECT_INTROSPECTION_LIBS@ @LDFLAGS@
 
 FLEX = @FLEX@
