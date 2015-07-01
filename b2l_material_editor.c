@@ -444,10 +444,30 @@ static gboolean dispatch(gpointer user_data)
 	return event_process();
 }
 
+#include <gtk/gtk.h>
+
 static gboolean idle(gpointer user_data)
 {
+	lua_getglobal(g_L, "playing_animation");
+	bool animation_playing = lua_toboolean(g_L, -1);
+	lua_pop(g_L, 1);
+	if (animation_playing) {
+		lua_getglobal(g_L, "animation_update");
+		lua_call(g_L, 0, 0);
+	}
 	event_process();
-	return false;
+	if (animation_playing)
+		while (gtk_events_pending())
+			gtk_main_iteration_do(false);
+
+	lua_getglobal(g_L, "shutdown");
+	bool shutdown = lua_toboolean(g_L, -1);
+	lua_pop(g_L, 1);
+
+	if (shutdown)
+		exit(0);
+
+	return animation_playing;
 }
 
 int luaopen_material_editor_capi(lua_State *L)

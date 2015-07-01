@@ -634,6 +634,17 @@ action_scale = Gtk.Scale {
 	end,
 }
 
+playing_animation = false
+shutdown = false
+
+function animation_update()
+	frame_delta = frame_delta + 0.3333
+	if (frame_start + frame_delta) >= frame_end then
+		frame_delta = 1
+	end
+	action_scale:set_value(frame_delta)
+end
+
 -- Pack everything into the window.
 local vbox_main = Gtk.VBox {
 	{
@@ -650,6 +661,7 @@ local vbox_main = Gtk.VBox {
 					Gtk.MenuItem {
 						label = "Exit",
 						on_activate = function()
+							shutdown = true
 							Gtk.main_quit()
 						end,
 					}
@@ -764,7 +776,25 @@ local vbox_main = Gtk.VBox {
 				top_attach = 5,
 			},
 			{
-				action_scale,
+				Gtk.HBox {
+					{
+						Gtk.ToolButton {
+							icon_name = "media-playback-start",
+							on_clicked = function(button)
+								if button.icon_name == "media-playback-start" then
+									playing_animation = true
+									button.icon_name = "media-playback-stop"
+								else
+									playing_animation = false
+									button.icon_name = "media-playback-start"
+								end
+								queue_render()
+							end,
+						},
+						expand = false
+					},
+					action_scale,
+				},
 				left_attach = 1,
 				top_attach = 5,
 				width = 1,
