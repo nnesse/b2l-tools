@@ -101,6 +101,68 @@ static void mat4_mul(const struct mat4 *m1, const struct mat4 *m2, struct mat4 *
 	}
 }
 
+static float vec3_norm(const float *v)
+{
+	return sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+}
+
+static void vec3_cross(const float *a, const float *b, float *c)
+{
+	c[0] = a[1] * b[2] - a[2] * b[1];
+	c[1] = -a[0] * b[2] + a[2] * b[0];
+	c[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+static void lerp(const float *v1, const float *v2, float d, float *v3)
+{
+	int i;
+	for (i = 0; i < 3; i++) {
+		v3[i] = v1[i] * (1-d) + v2[i] * d;
+	}
+}
+
+void vec3_normalize(float *v)
+{
+	int i;
+	float norm = vec3_norm(v);
+	if (norm > 0) {
+		for (i = 0; i < 3; i++) {
+			v[i] *= 1.0/norm;
+		}
+	}
+}
+
+static void spherical_lerp(const float *v1, const float *v2, float d, float *v3)
+{
+	float v1xv2[3];
+	float v1_x_v1xv2[3];
+
+	vec3_cross(v1, v2, v1xv2);
+	double theta = vec3_norm(v1xv2);
+	double phi = -d * theta;
+
+	vec3_normalize(v1xv2);
+
+	vec3_cross(v1, v1xv2, v1_x_v1xv2);
+
+	int i = 0;
+	float cos_phi = cos(phi);
+	float sin_phi = sin(phi);
+	for (i = 0; i < 3; i++) {
+		v3[i] = cos_phi * v1[i] + sin_phi * v1_x_v1xv2[i];
+	}
+}
+
+static void mat4_transpose(const struct mat4 *m, struct mat4 *out)
+{
+	int i, j;
+	for (i = 0; i < 4; i++) {
+		for (j = 0; j < 4; j++) {
+			out->v[i][j] = m->v[j][i];
+		}
+	}
+}
+
 static void mat4_mul_vec4(const struct mat4 *m, const float *v1, float *v2)
 {
 	int i, j;
@@ -457,15 +519,15 @@ static gboolean idle(gpointer user_data)
 	}
 	event_process();
 	if (animation_playing)
-		while (gtk_events_pending())
+		while (gtk_events_pending()) {
 			gtk_main_iteration_do(false);
+			lua_getglobal(g_L, "shutdown");
+			bool shutdown = lua_toboolean(g_L, -1);
+			lua_pop(g_L, 1);
 
-	lua_getglobal(g_L, "shutdown");
-	bool shutdown = lua_toboolean(g_L, -1);
-	lua_pop(g_L, 1);
-
-	if (shutdown)
-		exit(0);
+			if (shutdown)
+				exit(0);
+		}
 
 	return animation_playing;
 }
@@ -911,15 +973,21 @@ static void redraw(struct glwin *win)
 	if (weights_per_vertex > 0) {
 		static int render_count = 0;
 		render_count++;
-		int frame;
+		double frame;
+		int frame_start;
+		int frame_end;
 		lua_getglobal(L, "frame_start"); //16
-		frame = lua_tointeger(L, -1);
-		lua_getglobal(L, "frame_delta"); //17
-		frame += lua_tointeger(L, -1);
+		frame_start = lua_tointeger(L, -1);
+		lua_getglobal(L, "frame_end"); //17
+		frame_end = lua_tointeger(L, -1);
+		lua_getglobal(L, "frame_delta"); //18
+		frame = frame_start + lua_tonumber(L, -1);
+		int frame_i = floorf(frame);
+		double frame_fract = frame - frame_i;
 
-		lua_getfield(L, -17, "scenes"); //18
-		lua_getglobal(L, "current_scene"); //19
-		lua_getfield(L, -2, lua_tostring(L, -1)); //20
+		lua_getfield(L, -18, "scenes"); //19
+		lua_getglobal(L, "current_scene"); //20
+		lua_getfield(L, -2, lua_tostring(L, -1)); //21
 		if (!lua_istable(L, -1)) {
 			lua_pop(L, 20);
 			goto end;
@@ -928,13 +996,38 @@ static void redraw(struct glwin *win)
 		lua_getfield(L, -1, current_object);
 		lua_getfield(L, -1, "vertex_group_transform_array_offset");
 		int offset = lua_tointeger(L, -1);
-		lua_pop(L, 8);
-		offset += frame * sizeof(float) * 4 * 4 * num_vertex_groups;
+		lua_pop(L, 9);
+		int stride = sizeof(float) * 4 * 4 * num_vertex_groups;
+		int i;
+		for (i = 0; i < num_vertex_groups; i++) {
+			struct mat4 res;
+			struct mat4 M1;
+			struct mat4 M2;
+			struct mat4 *base = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + frame_i * stride);
+			struct mat4 *next = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
 
-		glUniformMatrix4fv(g_gl_state.groups_index,
-				num_vertex_groups,
-				GL_TRUE,
-				(GLfloat *)(g_gl_state.blob + offset));
+			if (frame_i == (frame_end-1)) {
+				next = (struct mat4 *)(g_gl_state.blob + offset + i * sizeof(float) * 4 * 4 + (frame_start) * stride);
+			} else if (frame_fract == 0) {
+				next = base;
+			}
+
+			mat4_transpose(base, &M1);
+			mat4_transpose(next, &M2);
+
+			mat4_zero(&res);
+			res.v[3][3] = 1;
+
+			spherical_lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
+			spherical_lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
+			spherical_lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
+			lerp(M1.v[3], M2.v[3], frame_fract, res.v[3]);
+
+			glUniformMatrix4fv(g_gl_state.groups_index + i,
+					1, /*num_vertex_groups, */
+					GL_FALSE,
+					(GLfloat *)&res);
+		}
 	}
 
 	lua_getglobal(L, "controls"); //16

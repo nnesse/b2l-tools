@@ -537,7 +537,7 @@ object_combo = Gtk.ComboBox {
 						actions_store:append {
 							[1] = action.name,
 							[2] = action.frame_start,
-							[3] = action.frame_end
+							[3] = action.frame_end - 1
 						}
 					end
 				end
@@ -615,10 +615,13 @@ action_combo = Gtk.ComboBox {
 		frame_end = row[3]
 		frame_delta = 1
 		action_scale.adjustment.lower = 1
-		action_scale.adjustment.upper = (frame_end - frame_start - 1)
+		action_scale.adjustment.upper = (frame_end - frame_start) + 1
 		action_scale:set_value(1)
 	end
 }
+
+playing_animation = false
+shutdown = false
 
 action_scale = Gtk.Scale {
 	adjustment = Gtk.Adjustment {
@@ -629,20 +632,19 @@ action_scale = Gtk.Scale {
 	},
 	digits = 0,
 	on_value_changed = function(self)
-		frame_delta = self:get_value()
+		if not playing_animation then
+			frame_delta = self:get_value() - 1
+		end
 		queue_render()
 	end,
 }
 
-playing_animation = false
-shutdown = false
-
 function animation_update()
-	frame_delta = frame_delta + 0.3333
+	frame_delta = frame_delta + 0.3333;
 	if (frame_start + frame_delta) >= frame_end then
-		frame_delta = 1
+		frame_delta = frame_delta - (frame_end - frame_start)
 	end
-	action_scale:set_value(frame_delta)
+	action_scale:set_value(frame_delta + 1)
 end
 
 -- Pack everything into the window.
