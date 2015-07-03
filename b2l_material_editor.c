@@ -941,19 +941,19 @@ static void redraw(struct glwin *win)
 		glBindVertexBuffer(WEIGHTS, g_gl_state.vbo, weights_array_offset, weights_per_vertex * 4);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_gl_state.vbo);
-	if (g_gl_state.normal_index > 0) {
+	if (g_gl_state.normal_index >= 0) {
 		glEnableVertexAttribArray(g_gl_state.normal_index);
 		glVertexAttribFormat(g_gl_state.normal_index, 3, GL_FLOAT, GL_FALSE, 0);
 		glVertexAttribBinding(g_gl_state.normal_index, NORMAL);
 	}
 
-	if (g_gl_state.uv_index > 0) {
+	if (g_gl_state.uv_index >= 0) {
 		glEnableVertexAttribArray(g_gl_state.uv_index);
 		glVertexAttribFormat(g_gl_state.uv_index, 2, GL_FLOAT, GL_FALSE, 0);
 		glVertexAttribBinding(g_gl_state.uv_index, UV);
 	}
 
-	if (g_gl_state.pos_index > 0) {
+	if (g_gl_state.pos_index >= 0) {
 		glEnableVertexAttribArray(g_gl_state.pos_index);
 		glVertexAttribFormat(g_gl_state.pos_index, 3, GL_FLOAT, GL_FALSE, 0);
 		glVertexAttribBinding(g_gl_state.pos_index, POS);
@@ -966,7 +966,7 @@ static void redraw(struct glwin *win)
 			glVertexAttribBinding(g_gl_state.weights_index[i], WEIGHTS);
 		}
 	}
-	if (num_uv_layers > 0 && g_gl_state.tangent_index > 0) {
+	if (num_uv_layers > 0 && g_gl_state.tangent_index >= 0) {
 		glEnableVertexAttribArray(g_gl_state.tangent_index);
 		glVertexAttribFormat(g_gl_state.tangent_index, 4, GL_FLOAT, GL_FALSE, 0);
 		glVertexAttribBinding(g_gl_state.tangent_index, TANGENT);
