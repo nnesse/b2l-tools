@@ -26,6 +26,8 @@ extern char *metalval;
 
 #define MAX_TEXTURE_UNITS 8
 
+#define USE_SLERP 1
+
 static int set_b2l_file(lua_State *L);
 static int need_redraw(lua_State *L);
 static int set_shaders(lua_State *L);
@@ -132,24 +134,49 @@ void vec3_normalize(float *v)
 	}
 }
 
-static void spherical_lerp(const float *v1, const float *v2, float d, float *v3)
+float vec3_dot(const float *v1, const float *v2)
+{
+	int i;
+	float ret = 0;
+	for (i = 0; i < 3; i++) {
+		ret += v1[i] * v2[i];
+	}
+	return ret;
+}
+
+static void spherical_lerp(float *v1, float *v2, float d, float *vout)
 {
 	float v1xv2[3];
-	float v1_x_v1xv2[3];
+	float v3[3];
+
+	float v1_norm = vec3_norm(v1);
+	float v2_norm = vec3_norm(v2);
+	vec3_normalize(v1);
+	vec3_normalize(v2);
 
 	vec3_cross(v1, v2, v1xv2);
-	double theta = vec3_norm(v1xv2);
-	double phi = -d * theta;
+
+	double theta;
+
+	float dot = vec3_dot(v1, v2);
+	if (dot > 1) dot = 1;
+	theta = acosf(dot);
+
+	if (theta < 0.05) {
+		lerp(v1, v2, d, vout);
+		return;
+	}
+
+	double phi = d * theta;
 
 	vec3_normalize(v1xv2);
-
-	vec3_cross(v1, v1xv2, v1_x_v1xv2);
+	vec3_cross(v1xv2, v1, v3);
 
 	int i = 0;
 	float cos_phi = cos(phi);
 	float sin_phi = sin(phi);
 	for (i = 0; i < 3; i++) {
-		v3[i] = cos_phi * v1[i] + sin_phi * v1_x_v1xv2[i];
+		vout[i] = (cos_phi * v1[i] + sin_phi * v3[i]) * (v1_norm * (1-d) + v2_norm * d);
 	}
 }
 
@@ -1012,16 +1039,36 @@ static void redraw(struct glwin *win)
 				next = base;
 			}
 
-			mat4_transpose(base, &M1);
-			mat4_transpose(next, &M2);
 
+#if USE_SLERP
+			struct mat4 temp;
+			mat4_zero(&temp);
+			temp.v[3][3] = 1;
+			M1 = *base;
+			M2 = *next;
+			spherical_lerp(M1.v[0], M2.v[0], frame_fract, temp.v[0]);
+			spherical_lerp(M1.v[1], M2.v[1], frame_fract, temp.v[1]);
+			spherical_lerp(M1.v[2], M2.v[2], frame_fract, temp.v[2]);
+			mat4_transpose(&temp, &res);
+			float v1[3];
+			float v2[3];
+			v1[0] = M1.v[0][3];
+			v1[1] = M1.v[1][3];
+			v1[2] = M1.v[2][3];
+			v2[0] = M2.v[0][3];
+			v2[1] = M2.v[1][3];
+			v2[2] = M2.v[2][3];
+			lerp(v1, v2, frame_fract, res.v[3]);
+#else
 			mat4_zero(&res);
 			res.v[3][3] = 1;
-
-			spherical_lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
-			spherical_lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
-			spherical_lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
+			mat4_transpose(base, &M1);
+			mat4_transpose(next, &M2);
+			lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
+			lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
+			lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
 			lerp(M1.v[3], M2.v[3], frame_fract, res.v[3]);
+#endif
 
 			glUniformMatrix4fv(g_gl_state.groups_index + i,
 					1, /*num_vertex_groups, */

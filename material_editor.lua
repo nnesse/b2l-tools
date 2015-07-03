@@ -630,7 +630,7 @@ action_scale = Gtk.Scale {
 		step_increment = 1,
 		page_increment = 1,
 	},
-	digits = 0,
+	digits = 2,
 	on_value_changed = function(self)
 		if not playing_animation then
 			frame_delta = self:get_value() - 1
