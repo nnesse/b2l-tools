@@ -70,16 +70,16 @@ data/lua:
 	mkdir -p $@
 
 @abs_builddir@/data/lua/lgi.lua: | data/lua
-	ln -s $$(realpath ../lgi/lgi.lua) $@
+	ln -s $$(realpath $(srcdir)/lgi/lgi.lua) $@
 
 @abs_builddir@/data/lua/pprint.lua: | data/lua
-	ln -s $$(realpath ../pprint.lua) $@
+	ln -s $$(realpath $(srcdir)/pprint.lua) $@
 
 @abs_builddir@/data/lua/lgi: | data/lua
-	ln -s $$(realpath ../lgi/lgi) $@
+	ln -s $$(realpath $(srcdir)/lgi/lgi) $@
 
 @abs_builddir@/data/lua/material_editor.lua: | data/lua
-	ln -s $$(realpath ../material_editor.lua) $@
+	ln -s $$(realpath $(srcdir)/material_editor.lua) $@
 
 install: b2l_material_editor material_editor.lua links
 	$(INSTALL) -d $(DESTDIR)$(datadir)/lua/lgi/override
