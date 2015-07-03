@@ -4,7 +4,7 @@ return {
       ambient_light = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.60833333333333 
+        value = 0 
       },
       bump = { 
         datatype = 'bool',
@@ -14,7 +14,7 @@ return {
       bump_depth = { 
         datatype = 'float',
         tag = 'Material',
-        value = 0.5 
+        value = 0.41414141414141 
       },
       diffuse_texture = { 
         datatype = 'sampler2D',
@@ -29,7 +29,7 @@ return {
       light_angle_b = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.5 
+        value = 0.70642201834862 
       },
       light_color = { 
         datatype = 'vec3',
@@ -39,7 +39,7 @@ return {
       light_intensity = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.5 
+        value = 0.60550458715596 
       },
       model = { 
         datatype = 'mat4',
@@ -48,7 +48,7 @@ return {
       normal_texture = { 
         datatype = 'sampler2D',
         tag = 'Material',
-        value = '../ignore/textures/ChickenE_nor.png' 
+        value = 'ChickenE_nor.png' 
       },
       proj = { 
         datatype = 'mat4',
