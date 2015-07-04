@@ -47,7 +47,8 @@ enum glwin_types {
 	GLWIN_POPUP,
 	GLWIN_NORMAL,
 	GLWIN_DIALOG,
-	GLWIN_TOOLBAR
+	GLWIN_TOOLBAR,
+	GLWIN_UTILITY
 };
 
 void glwin_set_type(struct glwin *win, enum glwin_types type);

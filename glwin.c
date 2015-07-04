@@ -343,6 +343,9 @@ void glwin_set_type(struct glwin *win, enum glwin_types type)
 	case GLWIN_TOOLBAR:
 		type_atom = XInternAtom(g_display, "_NET_WM_WINDOW_TYPE_TOOLBAR", False);
 		break;
+	case GLWIN_UTILITY:
+		type_atom = XInternAtom(g_display, "_NET_WM_WINDOW_TYPE_UTILITY", False);
+		break;
 	default:
 		return;
 	}
