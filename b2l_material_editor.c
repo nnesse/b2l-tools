@@ -587,7 +587,7 @@ static int create_glwin(lua_State *L)
 	if (!g_win)
 		exit(-1);
 
-	glwin_set_type(g_win, GLWIN_TOOLBAR);
+	glwin_set_type(g_win, GLWIN_UTILITY);
 	glwin_set_transient_for(g_win, xid);
 
 	glwin_show_window(g_win);
