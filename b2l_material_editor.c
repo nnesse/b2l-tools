@@ -65,6 +65,7 @@ static void on_mouse_move(struct glwin *, int, int);
 static void on_resize(struct glwin *);
 static void on_mouse_wheel(struct glwin *, int, int, int);
 
+
 static void redraw(struct glwin *win);
 
 struct quaternion {
@@ -471,7 +472,8 @@ static void on_resize(struct glwin *win)
 
 static void on_destroy(struct glwin *win)
 {
-	glwin_destroy_window(win);
+	//glwin_destroy_window(win);
+	exit(0);
 }
 
 struct glwin_callbacks cb;
