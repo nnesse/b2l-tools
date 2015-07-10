@@ -999,7 +999,7 @@ static void redraw(struct glwin *win)
 	proj.v[3][3] = 1.0;
 	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
 
-	if (weights_per_vertex > 0) {
+	if (g_gl_state.groups_index >= 0 && weights_per_vertex > 0) {
 		static int render_count = 0;
 		render_count++;
 		double frame;
