@@ -86,6 +86,8 @@ struct mat3 {
 
 #define NEW_STRUCT(TYPE) (struct TYPE *)malloc(sizeof(struct TYPE))
 
+static void generate_cylinder(int m, int n, GLuint *array_buffer, GLuint *index_buffer);
+
 static struct quaternion q_cur = {0,0,0,1};
 static struct quaternion q_delta = {0,0,0,1};
 static float g_offset[3] = {0,0,0};
@@ -815,6 +817,58 @@ static void init_gl_state()
 	glBindBuffer(GL_ARRAY_BUFFER, g_gl_state.vbo);
 
 	g_gl_state.initialized = true;
+}
+
+static void generate_cylinder(int m, int n, GLuint *array_buffer, GLuint *index_buffer)
+{
+	glGenBuffers(1, array_buffer);
+	glGenBuffers(1, index_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, *array_buffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *index_buffer);
+	glBufferStorage(GL_ARRAY_BUFFER, sizeof(float) * m * (n + 1) * 3, NULL, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+	glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint16_t) * (m * n * 3 * 2 + (m - 1) * 2 * 3), NULL, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+	float *r = (float *)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_WRITE);
+	int i, j;
+	for (j = 0; j < (n + 1); j++) {
+		float z = 1 - j * (2.0 / n);
+		for (i = 0; i < m; i++) {
+			float theta = i * ((2 * M_PI) / m);
+			float x = sin(theta);
+			float y = cos(theta);
+			r[0] = x;
+			r[1] = y;
+			r[2] = z;
+			r += 3;
+		}
+	}
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+
+	uint16_t *idx = (uint16_t *)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+	for (j = 0; j < n; j++) {
+		for (i = 0; i < m; i++) {
+			idx[0] = m * j + i;
+			idx[1] = m * (j + 1) + i;
+			idx[2] = m * j + ((i + 1) % m);
+
+			idx[3] = idx[1];
+			idx[4] = idx[2];
+			idx[5] = m * (j + 1) + ((i + 1) % m);
+			idx += 6;
+		}
+	}
+
+	for (j = 1; j < m; j++) {
+		idx[0] = 0;
+		idx[1] = j;
+		idx[2] = (j + 1) % m;
+		idx[3] = idx[0] + m * n;
+		idx[4] = idx[1] + m * n;
+		idx[5] = idx[2] + m * n;
+		idx += 6;
+	}
+
+	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 }
 
 static void redraw(struct glwin *win)
