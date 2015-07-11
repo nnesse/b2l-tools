@@ -9,6 +9,7 @@
 #include "lauxlib.h"
 
 #define GLB_ENABLE_GL_ARB_vertex_attrib_binding
+#define GLB_ENABLE_GL_ARB_buffer_storage
 #include "glb-glcore.h"
 #include "glsl.tab.h"
 #include "glsl_common.h"
@@ -598,7 +599,9 @@ static int create_glwin(lua_State *L)
 	if (!g_ctx)
 		exit(-1);
 	glwin_make_current(g_win, g_ctx);
-	glb_glcore_init(3, 3);
+	if (!glb_glcore_init(3, 3) || !GLB_GL_ARB_vertex_attrib_binding || !GLB_GL_ARB_buffer_storage) {
+		exit(-1);
+	}
 
 	need_redraw(L);
 
