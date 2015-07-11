@@ -601,9 +601,11 @@ static int create_glwin(lua_State *L)
 	if (!g_ctx)
 		exit(-1);
 	glwin_make_current(g_win, g_ctx);
+	/*
 	if (!glb_glcore_init(3, 3) || !GLB_GL_ARB_vertex_attrib_binding || !GLB_GL_ARB_buffer_storage) {
 		exit(-1);
 	}
+	*/
 
 	need_redraw(L);
 
@@ -886,9 +888,17 @@ static void redraw(struct glwin *win)
 		gl_init_result = glb_glcore_init(3, 3);
 	}
 	if (!gl_init_result) {
-		printf("Failed to initialize OpenGL bindings\n");
+		fprintf(stderr, "Failed to initialize OpenGL bindings\n");
 		exit(-1);
 		return;
+	}
+	if (!GLB_GL_ARB_buffer_storage) {
+		fprintf(stderr, "Missing GL extension: GL_ARB_buffer_storage\n");
+		exit(-1);
+	}
+	if (!GLB_GL_ARB_vertex_attrib_binding) {
+		fprintf(stderr, "Missing GL extension: GL_ARB_vertex_attrib_binding\n");
+		exit(-1);
 	}
 
 	glViewport(0, 0, win->width, win->height);

@@ -8,14 +8,16 @@ export bindir=@bindir@
 export libdir=@libdir@
 VPATH=$(srcdir)
 
-CFLAGS:= -g -O0 -Wall -Wno-unused-function -DLUA_USE_LINUX -DLUA_COMPAT_ALL
+CFLAGS:= -Wall -Wno-unused-function -DLUA_USE_LINUX -DLUA_COMPAT_ALL
 CFLAGS+= -DDATA_DIR=\"$(datadir)\"
 CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/lua/src -I${srcdir}/lgi/lgi
 CFLAGS+= @GLIB2_CFLAGS@ @GDKPIXBUF2_CFLAGS@ @GMODULE2_CFLAGS@ @LIBFFI_CFLAGS@ @GOBJECT_INTROSPECTION_CFLAGS@
 CFLAGS+= @GTK3_CFLAGS@
 CFLAGS+= @CFLAGS@
 
-LDFLAGS:= -lglwin -lglb-glcore -lGL -Wl,-rpath=@libdir@
+CXXFLAGS:= -Wall -I${srcdir}
+
+LDFLAGS:= -lGL -lX11 -Wl,-rpath=@libdir@
 LDFLAGS+= @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@ @GMODULE2_LIBS@ @LIBFFI_LIBS@ @GOBJECT_INTROSPECTION_LIBS@
 LDFLAGS+= @GTK3_LIBS@
 LDFLAGS+= @LDFLAGS@
@@ -38,7 +40,7 @@ lex.meta.c lex.meta.h: glsl_meta_filter.lex
 glsl.tab.c glsl.tab.h: glsl.y
 	$(BISON) $<
 
-GENERATED=lex.glsl.c lex.glsl.h lex.meta.c lex.meta.h glsl.tab.c glsl.tab.h
+GENERATED=lex.glsl.c lex.glsl.h lex.meta.c lex.meta.h glsl.tab.c glsl.tab.h glb-glcore.c glb-glcore.h glb-glx.c glb-glx.h
 
 LUA_O = $(addprefix lua/src/,lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
 	lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
@@ -48,16 +50,37 @@ LUA_O = $(addprefix lua/src/,lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfun
 
 LGI_O = $(addprefix lgi/lgi/,buffer.o callable.o core.o gi.o marshal.o object.o record.o)
 
+OBJS := $(LUA_O) $(LGI_O) glb-glx.o glb-glcore.o b2l_material_editor.o glwin.o glsl.tab.o lex.meta.o lex.glsl.o
+
+
+glsl.tab.o: lex.glsl.o
+
+b2l_material_editor.o: glb-glx.o glsl.tab.o lex.meta.o lex.glsl.o
+
 %.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
-b2l_material_editor: b2l_material_editor.c $(GENERATED) glsl_common.h $(LUA_O) $(LGI_O)
-	$(CC) $(CFLAGS) $(LUA_O) $(LGI_O) glsl.tab.c lex.meta.c lex.glsl.c $< $(LDFLAGS) -ldl -lm -o $@
+%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) -c $(CXXFLAGS) $< -o $@
+
+b2l_material_editor: $(OBJS) glsl_common.h
+	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -ldl -lm -o $@
+
+glbindify: glbindify.o tinyxml2.o
+	$(CXX) -ansi $(CFLAGS) glbindify.o tinyxml2.o -o glbindify
+
+glb-glcore.c: gl.xml glbindify
+	./glbindify -a gl -s ${srcdir}
+
+glb-glx.c: glx.xml glbindify
+	./glbindify -a glx -s ${srcdir}
 
 clean:
 	@-rm b2l_material_editor $(GENERATED)
-	@-rm $(LUA_O) $(LGI_O)
+	@-rm $(OBJS)
+	@-rm glbindify
 
 .PHONY: links
 
