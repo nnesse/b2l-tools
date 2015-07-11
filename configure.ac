@@ -1,5 +1,5 @@
 AC_PREREQ(2.59)
-AC_INIT(glwin, 0.1)
+AC_INIT(glwin, 0.2)
 
 AC_CANONICAL_SYSTEM
 AM_INIT_AUTOMAKE([foreign])
