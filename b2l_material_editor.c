@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <getopt.h>
 
 #include "lua.h"
 #include "lualib.h"
@@ -1315,7 +1316,16 @@ int lua_panic_handler (lua_State* L)
 	return 1;
 }
 
-int main()
+static void print_help(const char *program_name)
+{
+	printf("Usage: %s [OPTION]...\n", program_name);
+	printf("\n"
+	       "Options:\n"
+	       "  -d,--data-dir <path>               Path to application data. Overrides B2L_DATA_DIR.\n"
+	       "  -h,--help                          Print this page.\n");
+}
+
+int main(int argc, char **argv)
 {
 	/*
 	char exe_path[200];
@@ -1328,10 +1338,39 @@ int main()
 
 	truncate_to_dirname(exe_path);
 	*/
+	const char *b2l_data_dir = NULL;
+	const char *b2l_file_name = NULL;
 
-	const char *b2l_data_dir = getenv("B2L_DATA_DIR");
+	static struct option options [] = {
+		{"data-dir" , 1, 0, 'd' },
+		{"help"     , 0, 0, 'h' }
+	};
+
+	while (1) {
+		int option_index;
+		int c = getopt_long(argc, argv, "d:h", options, &option_index);
+		if (c == -1) {
+			break;
+		}
+		switch(c) {
+		case 'd':
+			b2l_data_dir = optarg;
+			break;
+		case 'h':
+			print_help(argv[0]);
+			exit(0);
+			break;
+		}
+	}
+	if (!b2l_data_dir) {
+		b2l_data_dir = getenv("B2L_DATA_DIR");
+	}
 	if (!b2l_data_dir) {
 		b2l_data_dir = DATA_DIR;
+	}
+
+	if (optind < argc) {
+		b2l_file_name = argv[optind];
 	}
 
 	lua_State *L = lua_newstate(l_alloc, NULL);
@@ -1368,6 +1407,12 @@ int main()
 		fprintf(stderr, "Error loading script: %s\n", lua_tostring(L, -1));
 		return 0;
 	}
+	if (!b2l_file_name) {
+		lua_pushnil(L);
+	} else {
+		lua_pushstring(L, b2l_file_name);
+	}
+	lua_setglobal(L, "b2l_filename");
 	err = lua_pcall(L, 0, 0, msgh);
 	switch (err) {
 	case LUA_ERRRUN:

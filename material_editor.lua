@@ -384,6 +384,10 @@ b2l_file_button = Gtk.FileChooserButton {
 	end,
 }
 
+if b2l_filename then
+	b2l_file_button:set_filename(b2l_filename)
+end
+
 function reload_fs(filename)
 	if filename then
 		local fs_text_next, err = GLib.file_get_contents(filename)
