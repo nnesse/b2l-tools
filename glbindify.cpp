@@ -889,7 +889,8 @@ static void print_help(const char *program_name)
 	       "Options:\n"
 	       "  -a,--api <api>                     Generate bindings for API <api>. Must be one\n"
 	       "                                     of 'gl', 'wgl', or 'glx'. Default is 'gl'\n"
-	       "  -s,--srcdir <dir>                  Directory to find XML sources\n");
+	       "  -s,--srcdir <dir>                  Directory to find XML sources\n"
+	       "  -h,--help                          Print this page\n");
 }
 
 int main(int argc, char **argv)
@@ -924,7 +925,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 		int option_index;
-		int c = getopt_long(argc, argv, "a:s:", options, &option_index);
+		int c = getopt_long(argc, argv, "a:s:h", options, &option_index);
 		if (c == -1) {
 			break;
 		}
