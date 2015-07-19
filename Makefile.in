@@ -78,9 +78,9 @@ glb-glx.c: glx.xml glbindify
 	./glbindify -a glx -s ${srcdir}
 
 clean:
-	@-rm b2l_material_editor $(GENERATED)
-	@-rm $(OBJS)
-	@-rm glbindify
+	@-rm -f b2l_material_editor $(GENERATED)
+	@-rm -f $(OBJS)
+	@-rm -f glbindify
 
 .PHONY: links
 
