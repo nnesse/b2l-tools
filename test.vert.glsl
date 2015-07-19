@@ -1,8 +1,8 @@
 #version 330
 
+in vec3 vertex;
 in vec3 normal;
 in vec2 uv;
-in vec3 pos;
 in vec4 tangent;
 
 in ivec2 weights[6];
@@ -37,7 +37,7 @@ void main()
 		int j = weights[i].x;
 		if (j < 0)
 			break;
-		v += weight * (groups[j] * vec4(pos,1)).xyz;
+		v += weight * (groups[j] * vec4(vertex,1)).xyz;
 		n += weight * (groups[j] * vec4(normal, 0)).xyz;
 		t += weight * (groups[j] * vec4(tangent.xyz, 0)).xyz;
 	}
@@ -48,6 +48,6 @@ void main()
 
 	vs_out.normal = (modelview * vec4(n, 0)).xyz;
 	vs_out.pos = (modelview * vec4(v, 0)).xyz;
-	vs_out.tangent = vec4((modelview * vec4(t, 0)).xyz, tangent.w);
+	vs_out.tangent = vec4((modelview * vec4(tangent.xyz, 0)).xyz, tangent.w);
 	gl_Position = proj * modelview * vec4(v, 1);
 }

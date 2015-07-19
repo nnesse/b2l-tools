@@ -50,12 +50,15 @@ LUA_O = $(addprefix lua/src/,lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfun
 
 LGI_O = $(addprefix lgi/lgi/,buffer.o callable.o core.o gi.o marshal.o object.o record.o)
 
-OBJS := $(LUA_O) $(LGI_O) glb-glx.o glb-glcore.o b2l_material_editor.o glwin.o glsl.tab.o lex.meta.o lex.glsl.o
-
+OBJS := $(LUA_O) $(LGI_O)
+OBJS += glb-glx.o glb-glcore.o b2l_material_editor.o glwin.o glsl.tab.o lex.meta.o lex.glsl.o
+OBJS += geometry.o
 
 glsl.tab.o: lex.glsl.o
 
 b2l_material_editor.o: glb-glx.o glsl.tab.o lex.meta.o lex.glsl.o
+
+geometry.o: geometry.h
 
 %.o: %.c
 	@mkdir -p $(dir $@)
@@ -65,7 +68,7 @@ b2l_material_editor.o: glb-glx.o glsl.tab.o lex.meta.o lex.glsl.o
 	@mkdir -p $(dir $@)
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
-b2l_material_editor: $(OBJS) glsl_common.h
+b2l_material_editor: $(OBJS) glsl_common.h geometry.h
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -ldl -lm -o $@
 
 glbindify: glbindify.o tinyxml2.o

@@ -18,6 +18,8 @@
 #include "lex.glsl.h"
 #include "lex.meta.h"
 
+#include "geometry.h"
+
 extern char *metalval;
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -29,6 +31,8 @@ extern char *metalval;
 #define MAX_TEXTURE_UNITS 8
 
 #define USE_SLERP 1
+
+#define NEW_STRUCT(TYPE) ((struct TYPE *)malloc(sizeof(struct TYPE), sizeof(intptr_t)))
 
 static int set_b2l_file(lua_State *L);
 static int need_redraw(lua_State *L);
@@ -84,8 +88,6 @@ struct mat4 {
 struct mat3 {
 	float v[3][3];
 };
-
-#define NEW_STRUCT(TYPE) (struct TYPE *)malloc(sizeof(struct TYPE))
 
 static void generate_cylinder(int m, int n, GLuint *array_buffer, GLuint *index_buffer);
 
@@ -514,11 +516,6 @@ struct gl_state {
 	GLuint program;
 	GLuint vao;
 	GLuint vbo;
-	GLint normal_index;
-	GLint uv_index;
-	GLint pos_index;
-	GLint weights_index[6];
-	GLint tangent_index;
 	GLint groups_index;
 } g_gl_state;
 
@@ -781,29 +778,22 @@ static bool recompile_shaders()
 		return false;
 	}
 
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_VERTEX, "vertex");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_NORMAL, "normal");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_UV, "uv");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_TANGENT, "tangent");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT0, "weight[0]");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT1, "weight[1]");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT2, "weight[2]");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT3, "weight[3]");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT4, "weight[4]");
+	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT5, "weight[5]");
+
 	glLinkProgram(g_gl_state.program);
-	g_gl_state.normal_index = glGetAttribLocation(g_gl_state.program, "normal");
-	g_gl_state.uv_index = glGetAttribLocation(g_gl_state.program, "uv");
-	g_gl_state.pos_index = glGetAttribLocation(g_gl_state.program, "pos");
-	g_gl_state.weights_index[0] = glGetAttribLocation(g_gl_state.program, "weights[0]");
-	g_gl_state.weights_index[1] = glGetAttribLocation(g_gl_state.program, "weights[1]");
-	g_gl_state.weights_index[2] = glGetAttribLocation(g_gl_state.program, "weights[2]");
-	g_gl_state.weights_index[3] = glGetAttribLocation(g_gl_state.program, "weights[3]");
-	g_gl_state.weights_index[4] = glGetAttribLocation(g_gl_state.program, "weights[4]");
-	g_gl_state.weights_index[5] = glGetAttribLocation(g_gl_state.program, "weights[5]");
-	g_gl_state.tangent_index = glGetAttribLocation(g_gl_state.program, "tangent");
 
 	g_gl_state.groups_index	= glGetUniformLocation(g_gl_state.program, "groups");
 	return true;
 }
-
-enum binding_points {
-	NORMAL,
-	UV,
-	POS,
-	WEIGHTS,
-	TANGENT
-};
 
 static void init_gl_state()
 {
@@ -822,56 +812,13 @@ static void init_gl_state()
 	g_gl_state.initialized = true;
 }
 
-static void generate_cylinder(int m, int n, GLuint *array_buffer, GLuint *index_buffer)
+int mesh_gc(lua_State *L)
 {
-	glGenBuffers(1, array_buffer);
-	glGenBuffers(1, index_buffer);
-
-	glBindBuffer(GL_ARRAY_BUFFER, *array_buffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *index_buffer);
-
-	glBufferStorage(GL_ARRAY_BUFFER, sizeof(float) * m * (n + 1) * 3, NULL, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
-	glBufferStorage(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint16_t) * (m * n * 3 * 2 + (m - 1) * 2 * 3), NULL, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
-
-	uint16_t *idx = (uint16_t *)glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
-	float *r = (float *)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_WRITE);
-
-	int i, j;
-	for (j = 0; j < (n + 1); j++) {
-		float z = 1 - j * (2.0 / n);
-		for (i = 0; i < m; i++) {
-			float theta = i * ((2 * M_PI) / m);
-			float x = sin(theta);
-			float y = cos(theta);
-			r[0] = x;
-			r[1] = y;
-			r[2] = z;
-			r += 3;
-			if (j < n) {
-				idx[0] = m * j + i;
-				idx[1] = m * (j + 1) + i;
-				idx[2] = m * j + ((i + 1) % m);
-
-				idx[3] = idx[1];
-				idx[4] = idx[2];
-				idx[5] = m * (j + 1) + ((i + 1) % m);
-				idx += 6;
-			}
-		}
-	}
-
-	for (j = 1; j < m; j++) {
-		idx[0] = 0;
-		idx[1] = j;
-		idx[2] = (j + 1) % m;
-		idx[3] = idx[0] + m * n;
-		idx[4] = idx[1] + m * n;
-		idx[5] = idx[2] + m * n;
-		idx += 6;
-	}
-
-	glUnmapBuffer(GL_ARRAY_BUFFER);
-	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+	struct geometry *g = lua_touserdata(L, -1);
+	fprintf(stderr, "deleting %p\n", g);
+	if (g)
+		delete_geometry(g);
+	return 0;
 }
 
 static void redraw(struct glwin *win)
@@ -907,35 +854,38 @@ static void redraw(struct glwin *win)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST);
 
+	int top_idx = lua_gettop(L);
+
 	lua_getglobal(L, "b2l_data"); //1
 	if (!lua_istable(L, -1)) {
 		lua_pop(L, 1);
 		goto end;
 	}
-	lua_getfield(L, -1, "objects"); //2
-	lua_getglobal(L, "current_object"); //3
+	int b2l_data_idx = lua_gettop(L);
+	lua_getfield(L, b2l_data_idx, "objects");
+	lua_getglobal(L, "current_object");
 	if (!lua_isstring(L, -1)) {
 		lua_pop(L, 3);
 		goto end;
 	}
 	const char *current_object = lua_tostring(L, -1);
-	lua_getfield(L, -2, current_object); //4
+	lua_getfield(L, -2, current_object);
 	if (lua_isnil(L, -1)) {
 		lua_pop(L, 4);
 		goto end;
 	}
+	int object_idx = lua_gettop(L);
 
-	lua_getfield(L, -1, "type"); //5
-	if(strcmp(lua_tostring(L, -1), "MESH")) {
+	lua_getfield(L, object_idx, "type");
+	if (strcmp(lua_tostring(L, -1), "MESH")) {
 		lua_pop(L, 5);
 		goto end;
 	}
-	lua_getfield(L, -2, "data"); //6
-	lua_getfield(L, -6, "meshes"); //7
-	lua_getfield(L, -1, lua_tostring(L, -2)); //8
+	lua_getfield(L, object_idx, "data");
+	lua_getfield(L, b2l_data_idx, "meshes");
+	lua_getfield(L, -1, lua_tostring(L, -2));
 
 	if (lua_isnil(L, -1)) {
-		lua_pop(L, 8);
 		goto end;
 	}
 
@@ -946,52 +896,41 @@ static void redraw(struct glwin *win)
 		g_gl_state.program_valid = recompile_shaders();
 
 	if (!g_gl_state.initialized || !g_gl_state.program_valid) {
-		lua_pop(L, 8);
 		goto end;
+	}
+
+	int mesh_idx = lua_gettop(L);
+
+	lua_getfield(L, mesh_idx, "geometry");
+	struct geometry *g = (struct geometry *)lua_touserdata(L, -1);
+	if (!g) {
+		lua_pop(L, 1);
+
+		lua_getfield(L, mesh_idx, "submeshes");
+		lua_len(L, -1);
+		int num_submesh = lua_tointeger(L, -1);
+		lua_pop(L, 2);
+
+		size_t geometry_size = offsetof(struct geometry, submesh[num_submesh]);
+		g = (struct geometry *)lua_newuserdata(L, geometry_size);
+		memset(g, 0, geometry_size);
+
+		lua_newtable(L);
+		lua_pushcfunction(L, mesh_gc);
+		lua_setfield(L, -2, "__gc");
+		lua_setmetatable(L, -2);
+
+		lua_setfield(L, mesh_idx, "geometry");
+		create_mesh_geometry(g, L, g_gl_state.blob);
+	} else {
+		lua_pop(L, 1);
 	}
 
 	g_gl_state.recompile_shaders = false;
 
 	glUseProgram(g_gl_state.program);
-	glBindVertexArray(g_gl_state.vao);
 
-	if (g_gl_state.blob_updated)  {
-		glBufferData(GL_ARRAY_BUFFER, g_gl_state.blob_size, g_gl_state.blob ,GL_STATIC_DRAW);
-		g_gl_state.blob_updated = false;
-	}
-
-	lua_getfield(L, -1, "vertex_normal_array_offset"); //9
-	int vertex_normal_array_offset = lua_tointeger(L, -1);
-	lua_getfield(L, -2, "uv_array_offset"); //10
-	int uv_array_offset = lua_tointeger(L, -1);
-
-	lua_getfield(L, -3, "uv_layers"); //11
-	lua_len(L, -1); //12
-	int num_uv_layers = lua_tointeger(L, -1);
-
-	int tangent_array_offset;
-	if (num_uv_layers > 0) {
-		lua_getfield(L, -5, "tangent_array_offset");
-		tangent_array_offset = lua_tointeger(L, -1);
-		lua_pop(L, 1);
-	}
-
-	lua_getfield(L, -5, "vertex_co_array_offset"); //13
-	int vertex_co_array_offset = lua_tointeger(L, -1);
-
-	lua_getfield(L, -6, "weights_per_vertex"); //14
-	int weights_per_vertex = lua_tointeger(L, -1);
-
-	int weights_array_offset;
-	if (weights_per_vertex > 0) {
-		lua_getfield(L, -7, "weights_array_offset");
-		weights_array_offset = lua_tointeger(L, -1);
-		lua_pop(L, 1);
-	} else {
-		weights_array_offset = -1;
-	}
-
-	lua_getfield(L, -11, "vertex_groups"); //15
+	lua_getfield(L, object_idx, "vertex_groups");
 	int num_vertex_groups;
 	if (lua_isnil(L, -1)) {
 		num_vertex_groups = 0;
@@ -999,47 +938,6 @@ static void redraw(struct glwin *win)
 		lua_len(L, -1);
 		num_vertex_groups = lua_tointeger(L, -1);
 		lua_pop(L, 1);
-	}
-
-	glBindVertexBuffer(NORMAL, g_gl_state.vbo, vertex_normal_array_offset, sizeof(float) * 3);
-	if (num_uv_layers > 0) {
-		glBindVertexBuffer(UV, g_gl_state.vbo, uv_array_offset, sizeof(float) * 2 * num_uv_layers);
-		glBindVertexBuffer(TANGENT, g_gl_state.vbo, tangent_array_offset, sizeof(float) * 4);
-	}
-	glBindVertexBuffer(POS, g_gl_state.vbo, vertex_co_array_offset, sizeof(float) * 3);
-	if (weights_per_vertex > 0)
-		glBindVertexBuffer(WEIGHTS, g_gl_state.vbo, weights_array_offset, weights_per_vertex * 4);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_gl_state.vbo);
-	if (g_gl_state.normal_index >= 0) {
-		glEnableVertexAttribArray(g_gl_state.normal_index);
-		glVertexAttribFormat(g_gl_state.normal_index, 3, GL_FLOAT, GL_FALSE, 0);
-		glVertexAttribBinding(g_gl_state.normal_index, NORMAL);
-	}
-
-	if (g_gl_state.uv_index >= 0) {
-		glEnableVertexAttribArray(g_gl_state.uv_index);
-		glVertexAttribFormat(g_gl_state.uv_index, 2, GL_FLOAT, GL_FALSE, 0);
-		glVertexAttribBinding(g_gl_state.uv_index, UV);
-	}
-
-	if (g_gl_state.pos_index >= 0) {
-		glEnableVertexAttribArray(g_gl_state.pos_index);
-		glVertexAttribFormat(g_gl_state.pos_index, 3, GL_FLOAT, GL_FALSE, 0);
-		glVertexAttribBinding(g_gl_state.pos_index, POS);
-	}
-	int i = 0;
-	for (i = 0; i < 6; i++) {
-		if (g_gl_state.weights_index[i] >= 0 && weights_per_vertex > 0) {
-			glEnableVertexAttribArray(g_gl_state.weights_index[i]);
-			glVertexAttribIFormat(g_gl_state.weights_index[i], 2, GL_SHORT, 4 * i);
-			glVertexAttribBinding(g_gl_state.weights_index[i], WEIGHTS);
-		}
-	}
-	if (num_uv_layers > 0 && g_gl_state.tangent_index >= 0) {
-		glEnableVertexAttribArray(g_gl_state.tangent_index);
-		glVertexAttribFormat(g_gl_state.tangent_index, 4, GL_FLOAT, GL_FALSE, 0);
-		glVertexAttribBinding(g_gl_state.tangent_index, TANGENT);
 	}
 
 	struct mat4 view;
@@ -1067,26 +965,25 @@ static void redraw(struct glwin *win)
 	proj.v[3][3] = 1.0;
 	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
 
-	if (g_gl_state.groups_index >= 0 && weights_per_vertex > 0) {
+	if (g_gl_state.groups_index >= 0 && g->type->attribute[ATTRIBUTE_WEIGHT0].size > 0) {
 		static int render_count = 0;
 		render_count++;
 		double frame;
 		int frame_start;
 		int frame_end;
-		lua_getglobal(L, "frame_start"); //16
+		lua_getglobal(L, "frame_start");
 		frame_start = lua_tointeger(L, -1);
-		lua_getglobal(L, "frame_end"); //17
+		lua_getglobal(L, "frame_end");
 		frame_end = lua_tointeger(L, -1);
-		lua_getglobal(L, "frame_delta"); //18
+		lua_getglobal(L, "frame_delta");
 		frame = frame_start + lua_tonumber(L, -1);
 		int frame_i = floorf(frame);
 		double frame_fract = frame - frame_i;
 
-		lua_getfield(L, -18, "scenes"); //19
-		lua_getglobal(L, "current_scene"); //20
-		lua_getfield(L, -2, lua_tostring(L, -1)); //21
+		lua_getfield(L, b2l_data_idx, "scenes");
+		lua_getglobal(L, "current_scene");
+		lua_getfield(L, -2, lua_tostring(L, -1));
 		if (!lua_istable(L, -1)) {
-			lua_pop(L, 20);
 			goto end;
 		}
 		lua_getfield(L, -1, "objects");
@@ -1147,29 +1044,14 @@ static void redraw(struct glwin *win)
 		}
 	}
 
-	lua_getglobal(L, "controls"); //16
+	lua_getglobal(L, "controls");
 	int controls = lua_gettop(L);
-	lua_getglobal(L, "materials"); //17
+	lua_getglobal(L, "materials");
 	int materials = lua_gettop(L);
 
-	lua_getfield(L, -10, "index_array_offset"); //18
-	int index_array_offset = lua_tointeger(L, -1);
-
-	lua_getfield(L, -11, "submeshes"); //19
-	lua_len(L, -1); //20
-	int num_submeshes = lua_tointeger(L, -1);
-
-	for (i = 0; i < num_submeshes; i++) {
-		lua_rawgeti(L, -2, i + 1);
-		lua_getfield(L, -1, "material_name");
-
-		const char *material_name = lua_tostring(L, -1);
-
-		lua_getfield(L, -2, "triangle_no");
-		int triangle_no = lua_tointeger(L, -1);
-		lua_getfield(L, -3, "triangle_count");
-		int triangle_count = lua_tointeger(L, -1);
-		lua_getfield(L, materials, material_name);
+	int i;
+	for (i = 0; i < g->num_submesh; i++) {
+		lua_getfield(L, materials, g->submesh[i].material_name);
 		lua_getfield(L, -1, "params");
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, -2)) {
@@ -1247,14 +1129,11 @@ static void redraw(struct glwin *win)
 			free((void *)datatype);
 			lua_pop(L, 2);
 		} //while (lua_next(L, -2) != 0)
-		glDrawElements(GL_TRIANGLES,
-				3 * triangle_count,
-				GL_UNSIGNED_SHORT,
-				(void *)((int64_t)index_array_offset) + 3 * 2 * triangle_no);
-		lua_pop(L, 6);
+		render_geometry(g, i);
+		lua_pop(L, 1);
 	}
-	lua_pop(L, 20);
 end:
+	lua_settop(L, top_idx);
 	{
 		GLenum err = glGetError();
 		if (err)
