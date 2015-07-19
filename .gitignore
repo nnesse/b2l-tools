@@ -4,7 +4,12 @@ ignore
 glsl.tab.?
 
 #flex
-glsl.lex.c
+lex.glsl.?
+lex.meta.?
+
+#glbindify
+glbindify
+glb-*.?
 
 #vim
 
