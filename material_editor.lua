@@ -259,6 +259,7 @@ function update_shaders()
 				settings_expanders[tag] = expander
 				grids_pos[tag] = 0
 			end
+			controls[k].widget:unparent()
 			controls[k].widget.margin_left = 30
 			grid:attach(Gtk.Label { label = k, xalign = 0 } , 0, grids_pos[tag], 1, 1)
 			grid:attach(controls[k].widget, 1, grids_pos[tag], 1, 1)
