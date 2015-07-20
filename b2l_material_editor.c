@@ -383,8 +383,7 @@ static void on_mouse_move(struct glwin *win, int x, int y)
 			axis[2] /= norm;
 		}
 		quaternion_from_axis_angle(&q_delta, axis[0], axis[1], axis[2], norm * 3 / win->width);
-
-		g_need_redraw = true;
+		need_redraw(g_L);
 	}
 	if (g_mouse_down[2]) {
 		float delta[3];
@@ -395,7 +394,7 @@ static void on_mouse_move(struct glwin *win, int x, int y)
 		g_offset_next[0] = -g_offset_next[0];
 		g_offset_next[1] = -g_offset_next[1];
 		g_offset_next[2] = -g_offset_next[2];
-		g_need_redraw = true;
+		need_redraw(g_L);
 	}
 }
 
@@ -526,8 +525,9 @@ static int event_process()
 {
 	glwin_get_events(false);
 	bool ret = glwin_process_events();
-	if (g_win)
+	if (g_win && g_need_redraw) {
 		redraw(g_win);
+	}
 	return ret;
 }
 
@@ -538,6 +538,8 @@ static gboolean dispatch(gpointer user_data)
 
 #include <gtk/gtk.h>
 
+static bool g_idling = false;
+
 static gboolean idle(gpointer user_data)
 {
 	lua_getglobal(g_L, "playing_animation");
@@ -546,6 +548,7 @@ static gboolean idle(gpointer user_data)
 	if (animation_playing) {
 		lua_getglobal(g_L, "animation_update");
 		lua_call(g_L, 0, 0);
+		g_need_redraw = true;
 	}
 	event_process();
 	if (animation_playing)
@@ -559,6 +562,7 @@ static gboolean idle(gpointer user_data)
 				exit(0);
 		}
 
+	g_idling = animation_playing;
 	return animation_playing;
 }
 
@@ -599,11 +603,6 @@ static int create_glwin(lua_State *L)
 	if (!g_ctx)
 		exit(-1);
 	glwin_make_current(g_win, g_ctx);
-	/*
-	if (!glb_glcore_init(3, 3) || !GLB_GL_ARB_vertex_attrib_binding || !GLB_GL_ARB_buffer_storage) {
-		exit(-1);
-	}
-	*/
 
 	need_redraw(L);
 
@@ -613,7 +612,10 @@ static int create_glwin(lua_State *L)
 static int need_redraw(lua_State *L)
 {
 	g_need_redraw = true;
-	g_idle_add(idle, NULL);
+	if (!g_idling) {
+		g_idling = true;
+		g_idle_add(idle, NULL);
+	}
 	return 0;
 }
 
@@ -625,7 +627,7 @@ static void process_declaration(lua_State *L, int uniform_table_idx, struct decl
 		int type_code;
 		if (d->type) {
 			struct generic_list *gl = (struct generic_list *)d->type->qualifiers;
-			while(gl != NULL) {
+			while (gl != NULL) {
 				switch(gl->ent->code) {
 				case UNIFORM:
 					uniform = true;
