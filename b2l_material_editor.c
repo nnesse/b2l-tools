@@ -407,6 +407,7 @@ static void on_expose(struct glwin *win)
 static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
 {
 	g_log_zoom  += direction * 0.1;
+	need_redraw(g_L);
 }
 
 static int lua_backtrace_string(lua_State *L)
@@ -703,7 +704,7 @@ static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
 	}
 	meta_scan_buffer(text, sz + 2);
 	int filtered_sz = 0;
-	while(metalex()) {
+	while (metalex()) {
 		filtered_sz += strlen(metalval);
 	}
 	metalex_destroy();
@@ -711,7 +712,7 @@ static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
 	char *out_text = malloc(filtered_sz + 1);
 	char *c = out_text;
 	meta_scan_buffer(text, sz + 2);
-	while(metalex()) {
+	while (metalex()) {
 		int s = strlen(metalval);
 		memcpy(c, metalval, s);
 		c += s;

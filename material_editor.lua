@@ -260,7 +260,7 @@ function update_shaders()
 				grids_pos[tag] = 0
 			end
 			controls[k].widget.margin_left = 30
-			grid:attach( Gtk.Label { label = k, xalign = 0 } , 0, grids_pos[tag], 1, 1)
+			grid:attach(Gtk.Label { label = k, xalign = 0 } , 0, grids_pos[tag], 1, 1)
 			grid:attach(controls[k].widget, 1, grids_pos[tag], 1, 1)
 			grids_pos[tag] = grids_pos[tag] + 1
 		end
