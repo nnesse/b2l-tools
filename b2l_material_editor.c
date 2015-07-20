@@ -16,6 +16,7 @@
 #include "glsl_common.h"
 
 #include "lex.glsl.h"
+#undef yytext_ptr
 #include "lex.meta.h"
 
 #include "geometry.h"
