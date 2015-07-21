@@ -5,6 +5,8 @@
 #include <math.h>
 #include <getopt.h>
 
+#include <gtk/gtk.h>
+
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
@@ -523,49 +525,10 @@ struct gl_state {
 static bool recompile_shaders();
 static void init_gl_state();
 
-static int event_process()
-{
-	glwin_get_events(false);
-	bool ret = glwin_process_events();
-	if (g_win && g_need_redraw) {
-		redraw(g_win);
-	}
-	return ret;
-}
-
 static gboolean dispatch(gpointer user_data)
 {
-	return event_process();
-}
-
-#include <gtk/gtk.h>
-
-static bool g_idling = false;
-
-static gboolean idle(gpointer user_data)
-{
-	lua_getglobal(g_L, "playing_animation");
-	bool animation_playing = lua_toboolean(g_L, -1);
-	lua_pop(g_L, 1);
-	if (animation_playing) {
-		lua_getglobal(g_L, "animation_update");
-		lua_call(g_L, 0, 0);
-		g_need_redraw = true;
-	}
-	event_process();
-	if (animation_playing)
-		while (gtk_events_pending()) {
-			gtk_main_iteration_do(false);
-			lua_getglobal(g_L, "shutdown");
-			bool shutdown = lua_toboolean(g_L, -1);
-			lua_pop(g_L, 1);
-
-			if (shutdown)
-				exit(0);
-		}
-
-	g_idling = animation_playing;
-	return animation_playing;
+	glwin_get_events(false);
+	return glwin_process_events();
 }
 
 int luaopen_material_editor_capi(lua_State *L)
@@ -614,10 +577,6 @@ static int create_glwin(lua_State *L)
 static int need_redraw(lua_State *L)
 {
 	g_need_redraw = true;
-	if (!g_idling) {
-		g_idling = true;
-		g_idle_add(idle, NULL);
-	}
 	return 0;
 }
 
@@ -1295,6 +1254,7 @@ int main(int argc, char **argv)
 	} else {
 		lua_pushstring(L, b2l_file_name);
 	}
+
 	lua_setglobal(L, "b2l_filename");
 	err = lua_pcall(L, 0, 0, msgh);
 	switch (err) {
@@ -1313,6 +1273,32 @@ int main(int argc, char **argv)
 	}
 	if (err != LUA_OK) {
 		fprintf(stderr, "%s", lua_tostring(L, -1));
+	}
+
+	bool shutdown = false;
+	bool block = true;
+	bool animation_playing = false;
+	while (!shutdown) {
+		while ((gtk_events_pending() || block) && !shutdown) {
+			gtk_main_iteration_do(block);
+			block = false;
+			lua_getglobal(g_L, "shutdown");
+			shutdown = lua_toboolean(g_L, -1);
+			lua_pop(g_L, 1);
+			lua_getglobal(g_L, "playing_animation");
+			animation_playing = lua_toboolean(g_L, -1);
+			lua_pop(g_L, 1);
+		}
+		if (animation_playing) {
+			lua_getglobal(g_L, "animation_update");
+			lua_call(g_L, 0, 0);
+			g_need_redraw = true;
+		}
+		if (g_win && g_need_redraw) {
+			redraw(g_win);
+		}
+		block = !animation_playing;
+		lua_gc(g_L, LUA_GCCOLLECT, 0);
 	}
 	return 0;
 }

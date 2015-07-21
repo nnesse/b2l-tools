@@ -863,4 +863,3 @@ window_main:add(vbox_main)
 
 -- Show windows and start the loop.
 window_main:show_all()
-Gtk.main()
