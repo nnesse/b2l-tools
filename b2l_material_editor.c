@@ -1271,7 +1271,8 @@ int main(int argc, char **argv)
 		break;
 	}
 	if (err != LUA_OK) {
-		fprintf(stderr, "%s", lua_tostring(L, -1));
+		fprintf(stderr, "%s\n", lua_tostring(L, -1));
+		return -1;
 	}
 
 	bool shutdown = false;
