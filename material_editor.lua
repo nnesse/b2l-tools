@@ -84,21 +84,20 @@ function update_shaders()
 		return
 	end
 
+	--Remove references to controls this shader
+	--doesn't need
 	for k, v in pairs(controls) do
-		if not uniforms[k] then
-			if controls[k].datatype == "sampler2D" and controls[k].texunit then
-				texture_units[controls[k].texunit] = false
-			end
-		end
 		if not uniforms[k] then
 			controls[k].widget = nil
 		end
 	end
 
+	-- Remove all expanders
 	for k, v in pairs(settings_expanders) do
 		vbox_settings:remove(v)
 	end
 
+	texture_units = {}
 	settings_grids = {}
 	settings_expanders = {}
 
@@ -134,109 +133,101 @@ function update_shaders()
 				value = 0.5
 			end
 			active_material.params[k].value = value
-			if not controls[k].widget then
-				local widget = Gtk.Scrollbar {
-					orientation = "HORIZONTAL",
-					adjustment = Gtk.Adjustment {
-						lower = 0,
-						upper = 1,
-					},
-					hexpand = true,
-					on_value_changed = function(self)
-						if active_material.params[k].value ~= self:get_value() then
-							setting_changed()
-						end
-						active_material.params[k].value = self:get_value()
-						queue_render()
+			local widget = Gtk.Scrollbar {
+				orientation = "HORIZONTAL",
+				adjustment = Gtk.Adjustment {
+					lower = 0,
+					upper = 1,
+				},
+				hexpand = true,
+				on_value_changed = function(self)
+					if active_material.params[k].value ~= self:get_value() then
+						setting_changed()
 					end
-				}
-				controls[k].widget = widget
-			end
+					active_material.params[k].value = self:get_value()
+					queue_render()
+				end
+			}
+			controls[k].widget = widget
 			controls[k].widget:set_value(value)
 		elseif datatype == "vec3" then
 			if not value then
 				value = {1, 1, 1}
 			end
 			active_material.params[k].value = value
-			if not controls[k].widget then
-				local widget = Gtk.ColorButton {
-					use_alpha = false,
-					on_color_set = function(self)
-						local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
-						if (not active_material.params[k].value) or
-							value[1] ~= active_material.params[k].value[1] or
-							value[2] ~= active_material.params[k].value[2] or
-							value[3] ~= active_material.params[k].value[3] then
-							setting_changed()
-						end
-						active_material.params[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
-						queue_render()
+			local widget = Gtk.ColorButton {
+				use_alpha = false,
+				on_color_set = function(self)
+					local value = {self.rgba.red, self.rgba.green, self.rgba.blue }
+					if (not active_material.params[k].value) or
+						value[1] ~= active_material.params[k].value[1] or
+						value[2] ~= active_material.params[k].value[2] or
+						value[3] ~= active_material.params[k].value[3] then
+						setting_changed()
 					end
-				}
-				controls[k].widget = widget
-			end
+					active_material.params[k].value = {self.rgba.red, self.rgba.green, self.rgba.blue }
+					queue_render()
+				end
+			}
+			controls[k].widget = widget
 			controls[k].widget:set_rgba(Gdk.RGBA {red = value[1], green = value[2], blue = value[3], alpha = 1})
 		elseif datatype == "bool" then
 			if value == nil then
 				value = false
 			end
 			active_material.params[k].value = value
-			if not controls[k].widget then
-				controls[k] = {}
-				local widget = Gtk.CheckButton {
-					label = id,
-					on_toggled = function(self)
-						if active_material.params[k].value ~= self.active then
-							setting_changed()
-						end
-						active_material.params[k].value = self.active
-						queue_render()
+			controls[k] = {}
+			local widget = Gtk.CheckButton {
+				label = id,
+				on_toggled = function(self)
+					if active_material.params[k].value ~= self.active then
+						setting_changed()
 					end
-				}
-				controls[k].widget = widget
-			end
+					active_material.params[k].value = self.active
+					queue_render()
+				end
+			}
+			controls[k].widget = widget
 			controls[k].widget:set_active(value)
 		elseif datatype == "sampler2D" then
 			if value ~= nil then
 				active_material.params[k].value = value
 			end
-			if not controls[k].widget then
-				local t = 1;
-				while texture_units[t] == true do
-					t = t + 1
-				end
-				texture_units[t] = true
-				controls[k] = { texunit= t }
-				local widget = Gtk.FileChooserButton {
-					title = id,
-					action = "OPEN",
-					on_selection_changed = function(chooser)
-						local abs_filename = chooser:get_filename()
-						local filename = b2l_relative_path(chooser:get_filename())
-						if filename and active_material.params[k].value ~= filename then
-							setting_changed()
-						end
-						if filename then
-							local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(abs_filename)
-							if pbuf then
-								active_material.params[k].value = filename
-								controls[k].pbuf = pbuf
-								controls[k].needs_upload = true
-								queue_render()
-							else
-								local dialog = Gtk.MessageDialog {
-									parent = window,
-									message_type = 'ERROR', buttons = 'CLOSE',
-									text = ("Failed to open image file: %s"):format(err),
-									on_response = Gtk.Widget.destroy
-								}
-								dialog:show_all()
-							end
-						end
-					end,
-				}
-				controls[k].widget = widget
+			local t = 1;
+			while texture_units[t] == true do
+				t = t + 1
 			end
+			texture_units[t] = true
+			controls[k] = { texunit= t }
+			local widget = Gtk.FileChooserButton {
+				title = id,
+				action = "OPEN",
+				on_selection_changed = function(chooser)
+					local abs_filename = chooser:get_filename()
+					local filename = b2l_relative_path(chooser:get_filename())
+					if filename and active_material.params[k].value ~= filename then
+						setting_changed()
+					end
+					if filename then
+						local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(abs_filename)
+						if pbuf then
+							active_material.params[k].value = filename
+							controls[k].pbuf = pbuf
+							controls[k].needs_upload = true
+							queue_render()
+						else
+							local dialog = Gtk.MessageDialog {
+								parent = window,
+								message_type = 'ERROR', buttons = 'CLOSE',
+								text = ("Failed to open image file: %s"):format(err),
+								on_response = Gtk.Widget.destroy
+							}
+							dialog:show_all()
+						end
+					end
+				end,
+			}
+			controls[k].widget = widget
 			if value ~= nil then
 				controls[k].widget:set_filename(b2l_absolute_path(value))
 			end
@@ -259,7 +250,6 @@ function update_shaders()
 				settings_expanders[tag] = expander
 				grids_pos[tag] = 0
 			end
-			controls[k].widget:unparent()
 			controls[k].widget.margin_left = 30
 			grid:attach(Gtk.Label { label = k, xalign = 0 } , 0, grids_pos[tag], 1, 1)
 			grid:attach(controls[k].widget, 1, grids_pos[tag], 1, 1)
@@ -528,7 +518,11 @@ object_combo = Gtk.ComboBox {
 		}
 	},
 	on_changed = function (combo)
-		local row = objects_store[combo:get_active_iter()]
+		local active = combo:get_active_iter()
+		if not active then
+			return
+		end
+		local row = objects_store[active]
 		local object_name = row[1]
 		current_object = object_name
 		actions_store:clear()
@@ -564,7 +558,11 @@ scene_combo = Gtk.ComboBox {
 		}
 	},
 	on_changed = function (combo)
-		local row = scenes_store[combo:get_active_iter()]
+		local active = combo:get_active_iter()
+		if not active then
+			return
+		end
+		local row = scenes_store[active]
 		current_scene = row[1]
 		queue_render()
 	end
@@ -581,7 +579,11 @@ material_combo = Gtk.ComboBox {
 		}
 	},
 	on_changed = function (combo)
-		local row = materials_store[combo:get_active_iter()]
+		local active = combo:get_active_iter()
+		if not active then
+			return
+		end
+		local row = materials_store[active]
 		local material_name = row[1]
 		if materials and material_name then
 			active_material = materials[material_name]
@@ -614,7 +616,11 @@ action_combo = Gtk.ComboBox {
 		}
 	},
 	on_changed = function (combo)
-		local row = actions_store[combo:get_active_iter()]
+		local active = combo:get_active_iter()
+		if not active then
+			return
+		end
+		local row = actions_store[active]
 		local action_name = row[1]
 		frame_start = row[2]
 		frame_end = row[3]

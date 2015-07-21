@@ -778,7 +778,6 @@ static void init_gl_state()
 int mesh_gc(lua_State *L)
 {
 	struct geometry *g = lua_touserdata(L, -1);
-	fprintf(stderr, "deleting %p\n", g);
 	if (g)
 		delete_geometry(g);
 	return 0;
