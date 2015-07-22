@@ -14,7 +14,9 @@ current_object = false
 
 local window_main = Gtk.Window {
    title = 'B2L Material Editor',
-   on_destroy = Gtk.main_quit,
+   on_destroy = function()
+	   shutdown = true
+   end,
    width_request = 250,
    on_realize = function (window)
 	   capi.create_glwin(window:get_window():get_xid())
@@ -675,7 +677,6 @@ local vbox_main = Gtk.VBox {
 						label = "Exit",
 						on_activate = function()
 							shutdown = true
-							Gtk.main_quit()
 						end,
 					}
 				}

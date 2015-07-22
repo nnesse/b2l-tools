@@ -22,6 +22,7 @@
 #include "lex.meta.h"
 
 #include "geometry.h"
+#include "program.h"
 
 extern char *metalval;
 
@@ -511,11 +512,19 @@ struct gl_state {
 	bool recompile_shaders;
 	bool program_valid;
 	bool blob_updated;
+
+	/*
 	const char *fragment_shader_text;
 	const char *vertex_shader_text;
 	GLuint vertex_shader;
 	GLuint fragment_shader;
+	*/
+
+	struct program program;
+
+	/*
 	GLuint program;
+	*/
 	GLuint vao;
 	GLuint vbo;
 	GLint groups_index;
@@ -705,55 +714,35 @@ static int set_shaders(lua_State *L)
 		return 1;
 	}
 
-	if (g_gl_state.fragment_shader_text)
-		free((char *)g_gl_state.fragment_shader_text);
-	if (g_gl_state.vertex_shader_text)
-		free((char *)g_gl_state.vertex_shader_text);
-	g_gl_state.fragment_shader_text = fragment_text;
-	g_gl_state.vertex_shader_text = vertex_text;
+	if (g_gl_state.program.fragment_text)
+		free((char *)g_gl_state.program.fragment_text);
+	if (g_gl_state.program.vertex_text)
+		free((char *)g_gl_state.program.vertex_text);
+	g_gl_state.program.fragment_text = fragment_text;
+	g_gl_state.program.vertex_text = vertex_text;
 	g_gl_state.recompile_shaders = true;
 	return 1;
 }
 
 static bool recompile_shaders()
 {
-	glShaderSource(g_gl_state.vertex_shader, 1, &g_gl_state.vertex_shader_text, NULL);
-	glShaderSource(g_gl_state.fragment_shader, 1, &g_gl_state.fragment_shader_text, NULL);
+	program_compile(&g_gl_state.program);
 
-	glCompileShader(g_gl_state.vertex_shader);
-	glCompileShader(g_gl_state.fragment_shader);
+	GLuint program = g_gl_state.program.program;
+	glBindAttribLocation(program, ATTRIBUTE_VERTEX, "vertex");
+	glBindAttribLocation(program, ATTRIBUTE_NORMAL, "normal");
+	glBindAttribLocation(program, ATTRIBUTE_UV, "uv");
+	glBindAttribLocation(program, ATTRIBUTE_TANGENT, "tangent");
+	glBindAttribLocation(program, ATTRIBUTE_WEIGHT0, "weight[0]");
+	glBindAttribLocation(program, ATTRIBUTE_WEIGHT1, "weight[1]");
+	glBindAttribLocation(program, ATTRIBUTE_WEIGHT2, "weight[2]");
+	glBindAttribLocation(program, ATTRIBUTE_WEIGHT3, "weight[3]");
+	glBindAttribLocation(program, ATTRIBUTE_WEIGHT4, "weight[4]");
+	glBindAttribLocation(program, ATTRIBUTE_WEIGHT5, "weight[5]");
 
-	char info_log[1000];
-	GLint ret;
+	program_link(&g_gl_state.program);
 
-	glGetShaderiv(g_gl_state.vertex_shader, GL_COMPILE_STATUS, &ret);
-	if (ret == GL_FALSE) {
-		glGetShaderInfoLog(g_gl_state.vertex_shader, 1000, NULL, info_log);
-		printf("Vertex shader compile failed:\n %s", info_log);
-		return false;
-	}
-
-	glGetShaderiv(g_gl_state.fragment_shader, GL_COMPILE_STATUS, &ret);
-	if (ret == GL_FALSE) {
-		glGetShaderInfoLog(g_gl_state.fragment_shader, 1000, NULL, info_log);
-		printf("Fragment shader compile failed:\n %s", info_log);
-		return false;
-	}
-
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_VERTEX, "vertex");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_NORMAL, "normal");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_UV, "uv");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_TANGENT, "tangent");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT0, "weight[0]");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT1, "weight[1]");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT2, "weight[2]");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT3, "weight[3]");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT4, "weight[4]");
-	glBindAttribLocation(g_gl_state.program, ATTRIBUTE_WEIGHT5, "weight[5]");
-
-	glLinkProgram(g_gl_state.program);
-
-	g_gl_state.groups_index	= glGetUniformLocation(g_gl_state.program, "groups");
+	g_gl_state.groups_index	= glGetUniformLocation(program, "groups");
 	return true;
 }
 
@@ -763,11 +752,9 @@ static void init_gl_state()
 	glGenVertexArrays(1, &g_gl_state.vao);
 	glBindVertexArray(g_gl_state.vao);
 	glGenTextures(MAX_TEXTURE_UNITS, g_texture_names);
-	g_gl_state.program = glCreateProgram();
-	g_gl_state.vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-	g_gl_state.fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-	glAttachShader(g_gl_state.program, g_gl_state.vertex_shader);
-	glAttachShader(g_gl_state.program, g_gl_state.fragment_shader);
+
+	program_init(&g_gl_state.program);
+
 	glGenBuffers(1, &g_gl_state.vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, g_gl_state.vbo);
 
@@ -889,7 +876,7 @@ static void redraw(struct glwin *win)
 
 	g_gl_state.recompile_shaders = false;
 
-	glUseProgram(g_gl_state.program);
+	glUseProgram(g_gl_state.program.program);
 
 	lua_getfield(L, object_idx, "vertex_groups");
 	int num_vertex_groups;
@@ -911,10 +898,13 @@ static void redraw(struct glwin *win)
 	model.v[3][0] = g_offset[0] + g_offset_next[0];
 	model.v[3][1] = g_offset[1] + g_offset_next[1];
 	model.v[3][2] = g_offset[2] + g_offset_next[2];
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "model"), 1, GL_FALSE, (GLfloat *)&model);
+
+	GLuint program = g_gl_state.program.program;
+
+	glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (GLfloat *)&model);
 	struct mat4 ident;
 	mat4_identity(&ident);
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "view"), 1, GL_FALSE, (GLfloat *)&view);
+	glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE, (GLfloat *)&view);
 
 	float zoom = exp(g_log_zoom);
 	float zr = 100;
@@ -924,7 +914,7 @@ static void redraw(struct glwin *win)
 	proj.v[1][1] = 1.0*win->width/(zoom*win->height);
 	proj.v[2][2] = 1.0/zr;
 	proj.v[3][3] = 1.0;
-	glUniformMatrix4fv(glGetUniformLocation(g_gl_state.program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
+	glUniformMatrix4fv(glGetUniformLocation(program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
 
 	if (g_gl_state.groups_index >= 0 && g->type->attribute[ATTRIBUTE_WEIGHT0].size > 0) {
 		static int render_count = 0;
@@ -966,7 +956,6 @@ static void redraw(struct glwin *win)
 			} else if (frame_fract == 0) {
 				next = base;
 			}
-
 
 #if USE_SLERP
 			struct mat4 temp;
@@ -1018,7 +1007,7 @@ static void redraw(struct glwin *win)
 		while (lua_next(L, -2)) {
 			int variable = lua_gettop(L);
 			const char *variable_name = lua_tostring(L, variable - 1);
-			int uniform_loc = glGetUniformLocation(g_gl_state.program, variable_name);
+			int uniform_loc = glGetUniformLocation(program, variable_name);
 			if (uniform_loc == -1) {
 				lua_pop(L, 1);
 				continue;
@@ -1117,8 +1106,8 @@ static int set_b2l_file(lua_State *L)
 	g_gl_state.blob = blob;
 	g_gl_state.blob_size = blob_size;
 	g_gl_state.blob_updated = true;
-	g_gl_state.fragment_shader_text = NULL;
-	g_gl_state.vertex_shader_text = NULL;
+	g_gl_state.program.fragment_text = NULL;
+	g_gl_state.program.vertex_text = NULL;
 	g_gl_state.program_valid = false;
 	return 0;
 }

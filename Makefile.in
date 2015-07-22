@@ -52,13 +52,15 @@ LGI_O = $(addprefix lgi/lgi/,buffer.o callable.o core.o gi.o marshal.o object.o 
 
 OBJS := $(LUA_O) $(LGI_O)
 OBJS += glb-glx.o glb-glcore.o b2l_material_editor.o glwin.o glsl.tab.o lex.meta.o lex.glsl.o
-OBJS += geometry.o
+OBJS += geometry.o program.o
 
 glsl.tab.o: lex.glsl.o
 
-b2l_material_editor.o: glb-glx.o glsl.tab.o lex.meta.o lex.glsl.o
+b2l_material_editor.o: glb-glx.o glsl.tab.o lex.meta.o lex.glsl.o geometry.h program.h
 
 geometry.o: geometry.h
+
+program.o: program.h
 
 %.o: %.c
 	@mkdir -p $(dir $@)
@@ -68,7 +70,7 @@ geometry.o: geometry.h
 	@mkdir -p $(dir $@)
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
-b2l_material_editor: $(OBJS) glsl_common.h geometry.h
+b2l_material_editor: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -ldl -lm -o $@
 
 glbindify: glbindify.o tinyxml2.o

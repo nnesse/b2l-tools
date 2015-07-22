@@ -4,7 +4,7 @@ return {
       ambient_light = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0 
+        value = 0.32558139534884 
       },
       bump = { 
         datatype = 'bool',
@@ -14,7 +14,7 @@ return {
       bump_depth = { 
         datatype = 'float',
         tag = 'Material',
-        value = 0.41414141414141 
+        value = 0.45378151260504 
       },
       diffuse_texture = { 
         datatype = 'sampler2D',
@@ -24,7 +24,7 @@ return {
       light_angle_a = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.5 
+        value = 0.17829457364341 
       },
       light_angle_b = { 
         datatype = 'float',
@@ -39,7 +39,7 @@ return {
       light_intensity = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.60550458715596 
+        value = 0.58914728682171 
       },
       model = { 
         datatype = 'mat4',
