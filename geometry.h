@@ -60,6 +60,8 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob);
 
 void create_cylinder_geometry(struct geometry *g, int m, int n);
 
+void create_cone_geometry(struct geometry *g, int n);
+
 void render_geometry(struct geometry *g, int submesh);
 
 void delete_geometry(struct geometry *g);

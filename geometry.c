@@ -138,6 +138,42 @@ void create_cylinder_geometry(struct geometry *g, int m, int n)
 	create_geometry_end(g);
 }
 
+void create_cone_geometry(struct geometry *g, int n)
+{
+	g->num_triangles = n * 2;
+	g->num_verticies = n + 1;
+	g->type = &buffer_type_v3f;
+
+	uint16_t *idx;
+	float *r;
+
+	create_geometry_begin(g, (void **)&r, &idx);
+
+	int i;
+	for (i = 0; i < n; i++) {
+		float theta = i * ((2 * M_PI) / n);
+		float x = sin(theta);
+		float z = cos(theta);
+		float y = -1;
+		r[0] = x;
+		r[1] = y;
+		r[2] = z;
+		r += 3;
+		idx[0] = i;
+		idx[1] = n;
+		idx[2] = (i + 1) % n;
+
+		idx[3] = 0;
+		idx[4] = (i + 1) % n;
+		idx[5] = (i + 2) % n;
+		idx += 6;
+	}
+	r[0] = 0;
+	r[1] = 1;
+	r[2] = 0;
+	create_geometry_end(g);
+}
+
 struct buffer_type buffer_type_mesh[2][6];
 
 void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)

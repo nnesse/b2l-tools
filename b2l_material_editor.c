@@ -74,7 +74,6 @@ static void on_mouse_move(struct glwin *, int, int);
 static void on_resize(struct glwin *);
 static void on_mouse_wheel(struct glwin *, int, int, int);
 
-
 static void redraw(struct glwin *win);
 
 struct quaternion {
