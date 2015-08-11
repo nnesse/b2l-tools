@@ -33,13 +33,8 @@ struct renderer
 	GLuint fragment_shader;
 	GLuint vertex_shader;
 	GLuint geometry_shader;
-	GLuint atlas_texture_name;
 	GLuint gl_vertex_array;
 	GLuint stream_vbo;
-	GLuint texcoord_texture;
-	GLuint texcoord_texture_buffer;
-	GLuint glyph_size_texture;
-	GLuint glyph_size_texture_buffer;
 	int sampler_loc;
 	int color_loc;
 	int glyph_size_sampler_loc;
@@ -47,6 +42,7 @@ struct renderer
 	int num_chars;
 
 	const char *charset;
+	int max_char;
 
 	uint8_t *atlas_buffer;
 	bool *layer_loaded;
@@ -83,6 +79,11 @@ struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t r
 	if (!inst->initialized)
 		return NULL;
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, font->atlas_texture);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_BUFFER, font->glyph_size_texture);
+
 	//Orphan previous buffer
 	int buffer_size = sizeof(struct gltext_glyph_instance) * num_chars;
 	glBindBuffer(GL_ARRAY_BUFFER, inst->stream_vbo);
@@ -108,16 +109,10 @@ void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct glte
 	glBindVertexArray(inst->gl_vertex_array);
 	glUniformMatrix4fv(inst->mvp_loc, 1, GL_FALSE, mvp);
 	glUniform4fv(inst->color_loc, 1, (GLfloat *)color);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_BUFFER, inst->texcoord_texture);
-	glActiveTexture(GL_TEXTURE2);
-	glBindTexture(GL_TEXTURE_BUFFER, inst->glyph_size_texture);
 	glDrawArrays(GL_POINTS, 0, inst->num_chars);
 }
 
-gltext_renderer_t gltext_renderer_new()
+gltext_renderer_t gltext_renderer_new(const char *charset)
 {
 	struct renderer *inst = malloc(sizeof(struct renderer));
 	memset(inst, 0, sizeof(*inst));
@@ -126,9 +121,19 @@ gltext_renderer_t gltext_renderer_new()
 	inst->fragment_shader = 0;
 	inst->vertex_shader = 0;
 	inst->geometry_shader = 0;
-	inst->atlas_texture_name = 0;
 	inst->initialized = false;
+	inst->charset = charset;
 	FT_Init_FreeType(&inst->ft_library);
+
+	int max_char = 0;
+	for (const char *c = inst->charset; *c; c++)
+		if (*c > max_char)
+			max_char = *c;
+
+	if ('\n' > max_char)
+		max_char = '\n';
+	inst->max_char = max_char;
+
 	return inst;
 }
 
@@ -145,8 +150,6 @@ void gltext_renderer_free(gltext_renderer_t renderer)
 		glDeleteProgram(inst->glsl_program);
 	if (inst->ft_library)
 		FT_Done_FreeType(inst->ft_library);
-	if (inst->atlas_texture_name)
-		glDeleteTextures(1, &inst->atlas_texture_name);
 	free(inst);
 }
 
@@ -335,102 +338,66 @@ static bool init_program(struct renderer *inst)
 
 	glUseProgram(inst->glsl_program);
 	glUniform1i(inst->sampler_loc, 0);
-	glUniform1i(inst->glyph_size_sampler_loc, 2);
+	glUniform1i(inst->glyph_size_sampler_loc, 1);
 	return true;
 }
 
-bool gltext_renderer_initialize(gltext_renderer_t renderer,
-	const char *charset,
-	const struct gltext_font_desc *font_descriptions,
-	int count,
-	struct gltext_font *fonts)
+
+bool gltext_font_initialize(gltext_renderer_t renderer, struct gltext_font *f, gltext_typeface_t typeface_, int size)
 {
 	struct renderer *inst = (struct renderer *)renderer;
-	if (inst->initialized)
-		return false; //You can't reinitialize the renderer
 
 	if (!inst->ft_library)
 		return false;
 
-	inst->charset = charset;
-
-	//Need at least one font
-	if (!count)
-		return false;
-
-	//Create GLSL program
-	if (!init_program(inst))
-		return false;
-
-	//Initialize glyph bitmaps
-	int total_glyphs = 0;
-	int i;
-	for (i = 0; i < count; i++) {
-		struct gltext_font *f = fonts + i;
-		const struct gltext_font_desc *font_desc = font_descriptions + i;
-		FT_Face typeface = (FT_Face) font_desc->typeface;
-		int size = font_desc->size;
-		int max_char = 0;
-
-		if (!typeface)
+	//Create GLSL program if neccisary
+	if (!inst->initialized)
+		if (!init_program(inst))
 			return false;
+	inst->initialized = true;
 
-		for (const char *c = inst->charset; *c; c++)
-			if (*c > max_char)
-				max_char = *c;
+	f->size = size;
+	f->typeface = typeface_;
+	FT_Face typeface = (FT_Face) f->typeface;
 
-		if ('\n' > max_char)
-			max_char = '\n';
+	int total_glyphs = strlen(inst->charset);
 
-		f->glyph_array = malloc((max_char + 1) * sizeof(struct gltext_glyph));
-		f->size = size;
-		f->typeface = typeface;
-		f->renderer = renderer;
-		FT_Set_Pixel_Sizes(typeface, size, size);
+	if (!typeface)
+		return false;
 
-		for (const char *c = inst->charset; *c; c++) {
-			struct gltext_glyph *g = f->glyph_array + (*c);
-			int index = FT_Get_Char_Index(typeface, *c);
-			FT_Load_Glyph(typeface, index, 0/* flags */);
-			FT_Render_Glyph(typeface->glyph, FT_RENDER_MODE_NORMAL);
-			g->c = *c;
-			g->bitmap_pitch = typeface->glyph->bitmap.pitch;
-			g->bitmap_width = typeface->glyph->bitmap.width;
-			g->bitmap_height = typeface->glyph->bitmap.rows;
-			size_t image_size = g->bitmap_pitch * g->bitmap_height;
-			g->bitmap_bits = (uint8_t *)malloc(image_size);
-			memcpy(g->bitmap_bits, typeface->glyph->bitmap.buffer, image_size);
-			g->left = typeface->glyph->bitmap_left;
-			g->top = typeface->glyph->bitmap_top;
-			g->advance_x = typeface->glyph->advance.x;
-			g->advance_y = typeface->glyph->advance.y;
-			g->font = f;
-			g->typeface_index = index;
-			total_glyphs++;
-		}
-		f->glyph_array['\n'].c = '\n';
-		f->glyph_array['\n'].font = f;
+	f->glyph_array = calloc((inst->max_char + 1), sizeof(struct gltext_glyph));
+	f->renderer = renderer;
+	FT_Set_Pixel_Sizes(typeface, size, size);
+
+	for (const char *c = inst->charset; *c; c++) {
+		struct gltext_glyph *g = f->glyph_array + (*c);
+		int index = FT_Get_Char_Index(typeface, *c);
+		FT_Load_Glyph(typeface, index, 0/* flags */);
+		FT_Render_Glyph(typeface->glyph, FT_RENDER_MODE_NORMAL);
+		g->bitmap_pitch = typeface->glyph->bitmap.pitch;
+		g->bitmap_width = typeface->glyph->bitmap.width;
+		g->bitmap_height = typeface->glyph->bitmap.rows;
+		size_t image_size = g->bitmap_pitch * g->bitmap_height;
+		g->bitmap_bits = (uint8_t *)malloc(image_size);
+		memcpy(g->bitmap_bits, typeface->glyph->bitmap.buffer, image_size);
+		g->left = typeface->glyph->bitmap_left;
+		g->top = typeface->glyph->bitmap_top;
+		g->advance_x = typeface->glyph->advance.x;
+		g->advance_y = typeface->glyph->advance.y;
+		g->font = f;
+		g->typeface_index = index;
 	}
 
-	//
-	// Assign glyphs to layers in the texture array
-	//
+	f->glyph_array['\n'].c = '\n';
+	f->glyph_array['\n'].font = f;
 	int w = 0;
-	for (i = 0; i < count; i++) {
-		const struct gltext_font *f = fonts + i;
-		const struct gltext_font_desc *font_desc = font_descriptions + i;
-		for (const char *c = inst->charset; *c; c++) {
-			struct gltext_glyph *g = f->glyph_array + (*c);
-			g->w = w++;
-			g->font = f;
-		}
+	for (const char *c = inst->charset; *c; c++) {
+		struct gltext_glyph *g = f->glyph_array + (*c);
+		g->w = w++;
+		g->font = f;
 	}
-	int tex_array_size = w + 1;
 
-	//
-	// Blit the glyph bitmaps into a CPU texture
-	//
-	inst->atlas_buffer = (uint8_t *)calloc(tex_array_size, TEXTURE_SIZE * TEXTURE_SIZE);
+	f->atlas_buffer = (uint8_t *)calloc(total_glyphs, TEXTURE_SIZE * TEXTURE_SIZE);
 	int8_t *glyph_size_array = (int8_t *)malloc(total_glyphs * sizeof(int16_t) * 4);
 	int8_t *glyph_size_ptr = glyph_size_array;
 	static double srcf[TEXELS_PER_LAYER];
@@ -440,78 +407,80 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 	static double gy[TEXELS_PER_LAYER];
 	static double dist[TEXELS_PER_LAYER];
 
-	for (i = 0; i < count; i++) {
-		const struct gltext_font *f = fonts + i;
-		const struct gltext_font_desc *font_desc = font_descriptions + i;
-		for (const char *c = inst->charset; *c; c++) {
-			struct gltext_glyph *g = f->glyph_array + (*c);
-			uint8_t *dest = inst->atlas_buffer + (TEXTURE_SIZE * 8) + 8 + (g->w * TEXELS_PER_LAYER);
-			uint8_t *source = g->bitmap_bits;
-			for (int i = 0; i < g->bitmap_height; i++) {
-				memcpy(dest, source, g->bitmap_width);
-				dest += TEXTURE_SIZE;
-				source += g->bitmap_pitch;
-			}
-
-			uint8_t *temp = inst->atlas_buffer + (g->w * TEXELS_PER_LAYER);
-			int index = 0;
-			for (int i = 0; i < g->bitmap_height + 16; i++) {
-				for (int j = 0; j < g->bitmap_width + 16; j++) {
-					srcf[index++] = (temp[j]*1.0)/256;
-				}
-				temp += TEXTURE_SIZE;
-			}
-			computegradient(srcf, g->bitmap_width + 16, g->bitmap_height + 16, gx, gy);
-			edtaa3(srcf, gx, gy, g->bitmap_width + 16, g->bitmap_height + 16, distx, disty, dist);
-	
-			temp = inst->atlas_buffer + (g->w * TEXELS_PER_LAYER);
-			index = 0;
-			for (int i = 0; i < g->bitmap_height + 16; i++) {
-				for (int j = 0; j < g->bitmap_width + 16; j++) {
-					float s = dist[index++];
-					int val = 128 - s*16.0;
-					if (val < 0) val = 0;
-					if (val > 255) val = 255;
-					temp[j] = val;
-				}
-				temp += TEXTURE_SIZE;
-			}
-			*(glyph_size_ptr++) = (int8_t)g->bitmap_width;
-			*(glyph_size_ptr++) = (int8_t)g->bitmap_height;
-			*(glyph_size_ptr++) = (int8_t)g->left;
-			*(glyph_size_ptr++) = (int8_t)g->top;
+	for (const char *c = inst->charset; *c; c++) {
+		struct gltext_glyph *g = f->glyph_array + (*c);
+		uint8_t *dest = f->atlas_buffer + (TEXTURE_SIZE * 8) + 8 + (g->w * TEXELS_PER_LAYER);
+		uint8_t *source = g->bitmap_bits;
+		for (int i = 0; i < g->bitmap_height; i++) {
+			memcpy(dest, source, g->bitmap_width);
+			dest += TEXTURE_SIZE;
+			source += g->bitmap_pitch;
 		}
+
+		uint8_t *temp = f->atlas_buffer + (g->w * TEXELS_PER_LAYER);
+		int index = 0;
+		for (int i = 0; i < g->bitmap_height + 16; i++) {
+			for (int j = 0; j < g->bitmap_width + 16; j++) {
+				srcf[index++] = (temp[j]*1.0)/256;
+			}
+			temp += TEXTURE_SIZE;
+		}
+		computegradient(srcf, g->bitmap_width + 16, g->bitmap_height + 16, gx, gy);
+		edtaa3(srcf, gx, gy, g->bitmap_width + 16, g->bitmap_height + 16, distx, disty, dist);
+
+		temp = f->atlas_buffer + (g->w * TEXELS_PER_LAYER);
+		index = 0;
+		for (int i = 0; i < g->bitmap_height + 16; i++) {
+			for (int j = 0; j < g->bitmap_width + 16; j++) {
+				float s = dist[index++];
+				int val = 128 - s*16.0;
+				if (val < 0) val = 0;
+				if (val > 255) val = 255;
+				temp[j] = val;
+			}
+			temp += TEXTURE_SIZE;
+		}
+		*(glyph_size_ptr++) = (int8_t)g->bitmap_width;
+		*(glyph_size_ptr++) = (int8_t)g->bitmap_height;
+		*(glyph_size_ptr++) = (int8_t)g->left;
+		*(glyph_size_ptr++) = (int8_t)g->top;
 	}
 
 	//
 	//Setup glyph size texture buffer
 	//
-	glGenBuffers(1, &inst->glyph_size_texture_buffer);
-	glBindBuffer(GL_TEXTURE_BUFFER, inst->glyph_size_texture_buffer);
+	glGenBuffers(1, &f->glyph_size_texture_buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, f->glyph_size_texture_buffer);
 	glBufferData(GL_TEXTURE_BUFFER, total_glyphs * 4, glyph_size_array, GL_STATIC_DRAW);
-	glGenTextures(1, &inst->glyph_size_texture);
-	glBindTexture(GL_TEXTURE_BUFFER, inst->glyph_size_texture);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8I, inst->glyph_size_texture_buffer);
+	glGenTextures(1, &f->glyph_size_texture);
+	glBindTexture(GL_TEXTURE_BUFFER, f->glyph_size_texture);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8I, f->glyph_size_texture_buffer);
 	free(glyph_size_array);
 
 	//
 	// Allocate and altas texture and setup texture filtering
 	//
-	glGenTextures(1, &inst->atlas_texture_name);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
+	glGenTextures(1, &f->atlas_texture);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, f->atlas_texture);
 	glTexImage3D(GL_TEXTURE_2D_ARRAY,
 		0, /* layer */
 		GL_R8,
-		TEXTURE_SIZE, TEXTURE_SIZE, tex_array_size /* uvw size */,
+		TEXTURE_SIZE, TEXTURE_SIZE, total_glyphs /* uvw size */,
 		0, /* border */
 		GL_RED,
 		GL_UNSIGNED_BYTE,
-		inst->atlas_buffer);
+		f->atlas_buffer);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	return true;
+}
 
-	inst->initialized = true;
-	return inst->initialized;
+
+bool gltext_font_free(struct gltext_font *font)
+{
+	glDeleteBuffers(1, &font->glyph_size_texture_buffer);
+	glDeleteTextures(1, &font->glyph_size_texture);
+	glDeleteTextures(1, &font->atlas_texture);
 }

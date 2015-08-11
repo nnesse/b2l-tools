@@ -36,7 +36,7 @@ struct gltext_glyph {
 	*/
 	int advance_y;
 
-	/* layer texture atlas */
+	/* coordinate in texture atlas */
 	int w;
 
 	const struct gltext_font *font;
@@ -74,28 +74,23 @@ struct gltext_font {
 	gltext_typeface_t typeface;
 	struct gltext_glyph *glyph_array;
 	gltext_renderer_t renderer;
-};
-
-//
-// font desc
-//
-struct gltext_font_desc {
-	int size;
-	gltext_typeface_t typeface;
+	int total_glyphs;
+	uint32_t atlas_texture;
+	uint32_t glyph_size_texture;
+	uint32_t glyph_size_texture_buffer;
+	uint8_t *atlas_buffer;
 };
 
 float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_glyph *next);
 
 gltext_typeface_t gltext_renderer_get_typeface(gltext_renderer_t renderer, const char *path);
 
-gltext_renderer_t gltext_renderer_new();
+gltext_renderer_t gltext_renderer_new(const char *charset);
 void gltext_renderer_free(gltext_renderer_t renderer);
 
-bool gltext_renderer_initialize(gltext_renderer_t renderer,
-	const char *charset,
-	const struct gltext_font_desc *font_descriptions,
-	int count,
-	struct gltext_font *fonts);
+bool gltext_font_initialize(gltext_renderer_t renderer, struct gltext_font *font, gltext_typeface_t typeface, int font_size);
+
+bool gltext_font_free(struct gltext_font *font);
 
 struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer, const struct gltext_font *font, int num_chars);
 void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct gltext_color *color, const float *mvp);
