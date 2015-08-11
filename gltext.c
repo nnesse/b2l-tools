@@ -31,7 +31,7 @@ struct renderer
 	//
 	GLuint glsl_program;
 	GLuint fragment_shader;
-	GLuint vertex_passthrough_shader;
+	GLuint vertex_shader;
 	GLuint geometry_shader;
 	GLuint atlas_texture_name;
 	GLuint gl_vertex_array;
@@ -124,7 +124,7 @@ gltext_renderer_t gltext_renderer_new()
 	inst->ft_library = NULL;
 	inst->glsl_program = 0;
 	inst->fragment_shader = 0;
-	inst->vertex_passthrough_shader = 0;
+	inst->vertex_shader = 0;
 	inst->geometry_shader = 0;
 	inst->atlas_texture_name = 0;
 	inst->initialized = false;
@@ -139,8 +139,8 @@ void gltext_renderer_free(gltext_renderer_t renderer)
 		glDeleteShader(inst->fragment_shader);
 	if (inst->geometry_shader)
 		glDeleteShader(inst->geometry_shader);
-	if (inst->vertex_passthrough_shader)
-		glDeleteShader(inst->vertex_passthrough_shader);
+	if (inst->vertex_shader)
+		glDeleteShader(inst->vertex_shader);
 	if (inst->glsl_program)
 		glDeleteProgram(inst->glsl_program);
 	if (inst->ft_library)
@@ -163,7 +163,7 @@ gltext_typeface_t gltext_renderer_get_typeface(gltext_renderer_t renderer, const
 
 static bool init_program(struct renderer *inst)
 {
-	const char *vertex_passthrough_shader_text =
+	const char *vertex_shader_text =
 		"#version 330\n"
 		"layout (location = 0) in vec2 pos_v;\n"
 		"layout (location = 1) in int glyph_index_v;\n"
@@ -264,25 +264,25 @@ static bool init_program(struct renderer *inst)
 		return false;
 	}
 
-	inst->vertex_passthrough_shader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(inst->vertex_passthrough_shader, 1, (const char **)&vertex_passthrough_shader_text, NULL);
-	glCompileShader(inst->vertex_passthrough_shader);
-	glGetShaderiv(inst->vertex_passthrough_shader, GL_COMPILE_STATUS, &success);
+	inst->vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(inst->vertex_shader, 1, (const char **)&vertex_shader_text, NULL);
+	glCompileShader(inst->vertex_shader);
+	glGetShaderiv(inst->vertex_shader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		char info_log[1000];
-		glGetShaderInfoLog(inst->vertex_passthrough_shader, sizeof(info_log), NULL, info_log);
+		glGetShaderInfoLog(inst->vertex_shader, sizeof(info_log), NULL, info_log);
 		printf("renderer: Vertex shader compile failed\n%s", info_log);
 		glDeleteShader(inst->fragment_shader);
 		inst->fragment_shader = 0;
-		glDeleteShader(inst->vertex_passthrough_shader);
-		inst->vertex_passthrough_shader = 0;
+		glDeleteShader(inst->vertex_shader);
+		inst->vertex_shader = 0;
 		glDeleteShader(inst->geometry_shader);
 		inst->geometry_shader = 0;
 		return false;
 	}
 
 	inst->glsl_program = glCreateProgram();
-	glAttachShader(inst->glsl_program, inst->vertex_passthrough_shader);
+	glAttachShader(inst->glsl_program, inst->vertex_shader);
 	glAttachShader(inst->glsl_program, inst->geometry_shader);
 	glAttachShader(inst->glsl_program, inst->fragment_shader);
 	glLinkProgram(inst->glsl_program);
@@ -293,8 +293,8 @@ static bool init_program(struct renderer *inst)
 		printf("renderer: Program link failed\n%s", info_log);
 		glDeleteShader(inst->fragment_shader);
 		inst->fragment_shader = 0;
-		glDeleteShader(inst->vertex_passthrough_shader);
-		inst->vertex_passthrough_shader = 0;
+		glDeleteShader(inst->vertex_shader);
+		inst->vertex_shader = 0;
 		glDeleteProgram(inst->glsl_program);
 		inst->glsl_program = 0;
 		return false;

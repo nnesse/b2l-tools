@@ -36,7 +36,7 @@ struct gltext_glyph {
 	*/
 	int advance_y;
 
-	/* Index into texture array */
+	/* layer texture atlas */
 	int w;
 
 	const struct gltext_font *font;
