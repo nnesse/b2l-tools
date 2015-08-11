@@ -85,8 +85,7 @@ int main()
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	struct gltext_font_desc font_desc = {
 		.typeface = gltext_renderer_get_typeface(g_renderer, TTF_PATH "/LiberationSans-Regular.ttf"),
-		.width = 20,
-		.height = 20,
+		.size = 20,
 		.charset = charset
 	};
 	if (!gltext_renderer_initialize(g_renderer, &font_desc, 1, g_fonts)) {

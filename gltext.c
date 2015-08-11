@@ -382,8 +382,7 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 		struct gltext_font *f = fonts + i;
 		const struct gltext_font_desc *font_desc = font_descriptions + i;
 		FT_Face typeface = (FT_Face) font_desc->typeface;
-		int width = font_desc->width;
-		int height = font_desc->height;
+		int size = font_desc->size;
 		int max_char = 0;
 
 		if (!typeface)
@@ -397,11 +396,10 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 			max_char = '\n';
 
 		f->glyph_array = malloc((max_char + 1) * sizeof(struct gltext_glyph));
-		f->width = width;
-		f->height = height;
+		f->size = size;
 		f->typeface = typeface;
 		f->renderer = renderer;
-		FT_Set_Pixel_Sizes(typeface, width, height);
+		FT_Set_Pixel_Sizes(typeface, size, size);
 
 		for (const char *c = font_desc->charset; *c; c++) {
 			struct gltext_glyph *g = f->glyph_array + (*c);

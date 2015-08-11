@@ -70,8 +70,7 @@ struct gltext_glyph_instance {
 // font
 //
 struct gltext_font {
-	int width;
-	int height;
+	int size;
 	gltext_typeface_t typeface;
 	struct gltext_glyph *glyph_array;
 	gltext_renderer_t renderer;
@@ -81,8 +80,7 @@ struct gltext_font {
 // font desc
 //
 struct gltext_font_desc {
-	int width;
-	int height;
+	int size;
 	gltext_typeface_t typeface;
 	const char *charset;
 };
