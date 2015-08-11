@@ -23,7 +23,7 @@ void on_expose(struct glwin *win)
 		-1,0,0,1};
 
 	const char *str = "The quick brown fox jumps over the lazy dog()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
-	struct gltext_glyph_instance *r = gltext_renderer_prepare_render(g_renderer, strlen(str));
+	struct gltext_glyph_instance *r = gltext_renderer_prepare_render(g_renderer, g_fonts + 0, strlen(str));
 
 	struct gltext_glyph *g_prev = NULL;
 	float x_pos = 0;
@@ -40,12 +40,11 @@ void on_expose(struct glwin *win)
 		r->pos[0] = x_pos;
 		r->pos[1] = y_pos;
 		r->w = g_cur->w;
-		r->color = color;
 		r++;
 		str++;
 		g_prev = g_cur;
 	}
-	gltext_renderer_submit_render(g_renderer, mvp);
+	gltext_renderer_submit_render(g_renderer, &color, mvp);
 	glwin_swap_buffers(win);
 }
 
@@ -84,11 +83,10 @@ int main()
 
 	const char *charset = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	struct gltext_font_desc font_desc = {
-		.typeface = gltext_renderer_get_typeface(g_renderer, TTF_PATH "/LiberationSans-Regular.ttf"),
 		.size = 20,
-		.charset = charset
+		.typeface = gltext_renderer_get_typeface(g_renderer, TTF_PATH "/LiberationSans-Regular.ttf"),
 	};
-	if (!gltext_renderer_initialize(g_renderer, &font_desc, 1, g_fonts)) {
+	if (!gltext_renderer_initialize(g_renderer, charset, &font_desc, 1, g_fonts)) {
 		fprintf(stderr, "Failed to initialize renderer\n");
 		exit(-1);
 	}

@@ -82,7 +82,6 @@ struct gltext_font {
 struct gltext_font_desc {
 	int size;
 	gltext_typeface_t typeface;
-	const char *charset;
 };
 
 float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_glyph *next);
@@ -93,12 +92,12 @@ gltext_renderer_t gltext_renderer_new();
 void gltext_renderer_free(gltext_renderer_t renderer);
 
 bool gltext_renderer_initialize(gltext_renderer_t renderer,
+	const char *charset,
 	const struct gltext_font_desc *font_descriptions,
 	int count,
 	struct gltext_font *fonts);
 
-struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer, int num_chars);
-void gltext_renderer_submit_render(gltext_renderer_t renderer, const float *mvp);
-void gltext_renderer_set_ambient_color(gltext_renderer_t renderer, struct gltext_color *color);
+struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer, const struct gltext_font *font, int num_chars);
+void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct gltext_color *color, const float *mvp);
 
 #endif

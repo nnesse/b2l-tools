@@ -41,11 +41,12 @@ struct renderer
 	GLuint glyph_size_texture;
 	GLuint glyph_size_texture_buffer;
 	int sampler_loc;
-	int ambient_color_loc;
+	int color_loc;
 	int glyph_size_sampler_loc;
 	int mvp_loc;
-	struct gltext_color ambient_color;
 	int num_chars;
+
+	const char *charset;
 
 	uint8_t *atlas_buffer;
 	bool *layer_loaded;
@@ -76,7 +77,7 @@ float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_gl
 	return ret;
 }
 
-struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer_, int num_chars)
+struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer_, const struct gltext_font *font, int num_chars)
 {
 	struct renderer *inst = (struct renderer *)renderer_;
 	if (!inst->initialized)
@@ -99,14 +100,14 @@ struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t r
 	return ret;
 }
 
-void gltext_renderer_submit_render(gltext_renderer_t renderer, const float *mvp)
+void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct gltext_color *color, const float *mvp)
 {
 	struct renderer *inst = (struct renderer *)renderer;
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glUseProgram(inst->glsl_program);
 	glBindVertexArray(inst->gl_vertex_array);
 	glUniformMatrix4fv(inst->mvp_loc, 1, GL_FALSE, mvp);
-	glUniform4fv(inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
+	glUniform4fv(inst->color_loc, 1, (GLfloat *)color);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, inst->atlas_texture_name);
 	glActiveTexture(GL_TEXTURE1);
@@ -114,12 +115,6 @@ void gltext_renderer_submit_render(gltext_renderer_t renderer, const float *mvp)
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_BUFFER, inst->glyph_size_texture);
 	glDrawArrays(GL_POINTS, 0, inst->num_chars);
-}
-
-void gltext_renderer_set_ambient_color(gltext_renderer_t renderer, struct gltext_color *color)
-{
-	struct renderer *inst = (struct renderer *)renderer;
-	inst->ambient_color = *color;
 }
 
 gltext_renderer_t gltext_renderer_new()
@@ -132,10 +127,6 @@ gltext_renderer_t gltext_renderer_new()
 	inst->vertex_passthrough_shader = 0;
 	inst->geometry_shader = 0;
 	inst->atlas_texture_name = 0;
-	inst->ambient_color.r = 1;
-	inst->ambient_color.g = 1;
-	inst->ambient_color.b = 1;
-	inst->ambient_color.a = 1;
 	inst->initialized = false;
 	FT_Init_FreeType(&inst->ft_library);
 	return inst;
@@ -179,11 +170,9 @@ static bool init_program(struct renderer *inst)
 		"layout (location = 2) in vec4 color_v;\n"
 		"out vec2 pos;\n"
 		"out int glyph_index;\n"
-		"out vec4 color;\n"
 		"void main()\n"
 		"{\n"
 			"pos = pos_v;\n"
-			"color = color_v;\n"
 			"glyph_index = glyph_index_v;\n"
 			"gl_Position = vec4(0, 0, 1, 1);\n"
 		"}\n";
@@ -193,18 +182,15 @@ static bool init_program(struct renderer *inst)
 		"layout(points) in;\n"
 		"layout(triangle_strip, max_vertices=4) out;\n"
 		"in vec2 pos[1];\n"
-		"in vec4 color[1];\n"
 		"in int glyph_index[1];\n"
 		"uniform mat4 mvp;\n"
 		"uniform isamplerBuffer glyph_size_sampler;\n"
 		"out vec3 texcoord_f;\n"
-		"out vec4 color_f;\n"
 		"\n"
 		"void genVertex(vec2 ul, vec2 corner, vec2 size, vec3 texcoord)\n"
 		"{\n"
 			"gl_Position = mvp * vec4((ul - vec2(8, 8) + (corner * size)), 0, 1);\n"
 			"texcoord_f = texcoord + vec3(corner * size, 0);\n"
-			"color_f = color[0];\n"
 			"EmitVertex();\n"
 		"}\n"
 		"\n"
@@ -226,9 +212,8 @@ static bool init_program(struct renderer *inst)
 	const char *fragment_shader_text =
 		"#version 330\n"
 		"uniform sampler2DArray sampler;\n"
-		"uniform vec4 ambient_color;\n"
+		"uniform vec4 color;\n"
 		"in vec3 texcoord_f;\n"
-		"in vec4 color_f;\n"
 		"out vec4 frag_color;\n"
 		"void main()\n"
 		"{\n"
@@ -244,7 +229,7 @@ static bool init_program(struct renderer *inst)
 			"dfdy = -(D10 - D00);\n"
 			"float aastep = length(vec2(dfdx, dfdy));\n"
 			"float texel = smoothstep(-aastep, aastep, D);\n"
-			"frag_color = ambient_color * vec4(color_f) * vec4(texel);\n"
+			"frag_color = color * vec4(texel);\n"
 		"}\n";
 
 	GLint success;
@@ -345,17 +330,17 @@ static bool init_program(struct renderer *inst)
 	//Cache uniform locations
 	inst->mvp_loc = glGetUniformLocation(inst->glsl_program, "mvp");
 	inst->sampler_loc = glGetUniformLocation(inst->glsl_program, "sampler");
-	inst->ambient_color_loc = glGetUniformLocation(inst->glsl_program, "ambient_color");
+	inst->color_loc = glGetUniformLocation(inst->glsl_program, "color");
 	inst->glyph_size_sampler_loc = glGetUniformLocation(inst->glsl_program, "glyph_size_sampler");
 
 	glUseProgram(inst->glsl_program);
 	glUniform1i(inst->sampler_loc, 0);
 	glUniform1i(inst->glyph_size_sampler_loc, 2);
-	glUniform4fv(inst->ambient_color_loc, 1, (GLfloat *)&inst->ambient_color);
 	return true;
 }
 
 bool gltext_renderer_initialize(gltext_renderer_t renderer,
+	const char *charset,
 	const struct gltext_font_desc *font_descriptions,
 	int count,
 	struct gltext_font *fonts)
@@ -366,6 +351,8 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 
 	if (!inst->ft_library)
 		return false;
+
+	inst->charset = charset;
 
 	//Need at least one font
 	if (!count)
@@ -388,7 +375,7 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 		if (!typeface)
 			return false;
 
-		for (const char *c = font_desc->charset; *c; c++)
+		for (const char *c = inst->charset; *c; c++)
 			if (*c > max_char)
 				max_char = *c;
 
@@ -401,7 +388,7 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 		f->renderer = renderer;
 		FT_Set_Pixel_Sizes(typeface, size, size);
 
-		for (const char *c = font_desc->charset; *c; c++) {
+		for (const char *c = inst->charset; *c; c++) {
 			struct gltext_glyph *g = f->glyph_array + (*c);
 			int index = FT_Get_Char_Index(typeface, *c);
 			FT_Load_Glyph(typeface, index, 0/* flags */);
@@ -432,7 +419,7 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 	for (i = 0; i < count; i++) {
 		const struct gltext_font *f = fonts + i;
 		const struct gltext_font_desc *font_desc = font_descriptions + i;
-		for (const char *c = font_desc->charset; *c; c++) {
+		for (const char *c = inst->charset; *c; c++) {
 			struct gltext_glyph *g = f->glyph_array + (*c);
 			g->w = w++;
 			g->font = f;
@@ -456,7 +443,7 @@ bool gltext_renderer_initialize(gltext_renderer_t renderer,
 	for (i = 0; i < count; i++) {
 		const struct gltext_font *f = fonts + i;
 		const struct gltext_font_desc *font_desc = font_descriptions + i;
-		for (const char *c = font_desc->charset; *c; c++) {
+		for (const char *c = inst->charset; *c; c++) {
 			struct gltext_glyph *g = f->glyph_array + (*c);
 			uint8_t *dest = inst->atlas_buffer + (TEXTURE_SIZE * 8) + 8 + (g->w * TEXELS_PER_LAYER);
 			uint8_t *source = g->bitmap_bits;
