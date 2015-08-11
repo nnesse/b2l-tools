@@ -6,7 +6,7 @@
 #include "glb-glcore.h"
 
 gltext_renderer_t g_renderer;
-struct gltext_font g_font;
+gltext_font_t g_font;
 
 void on_expose(struct glwin *win)
 {
@@ -23,7 +23,7 @@ void on_expose(struct glwin *win)
 		-1,0,0,1};
 
 	const char *str = "The quick brown fox jumps over the lazy dog()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
-	struct gltext_glyph_instance *r = gltext_renderer_prepare_render(g_renderer, &g_font, strlen(str));
+	struct gltext_glyph_instance *r = gltext_renderer_prepare_render(g_renderer, g_font, strlen(str));
 
 	struct gltext_glyph *g_prev = NULL;
 	float x_pos = 0;
@@ -35,7 +35,7 @@ void on_expose(struct glwin *win)
 		.a = 1
 	};
 	while (*str) {
-		struct gltext_glyph *g_cur = g_font.glyph_array + (*str);
+		struct gltext_glyph *g_cur = gltext_get_glyph(g_font, *str);
 		x_pos += gltext_get_advance(g_prev, g_cur);
 		r->pos[0] = x_pos;
 		r->pos[1] = y_pos;
@@ -81,7 +81,8 @@ int main()
 	glwin_make_current(win, ctx);
 	glb_glcore_init(3, 3);
 
-	if (!gltext_font_initialize(g_renderer, &g_font, gltext_renderer_get_typeface(g_renderer, TTF_PATH "/LiberationSans-Regular.ttf"), 20)) {
+	g_font = gltext_font_create(g_renderer, gltext_renderer_get_typeface(g_renderer, TTF_PATH "/LiberationSans-Regular.ttf"), 20);
+	if (!g_font) {
 		fprintf(stderr, "Failed to create font\n");
 		exit(-1);
 	}

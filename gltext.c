@@ -73,8 +73,9 @@ float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_gl
 	return ret;
 }
 
-struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer_, const struct gltext_font *font, int num_chars)
+struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer_, gltext_font_t font_, int num_chars)
 {
+	struct gltext_font *font = (struct gltext_font *)(font_);
 	struct renderer *inst = (struct renderer *)renderer_;
 	if (!inst->initialized)
 		return NULL;
@@ -343,7 +344,7 @@ static bool init_program(struct renderer *inst)
 }
 
 
-bool gltext_font_initialize(gltext_renderer_t renderer, struct gltext_font *f, gltext_typeface_t typeface_, int size)
+gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t typeface_, int size)
 {
 	struct renderer *inst = (struct renderer *)renderer;
 
@@ -355,6 +356,8 @@ bool gltext_font_initialize(gltext_renderer_t renderer, struct gltext_font *f, g
 		if (!init_program(inst))
 			return false;
 	inst->initialized = true;
+
+	struct gltext_font *f = (struct gltext_font *)calloc(1, sizeof(struct gltext_font));
 
 	f->size = size;
 	f->typeface = typeface_;
@@ -474,13 +477,15 @@ bool gltext_font_initialize(gltext_renderer_t renderer, struct gltext_font *f, g
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	return true;
+	return f;
 }
 
 
-bool gltext_font_free(struct gltext_font *font)
+bool gltext_font_free(gltext_font_t font_)
 {
+	struct gltext_font *font = (struct gltext_font *)(font_);
 	glDeleteBuffers(1, &font->glyph_size_texture_buffer);
 	glDeleteTextures(1, &font->glyph_size_texture);
 	glDeleteTextures(1, &font->atlas_texture);
+	free(font);
 }
