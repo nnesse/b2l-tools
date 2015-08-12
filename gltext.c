@@ -12,9 +12,29 @@
 
 enum vertex_attrib_locations {
 	POS_LOC = 0,
-	GLYPH_INDEX_LOC = 1,
-	COLOR_LOC = 2,
+	GLYPH_INDEX_LOC = 1
 };
+
+
+//
+// font
+//
+struct gltext_font {
+	int size;
+	gltext_typeface_t typeface;
+	struct gltext_glyph *glyph_array;
+	gltext_renderer_t renderer;
+	int total_glyphs;
+	GLuint atlas_texture;
+	GLuint glyph_size_texture;
+	GLuint glyph_size_texture_buffer;
+};
+
+struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c)
+{
+	struct gltext_font *font = (struct gltext_font *)(font_);
+	return font->glyph_array + c;
+}
 
 //
 // renderer
@@ -44,13 +64,8 @@ struct renderer
 	const char *charset;
 	int max_char;
 
-	uint8_t *atlas_buffer;
-	bool *layer_loaded;
 	bool initialized;
 };
-
-#define TEXTURE_SIZE 128
-#define TEXELS_PER_LAYER (TEXTURE_SIZE * TEXTURE_SIZE)
 
 float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_glyph *next)
 {
@@ -306,7 +321,6 @@ static bool init_program(struct renderer *inst)
 
 	glEnableVertexAttribArray(GLYPH_INDEX_LOC);
 	glEnableVertexAttribArray(POS_LOC);
-	glEnableVertexAttribArray(COLOR_LOC);
 
 	glGenBuffers(1, &inst->stream_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, inst->stream_vbo);
@@ -317,13 +331,6 @@ static bool init_program(struct renderer *inst)
 		GL_FALSE,
 		sizeof(struct gltext_glyph_instance),
 		(void *)offsetof(struct gltext_glyph_instance, pos));
-
-	glVertexAttribPointer(COLOR_LOC,
-		4,
-		GL_FLOAT,
-		GL_FALSE,
-		sizeof(struct gltext_glyph_instance),
-		(void *)offsetof(struct gltext_glyph_instance, color));
 
 	glVertexAttribIPointer(GLYPH_INDEX_LOC,
 		1,
@@ -342,7 +349,6 @@ static bool init_program(struct renderer *inst)
 	glUniform1i(inst->glyph_size_sampler_loc, 1);
 	return true;
 }
-
 
 gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t typeface_, int size)
 {
@@ -372,6 +378,8 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	f->renderer = renderer;
 	FT_Set_Pixel_Sizes(typeface, size, size);
 
+	int max_dim = 0;
+
 	for (const char *c = inst->charset; *c; c++) {
 		struct gltext_glyph *g = f->glyph_array + (*c);
 		int index = FT_Get_Char_Index(typeface, *c);
@@ -389,6 +397,18 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 		g->advance_y = typeface->glyph->advance.y;
 		g->font = f;
 		g->typeface_index = index;
+		max_dim = g->bitmap_width > max_dim ? g->bitmap_width : max_dim;
+		max_dim = g->bitmap_height > max_dim ? g->bitmap_height : max_dim;
+	}
+
+	int pot_size;
+
+	max_dim += 16;
+
+	if (max_dim < 16) {
+		pot_size = 16;
+	} else {
+		pot_size = 1 << (32 - __builtin_clz(max_dim));
 	}
 
 	f->glyph_array['\n'].c = '\n';
@@ -400,38 +420,41 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 		g->font = f;
 	}
 
-	f->atlas_buffer = (uint8_t *)calloc(total_glyphs, TEXTURE_SIZE * TEXTURE_SIZE);
+	int texels_per_layer = pot_size * pot_size;
+	uint8_t *atlas_buffer = (uint8_t *)calloc(total_glyphs, texels_per_layer);
 	int8_t *glyph_size_array = (int8_t *)malloc(total_glyphs * sizeof(int16_t) * 4);
 	int8_t *glyph_size_ptr = glyph_size_array;
-	static double srcf[TEXELS_PER_LAYER];
-	static short distx[TEXELS_PER_LAYER];
-	static short disty[TEXELS_PER_LAYER];
-	static double gx[TEXELS_PER_LAYER];
-	static double gy[TEXELS_PER_LAYER];
-	static double dist[TEXELS_PER_LAYER];
 
+	double *srcf = (double *)malloc(texels_per_layer * sizeof(double));
+	short *distx = (short *)malloc(texels_per_layer * sizeof(short));
+	short *disty = (short *)malloc(texels_per_layer * sizeof(short)) ;
+	double *gx = (double *)malloc(texels_per_layer * sizeof(double));
+	double *gy = (double *)malloc(texels_per_layer * sizeof(double));
+	double *dist = (double *)malloc(texels_per_layer * sizeof(double));
+
+	uint8_t *layer_ptr = atlas_buffer;
 	for (const char *c = inst->charset; *c; c++) {
 		struct gltext_glyph *g = f->glyph_array + (*c);
-		uint8_t *dest = f->atlas_buffer + (TEXTURE_SIZE * 8) + 8 + (g->w * TEXELS_PER_LAYER);
+		uint8_t *dest = layer_ptr + (pot_size * 8) + 8;
 		uint8_t *source = g->bitmap_bits;
 		for (int i = 0; i < g->bitmap_height; i++) {
 			memcpy(dest, source, g->bitmap_width);
-			dest += TEXTURE_SIZE;
+			dest += pot_size;
 			source += g->bitmap_pitch;
 		}
 
-		uint8_t *temp = f->atlas_buffer + (g->w * TEXELS_PER_LAYER);
+		uint8_t *temp = layer_ptr;
 		int index = 0;
 		for (int i = 0; i < g->bitmap_height + 16; i++) {
 			for (int j = 0; j < g->bitmap_width + 16; j++) {
 				srcf[index++] = (temp[j]*1.0)/256;
 			}
-			temp += TEXTURE_SIZE;
+			temp += pot_size;
 		}
 		computegradient(srcf, g->bitmap_width + 16, g->bitmap_height + 16, gx, gy);
 		edtaa3(srcf, gx, gy, g->bitmap_width + 16, g->bitmap_height + 16, distx, disty, dist);
 
-		temp = f->atlas_buffer + (g->w * TEXELS_PER_LAYER);
+		temp = layer_ptr;
 		index = 0;
 		for (int i = 0; i < g->bitmap_height + 16; i++) {
 			for (int j = 0; j < g->bitmap_width + 16; j++) {
@@ -441,13 +464,21 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 				if (val > 255) val = 255;
 				temp[j] = val;
 			}
-			temp += TEXTURE_SIZE;
+			temp += pot_size;
 		}
 		*(glyph_size_ptr++) = (int8_t)g->bitmap_width;
 		*(glyph_size_ptr++) = (int8_t)g->bitmap_height;
 		*(glyph_size_ptr++) = (int8_t)g->left;
 		*(glyph_size_ptr++) = (int8_t)g->top;
+		layer_ptr += texels_per_layer;
 	}
+
+	free(srcf);
+	free(distx);
+	free(disty);
+	free(gx);
+	free(gy);
+	free(dist);
 
 	//
 	//Setup glyph size texture buffer
@@ -468,15 +499,16 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	glTexImage3D(GL_TEXTURE_2D_ARRAY,
 		0, /* layer */
 		GL_R8,
-		TEXTURE_SIZE, TEXTURE_SIZE, total_glyphs /* uvw size */,
+		pot_size, pot_size, total_glyphs /* uvw size */,
 		0, /* border */
 		GL_RED,
 		GL_UNSIGNED_BYTE,
-		f->atlas_buffer);
+		atlas_buffer);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	free(atlas_buffer);
 	return f;
 }
 

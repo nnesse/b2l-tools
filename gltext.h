@@ -40,6 +40,7 @@ struct gltext_glyph {
 	/* coordinate in texture atlas */
 	int w;
 
+	/* handle to font */
 	gltext_font_t font;
 
 	/* Glyph bitmap */
@@ -62,24 +63,6 @@ struct gltext_glyph_instance {
 
 	/* Layer in texture array */
 	int w;
-
-	/* Color of glyph */
-	struct gltext_color color;
-};
-
-//
-// font
-//
-struct gltext_font {
-	int size;
-	gltext_typeface_t typeface;
-	struct gltext_glyph *glyph_array;
-	gltext_renderer_t renderer;
-	int total_glyphs;
-	uint32_t atlas_texture;
-	uint32_t glyph_size_texture;
-	uint32_t glyph_size_texture_buffer;
-	uint8_t *atlas_buffer;
 };
 
 float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_glyph *next);
@@ -93,11 +76,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 
 bool gltext_font_free(gltext_font_t font);
 
-inline struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c)
-{
-	struct gltext_font *font = (struct gltext_font *)(font_);
-	return font->glyph_array + c;
-}
+struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c);
 
 struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer, gltext_font_t font, int num_chars);
 void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct gltext_color *color, const float *mvp);
