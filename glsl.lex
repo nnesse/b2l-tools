@@ -42,7 +42,7 @@ volatile	return VOLATILE;
 restrict	return RESTRICT;
 readonly	return READONLY;
 writeonly	return WRITEONLY;
-atomic_uint	return UINT;
+atomic_uint	return ATOMIC_UINT;
 layout		return LAYOUT;
 centroid	return CENTROID;
 flat		return FLAT;
