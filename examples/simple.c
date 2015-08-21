@@ -87,9 +87,6 @@ int main()
 		exit(-1);
 	}
 
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
 	while (glwin_process_events()) {
 		if (glwin_get_events(true) < 0)
 			break;

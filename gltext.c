@@ -120,6 +120,8 @@ struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t r
 void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct gltext_color *color, const float *mvp)
 {
 	struct renderer *inst = (struct renderer *)renderer;
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 	glUseProgram(inst->glsl_program);
 	glBindVertexArray(inst->gl_vertex_array);
