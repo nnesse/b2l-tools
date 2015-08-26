@@ -1,12 +1,19 @@
 AM_CPPFLAGS = -I$(top_builddir)
 
-lib_LTLIBRARIES = libglwin.la
-libglwin_la_SOURCES = glwin.c
-libglwin_la_LIBADD = -lX11 -lGL -lglb-glx
-libglwin_la_CFLAGS =
+lib_LTLIBRARIES = libglplatform.la
+libglplatform_la_SOURCES = glwin.c glb-glcore.c glb-glx.c
 
 noinst_PROGRAMS = example
 example_SOURCES = example.c
-example_LDADD = libglwin.la -lglb-glcore
+example_LDADD = libglplatform.la
 
-include_HEADERS = glwin.h
+BUILT_SOURCES = glb-glcore.c glb-glx.c
+CLEANFILES = $(BUILT_SOURCES) glb-glx.h glb-glcore.h
+
+glb-glcore.c:
+	$(GLBINDIFY) -s $(srcdir) -a gl
+
+glb-glx.c:
+	$(GLBINDIFY) -s $(srcdir) -a glx
+
+include_HEADERS = glb-glcore.h glb-glx.h glwin.h
