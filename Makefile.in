@@ -17,7 +17,7 @@ CFLAGS+= @CFLAGS@
 
 CXXFLAGS:= -Wall -I${srcdir}
 
-LDFLAGS:= -lGL -lX11 -Wl,-rpath=@libdir@
+LDFLAGS:= -lGL -lX11 -lglplatform -Wl,-rpath=@libdir@
 LDFLAGS+= @GLIB2_LIBS@ @GDKPIXBUF2_LIBS@ @GMODULE2_LIBS@ @LIBFFI_LIBS@ @GOBJECT_INTROSPECTION_LIBS@
 LDFLAGS+= @GTK3_LIBS@
 LDFLAGS+= @LDFLAGS@
@@ -40,7 +40,7 @@ lex.meta.c lex.meta.h: glsl_meta_filter.lex
 glsl.tab.c glsl.tab.h: glsl.y
 	$(BISON) $<
 
-GENERATED=lex.glsl.c lex.glsl.h lex.meta.c lex.meta.h glsl.tab.c glsl.tab.h glb-glcore.c glb-glcore.h glb-glx.c glb-glx.h
+GENERATED=lex.glsl.c lex.glsl.h lex.meta.c lex.meta.h glsl.tab.c glsl.tab.h
 
 LUA_O = $(addprefix lua/src/,lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
 	lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
@@ -51,12 +51,14 @@ LUA_O = $(addprefix lua/src/,lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfun
 LGI_O = $(addprefix lgi/lgi/,buffer.o callable.o core.o gi.o marshal.o object.o record.o)
 
 OBJS := $(LUA_O) $(LGI_O)
-OBJS += glb-glx.o glb-glcore.o b2l_material_editor.o glwin.o glsl.tab.o lex.meta.o lex.glsl.o
+OBJS += b2l_material_editor.o glsl.tab.o lex.meta.o lex.glsl.o
 OBJS += geometry.o program.o
 
 glsl.tab.o: lex.glsl.o
 
-b2l_material_editor.o: glb-glx.o glsl.tab.o lex.meta.o lex.glsl.o geometry.h program.h
+lex.glsl.o: glsl.tab.h
+
+b2l_material_editor.o: lex.meta.o lex.glsl.o geometry.h program.h
 
 geometry.o: geometry.h
 
@@ -73,19 +75,9 @@ program.o: program.h
 b2l_material_editor: $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -ldl -lm -o $@
 
-glbindify: glbindify.o tinyxml2.o
-	$(CXX) -ansi $(CFLAGS) glbindify.o tinyxml2.o -o glbindify
-
-glb-glcore.c: gl.xml glbindify
-	./glbindify -a gl -s ${srcdir}
-
-glb-glx.c: glx.xml glbindify
-	./glbindify -a glx -s ${srcdir}
-
 clean:
 	@-rm -f b2l_material_editor $(GENERATED)
 	@-rm -f $(OBJS)
-	@-rm -f glbindify
 
 .PHONY: links
 
