@@ -1,19 +1,68 @@
-AM_CFLAGS:=-Wall -Wno-unused-function -DLUA_USE_LINUX -DLUA_COMPAT_ALL
-AM_CFLAGS+=-DDATA_DIR=\"$(datadir)/b2l\"
-AM_CFLAGS+= -I@builddir@ -I$(srcdir) -I${srcdir}/lua/src -I${srcdir}/lgi/lgi
-AM_CFLAGS+= $(GLIB2_CFLAGS) $(GDKPIXBUF2_CFLAGS) $(GMODULE2_CFLAGS) $(LIBFFI_CFLAGS) $(GOBJECT_INTROSPECTION_CFLAGS)
-AM_CFLAGS+= $(GTK3_CFLAGS)
+AM_CFLAGS:=-Wall -Wno-unused-function
 
-AM_LDFLAGS:= $(GLIB2_LIBS) $(GDKPIXBUF2_LIBS) $(GMODULE2_LIBS) $(LIBFFI_LIBS) $(GOBJECT_INTROSPECTION_LIBS)
-AM_LDFLAGS+= $(GTK3_LIBS)
+AM_CFLAGS+= -DLUA_USE_LINUX \
+	-DLUA_COMPAT_ALL \
+	-DDATA_DIR=\"$(datadir)/b2l\"
 
-LUA_SRC := lua/src/lapi.c lua/src/lcode.c lua/src/lctype.c lua/src/ldebug.c lua/src/ldo.c lua/src/ldump.c lua/src/lfunc.c lua/src/lgc.c lua/src/llex.c \
-	lua/src/lmem.c lua/src/lobject.c lua/src/lopcodes.c lua/src/lparser.c lua/src/lstate.c lua/src/lstring.c lua/src/ltable.c \
-	lua/src/ltm.c lua/src/lundump.c lua/src/lvm.c lua/src/lzio.c lua/src/lauxlib.c lua/src/lbaselib.c lua/src/lbitlib.c \
-	lua/src/lcorolib.c lua/src/ldblib.c lua/src/liolib.c lua/src/lmathlib.c lua/src/loslib.c lua/src/lstrlib.c lua/src/ltablib.c \
-	lua/src/loadlib.c lua/src/linit.c
+AM_CFLAGS+= -I$(builddir) \
+	-I$(srcdir) \
+	-I${srcdir}/lua/src \
+	-I${srcdir}/lgi/lgi
 
-LGI_SRC := lgi/lgi/buffer.c lgi/lgi/callable.c lgi/lgi/core.c lgi/lgi/gi.c lgi/lgi/marshal.c lgi/lgi/object.c lgi/lgi/record.c
+AM_CFLAGS+= $(GLIB2_CFLAGS) \
+	$(GDKPIXBUF2_CFLAGS) \
+	$(GMODULE2_CFLAGS) \
+	$(LIBFFI_CFLAGS) \
+	$(GOBJECT_INTROSPECTION_CFLAGS) \
+	$(GTK3_CFLAGS)
+
+AM_LDFLAGS:= $(GLIB2_LIBS) \
+	$(GDKPIXBUF2_LIBS) \
+	$(GMODULE2_LIBS) \
+	$(LIBFFI_LIBS) \
+	$(GOBJECT_INTROSPECTION_LIBS) \
+	$(GTK3_LIBS)
+
+LUA_SRC := lua/src/lapi.c \
+	lua/src/lcode.c \
+	lua/src/lctype.c \
+	lua/src/ldebug.c \
+	lua/src/ldo.c \
+	lua/src/ldump.c \
+	lua/src/lfunc.c \
+	lua/src/lgc.c \
+	lua/src/llex.c \
+	lua/src/lmem.c \
+	lua/src/lobject.c \
+	lua/src/lopcodes.c \
+	lua/src/lparser.c \
+	lua/src/lstate.c \
+	lua/src/lstring.c \
+	lua/src/ltable.c \
+	lua/src/ltm.c \
+	lua/src/lundump.c \
+	lua/src/lvm.c \
+	lua/src/lzio.c \
+	lua/src/lauxlib.c \
+	lua/src/lbaselib.c \
+	lua/src/lbitlib.c \
+	lua/src/lcorolib.c \
+	lua/src/ldblib.c \
+	lua/src/liolib.c \
+	lua/src/lmathlib.c \
+	lua/src/loslib.c \
+	lua/src/lstrlib.c \
+	lua/src/ltablib.c \
+	lua/src/loadlib.c \
+	lua/src/linit.c
+
+LGI_SRC := lgi/lgi/buffer.c \
+	lgi/lgi/callable.c \
+	lgi/lgi/core.c \
+	lgi/lgi/gi.c \
+	lgi/lgi/marshal.c \
+	lgi/lgi/object.c \
+	lgi/lgi/record.c
 
 BUILT_SOURCES=lex.glsl.c lex.meta.c glsl.tab.c
 CLEAN_FILES=$(BUILT_SOURCES) lex.glsl.h lex.meta.h glsl.tab.h
@@ -70,4 +119,11 @@ lgi_lgi_override_DATA := lgi/lgi/override/Clutter.lua \
 	lgi/lgi/override/Gio.lua
 
 bin_PROGRAMS=b2l_material_editor
-b2l_material_editor_SOURCES:= $(LUA_SRC) $(LGI_SRC) b2l_material_editor.c glsl.tab.c lex.meta.c lex.glsl.c geometry.c program.c
+b2l_material_editor_SOURCES:= $(LUA_SRC) \
+	$(LGI_SRC) \
+	b2l_material_editor.c \
+	glsl.tab.c \
+	lex.meta.c \
+	lex.glsl.c \
+	geometry.c \
+	program.c
