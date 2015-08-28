@@ -195,7 +195,7 @@ struct declaration *g_decls = NULL;
 %defines
 
 %define api.value.type union
-%define api.prefix glsl
+%define api.prefix {glsl}
 
 %type <struct generic *> function_declarator
 %type <struct generic *> function_header_with_parameters

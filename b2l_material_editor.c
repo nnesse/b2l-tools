@@ -1216,19 +1216,23 @@ int main(int argc, char **argv)
 	lua_setfield(L, -2, "lgi.corelgilua");
 
 	lua_pushstring(L, b2l_data_dir);
-	lua_pushstring(L, "/lua/?.lua");
-	lua_concat(L, 2);
+	lua_pushstring(L, "/?.lua;");
+	lua_pushstring(L, b2l_data_dir);
+	lua_pushstring(L, "/lgi/?.lua");
+	lua_concat(L, 4);
 	lua_setfield(L, -3, "path");
 
 	lua_pushstring(L, b2l_data_dir);
-	lua_pushstring(L, "/lua/lib/?.so");
-	lua_concat(L, 2);
+	lua_pushstring(L, "/lib/?.so;");
+	lua_pushstring(L, b2l_data_dir);
+	lua_pushstring(L, "/lgi/lib/?.so");
+	lua_concat(L, 4);
 	lua_setfield(L, -3, "cpath");
 
 	lua_pushcfunction(L, lua_message_handler);
 	int msgh = lua_gettop(L);
 	lua_pushstring(L, b2l_data_dir);
-	lua_pushstring(L, "/lua/material_editor.lua");
+	lua_pushstring(L, "/material_editor.lua");
 	lua_concat(L, 2);
 	int err;
 	err = luaL_loadfile(L, lua_tostring(L, -1));
