@@ -9,6 +9,10 @@ AC_CHECK_PROG(FLEX,flex,flex)
 
 AS_IF([test x$FLEX != xflex],AC_MSG_ERROR([Could not find flex]))
 
+AC_CHECK_LIB([X11],[XOpenDisplay],,AC_MSG_ERROR([Could not find libX11]))
+AC_CHECK_LIB([GL],[glXGetProcAddress],,AC_MSG_ERROR([Could not find libGL]))
+AC_CHECK_LIB([glplatform],[glwin_init],,AC_MSG_ERROR([Could not find libglplatform]))
+
 AC_MSG_CHECKING([if bison is new enough])
 dir=`mktemp -d`
 bison $srcdir/tests/test.y -o $dir/test.c || BISON=no
