@@ -16,4 +16,4 @@ glb-glcore.c:
 glb-glx.c:
 	$(GLBINDIFY) -a glx
 
-include_HEADERS = glb-glcore.h glb-glx.h glwin.h
+include_HEADERS = glb-glcore.h glb-glx.h glplatform.h

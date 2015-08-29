@@ -1,4 +1,4 @@
-#include "glwin.h"
+#include "glplatform.h"
 #include "glb-glcore.h"
 
 #include <stdlib.h>
