@@ -30,7 +30,7 @@ extern char *metalval;
 
 #include <glib.h>
 #include <glib-unix.h>
-#include <glwin.h>
+#include <glplatform.h>
 
 #define MAX_TEXTURE_UNITS 8
 
@@ -535,8 +535,8 @@ static void init_gl_state();
 
 static gboolean dispatch(gpointer user_data)
 {
-	glwin_get_events(false);
-	return glwin_process_events();
+	glplatform_get_events(false);
+	return glplatform_process_events();
 }
 
 int luaopen_material_editor_capi(lua_State *L)
@@ -552,9 +552,9 @@ int luaopen_material_editor_capi(lua_State *L)
 	cb.on_mouse_move = on_mouse_move;
 	cb.on_mouse_wheel = on_mouse_wheel;
 	cb.on_resize = on_resize;
-	glwin_init();
+	glplatform_init();
 	GMainContext *ctx = g_main_context_default();
-	g_src = g_unix_fd_source_new(glwin_epoll_fd, G_IO_IN);
+	g_src = g_unix_fd_source_new(glplatform_epoll_fd, G_IO_IN);
 	g_source_attach(g_src, ctx);
 	g_source_set_callback(g_src, dispatch, NULL, NULL);
 	return 1;
@@ -563,7 +563,7 @@ int luaopen_material_editor_capi(lua_State *L)
 static int create_glwin(lua_State *L)
 {
 	int xid = lua_tointeger(L, -1);
-	g_win = glwin_create_window("B2L 3D View", &cb, 512, 512);
+	g_win = glplatform_create_window("B2L 3D View", &cb, 512, 512);
 	if (!g_win)
 		exit(-1);
 
@@ -572,10 +572,10 @@ static int create_glwin(lua_State *L)
 
 	glwin_show_window(g_win);
 
-	g_ctx = glwin_create_context(g_win, 3, 3);
+	g_ctx = glplatform_create_context(g_win, 3, 3);
 	if (!g_ctx)
 		exit(-1);
-	glwin_make_current(g_win, g_ctx);
+	glplatform_make_current(g_win, g_ctx);
 
 	need_redraw(L);
 
@@ -771,9 +771,9 @@ int mesh_gc(lua_State *L)
 
 static void redraw(struct glwin *win)
 {
-	struct glwin_thread_state thread_state;
-	glwin_get_thread_state(&thread_state);
-	glwin_make_current(win, g_ctx);
+	struct glplatform_thread_state thread_state;
+	glplatform_get_thread_state(&thread_state);
+	glplatform_make_current(win, g_ctx);
 
 	lua_State *L = g_L;
 
@@ -1090,7 +1090,7 @@ end:
 			printf("render_scene GL error = %d\n", err);
 	}
 	glwin_swap_buffers(g_win);
-	glwin_set_thread_state(&thread_state);
+	glplatform_set_thread_state(&thread_state);
 	g_need_redraw = false;
 	return;
 }
