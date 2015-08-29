@@ -11,9 +11,9 @@ BUILT_SOURCES = glb-glcore.c glb-glx.c
 CLEANFILES = $(BUILT_SOURCES) glb-glx.h glb-glcore.h
 
 glb-glcore.c:
-	$(GLBINDIFY) -s $(srcdir) -a gl
+	$(GLBINDIFY) -a gl
 
 glb-glx.c:
-	$(GLBINDIFY) -s $(srcdir) -a glx
+	$(GLBINDIFY) -a glx
 
 include_HEADERS = glb-glcore.h glb-glx.h glwin.h
