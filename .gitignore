@@ -19,7 +19,7 @@ glb-*.?
 *~
 # http://www.gnu.org/software/automake
 
-#Makefile.in
+Makefile.in
 /Makefile
 
 
