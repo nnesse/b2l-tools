@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "glwin.h"
+#include "glplatform.h"
 #include "gltext.h"
 #include "glb-glcore.h"
 
@@ -50,7 +50,7 @@ void on_expose(struct glwin *win)
 
 void on_destroy(struct glwin *win)
 {
-	glwin_destroy_window(win);
+	glplatform_destroy_window(win);
 }
 
 int main()
@@ -62,23 +62,23 @@ int main()
 
 	g_renderer = gltext_renderer_new(" abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\");
 
-	if (!glwin_init()) {
+	if (!glplatform_init()) {
 		fprintf(stderr, "Failed to initialize GL window manager\n");
 		exit(-1);
 	}
 
-	struct glwin *win = glwin_create_window("Simple text test", &cb, 1024, 256);
+	struct glwin *win = glplatform_create_window("Simple text test", &cb, 1024, 256);
 	if (!win) {
 		fprintf(stderr, "Failed to create OpenGL window\n");
 		exit(-1);
 	}
 	glwin_show_window(win);
-	glwin_context_t ctx = glwin_create_context(win, 3, 3);
+	glwin_context_t ctx = glplatform_create_context(win, 3, 3);
 	if (!ctx) {
 		fprintf(stderr, "Failed to create OpenGL context\n");
 		return 0;
 	}
-	glwin_make_current(win, ctx);
+	glplatform_make_current(win, ctx);
 	glb_glcore_init(3, 3);
 
 	g_font = gltext_font_create(g_renderer, gltext_renderer_get_typeface(g_renderer, TTF_PATH "/LiberationSans-Regular.ttf"), 20);
@@ -87,8 +87,8 @@ int main()
 		exit(-1);
 	}
 
-	while (glwin_process_events()) {
-		if (glwin_get_events(true) < 0)
+	while (glplatform_process_events()) {
+		if (glplatform_get_events(true) < 0)
 			break;
 	}
 }
