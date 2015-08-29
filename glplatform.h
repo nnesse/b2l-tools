@@ -35,7 +35,7 @@ struct glwin {
 	struct glwin **pprev;
 };
 
-struct glwin_thread_state {
+struct glplatform_thread_state {
 	void *display;
 	void *context;
 	uint32_t read_draw;
@@ -52,9 +52,9 @@ struct glwin *glplatform_create_window(const char *title,
 
 void glplatform_destroy_window(struct glwin *win);
 
-void glplatform_get_thread_state(struct glwin_thread_state *state);
+void glplatform_get_thread_state(struct glplatform_thread_state *state);
 
-void glplatform_set_thread_state(const struct glwin_thread_state *state);
+void glplatform_set_thread_state(const struct glplatform_thread_state *state);
 
 int glplatform_get_events(bool block);
 

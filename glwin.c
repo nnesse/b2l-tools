@@ -492,7 +492,7 @@ void glwin_show_window(struct glwin *win)
 	XSync(g_display, 0);
 }
 
-void glplatform_get_thread_state(struct glwin_thread_state *state)
+void glplatform_get_thread_state(struct glplatform_thread_state *state)
 {
 	state->write_draw = glXGetCurrentDrawable();
 	state->read_draw = glXGetCurrentDrawable();
@@ -500,7 +500,7 @@ void glplatform_get_thread_state(struct glwin_thread_state *state)
 	state->context = glXGetCurrentContext();
 }
 
-void glplatform_set_thread_state(const struct glwin_thread_state *state)
+void glplatform_set_thread_state(const struct glplatform_thread_state *state)
 {
 	glXMakeContextCurrent(state->display,
 			state->write_draw,
