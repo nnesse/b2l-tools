@@ -1,5 +1,3 @@
-#define GLB_ENABLE_GLX_create_context
-#define GLB_ENABLE_GLX_create_context_profile
 #include "glwin.h"
 
 #include <X11/Xlib.h>
@@ -14,7 +12,7 @@
 #define GLB_ENABLE_GLX_ARB_create_context_profile
 #include "glb-glx.h"
 
-int glwin_epoll_fd;
+int glplatform_epoll_fd;
 static int g_x11_fd;
 static int g_event_count;
 static struct epoll_event g_events[100];
@@ -203,10 +201,10 @@ static int handle_x_event(struct glwin *win, XEvent *event)
 	return 0;
 }
 
-bool glwin_init()
+bool glplatform_init()
 {
 	g_event_count = 0;
-	glwin_epoll_fd = epoll_create1(0);
+	glplatform_epoll_fd = epoll_create1(0);
 	g_display = XOpenDisplay(NULL);
 	g_x11_fd = XConnectionNumber(g_display);
 	glb_glx_init(1, 4);
@@ -220,19 +218,19 @@ bool glwin_init()
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
 	ev.data.fd = g_x11_fd;
-	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_ADD, g_x11_fd, &ev); //TODO: check for errors
+	epoll_ctl(glplatform_epoll_fd, EPOLL_CTL_ADD, g_x11_fd, &ev); //TODO: check for errors
 
 	g_screen = DefaultScreen(g_display);
 	g_delete_atom = XInternAtom(g_display, "WM_DELETE_WINDOW", True);
 	return true;
 }
 
-void glwin_shutdown()
+void glplatform_shutdown()
 {
 	XCloseDisplay(g_display);
 }
 
-struct glwin *glwin_create_window(const char *title, struct glwin_callbacks *callbacks, int width, int height)
+struct glwin *glplatform_create_window(const char *title, struct glwin_callbacks *callbacks, int width, int height)
 {
 	GLXFBConfig fb_config;
 	Window window;
@@ -359,12 +357,12 @@ void glwin_set_type(struct glwin *win, enum glwin_types type)
 		1);
 }
 
-void glwin_make_current(struct glwin *win, glwin_context_t context)
+void glplatform_make_current(struct glwin *win, glwin_context_t context)
 {
 	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
 }
 
-glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver)
+glwin_context_t glplatform_create_context(struct glwin *win, int maj_ver, int min_ver)
 {
 	int attribList[] = {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
@@ -423,11 +421,11 @@ static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
 	return True;
 }
 
-int glwin_get_events(bool block)
+int glplatform_get_events(bool block)
 {
 	int rc = 0;
 	if (g_event_count < 100) {
-		rc = epoll_wait(glwin_epoll_fd, g_events + g_event_count, 100 - g_event_count, block ? -1 : 0);
+		rc = epoll_wait(glplatform_epoll_fd, g_events + g_event_count, 100 - g_event_count, block ? -1 : 0);
 		if (rc == -1) {
 			fprintf(stderr, "glwin_get_events(): epoll_wait() failed: %s", strerror(errno));
 		} else {
@@ -437,7 +435,7 @@ int glwin_get_events(bool block)
 	return rc;
 }
 
-bool glwin_process_events()
+bool glplatform_process_events()
 {
 	XEvent event;
 	int i;
@@ -464,7 +462,7 @@ void glwin_swap_buffers(struct glwin *win)
 	XSync(g_display, 0);
 }
 
-void glwin_destroy_window(struct glwin *win)
+void glplatform_destroy_window(struct glwin *win)
 {
 	glXMakeContextCurrent(g_display, None, None, NULL);
 	glXDestroyWindow(g_display, win->glx_window);
@@ -473,18 +471,18 @@ void glwin_destroy_window(struct glwin *win)
 	retire_glwin(win);
 }
 
-void glwin_fd_bind(int fd, struct glwin *win)
+void glplatform_fd_bind(int fd, struct glwin *win)
 {
 	struct epoll_event ev;
 	ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
 	ev.data.fd = fd;
-	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+	epoll_ctl(glplatform_epoll_fd, EPOLL_CTL_ADD, fd, &ev);
 	g_fd_binding[fd] = win;
 }
 
-void glwin_fd_unbind(int fd)
+void glplatform_fd_unbind(int fd)
 {
-	epoll_ctl(glwin_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+	epoll_ctl(glplatform_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 	g_fd_binding[fd] = NULL;
 }
 
@@ -494,7 +492,7 @@ void glwin_show_window(struct glwin *win)
 	XSync(g_display, 0);
 }
 
-void glwin_get_thread_state(struct glwin_thread_state *state)
+void glplatform_get_thread_state(struct glwin_thread_state *state)
 {
 	state->write_draw = glXGetCurrentDrawable();
 	state->read_draw = glXGetCurrentDrawable();
@@ -502,7 +500,7 @@ void glwin_get_thread_state(struct glwin_thread_state *state)
 	state->context = glXGetCurrentContext();
 }
 
-void glwin_set_thread_state(const struct glwin_thread_state *state)
+void glplatform_set_thread_state(const struct glwin_thread_state *state)
 {
 	glXMakeContextCurrent(state->display,
 			state->write_draw,

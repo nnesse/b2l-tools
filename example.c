@@ -22,7 +22,7 @@ void on_key_down(struct glwin *win, int k)
 
 void on_destroy(struct glwin *win)
 {
-	glwin_destroy_window(win);
+	glplatform_destroy_window(win);
 }
 
 int main()
@@ -32,23 +32,23 @@ int main()
 		.on_destroy = on_destroy,
 		.on_key_down = on_key_down
 	};
-	if (!glwin_init()) {
+	if (!glplatform_init()) {
 		exit(-1);
 	}
-	struct glwin *win = glwin_create_window("Hello window", &cb, 512, 512);
+	struct glwin *win = glplatform_create_window("Hello window", &cb, 512, 512);
 	if (!win)
 		exit(-1);
 
 	glwin_show_window(win);
-	glwin_context_t ctx = glwin_create_context(win, 3, 3);
+	glwin_context_t ctx = glplatform_create_context(win, 3, 3);
 	if (!ctx)
 		exit(-1);
-	glwin_make_current(win, ctx);
+	glplatform_make_current(win, ctx);
 	if (!glb_glcore_init(3, 3)) {
 		exit(-1);
 	}
-	while (glwin_process_events()) {
-		if (glwin_get_events(true) < 0)
+	while (glplatform_process_events()) {
+		if (glplatform_get_events(true) < 0)
 			break;
 	}
 }

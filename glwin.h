@@ -35,13 +35,40 @@ struct glwin {
 	struct glwin **pprev;
 };
 
-bool glwin_init();
-void glwin_shutdown();
+struct glwin_thread_state {
+	void *display;
+	void *context;
+	uint32_t read_draw;
+	uint32_t write_draw;
+};
 
-struct glwin *glwin_create_window(const char *title,
+bool glplatform_init();
+void glplatform_shutdown();
+
+struct glwin *glplatform_create_window(const char *title,
 		struct glwin_callbacks *callbacks,
 		int width,
 		int height);
+
+void glplatform_destroy_window(struct glwin *win);
+
+void glplatform_get_thread_state(struct glwin_thread_state *state);
+
+void glplatform_set_thread_state(const struct glwin_thread_state *state);
+
+int glplatform_get_events(bool block);
+
+void glplatform_make_current(struct glwin *win, glwin_context_t context);
+
+bool glplatform_process_events();
+
+void glplatform_fd_bind(int fd, struct glwin *win);
+
+void glplatform_fd_unbind(int fd);
+
+glwin_context_t glplatform_create_context(struct glwin *win, int maj_ver, int min_ver);
+
+extern int glplatform_epoll_fd;
 
 enum glwin_types {
 	GLWIN_POPUP,
@@ -54,34 +81,12 @@ enum glwin_types {
 void glwin_set_type(struct glwin *win, enum glwin_types type);
 
 void glwin_set_transient_for(struct glwin *win, intptr_t id);
-
-void glwin_make_current(struct glwin *win, glwin_context_t context);
-bool glwin_process_events();
-int glwin_get_events(bool block);
-void glwin_destroy_window(struct glwin *win);
-void glwin_fd_bind(int fd, struct glwin *win);
-void glwin_fd_unbind(int fd);
-
-glwin_context_t glwin_create_context(struct glwin *win, int maj_ver, int min_ver);
 void glwin_swap_buffers(struct glwin *win);
 void glwin_show_window(struct glwin *win);
 void glwin_fullscreen(struct glwin *win, bool fullscreen);
 
-struct glwin_thread_state {
-	void *display;
-	void *context;
-	uint32_t read_draw;
-	uint32_t write_draw;
-};
-
-void glwin_get_thread_state(struct glwin_thread_state *state);
-
-void glwin_set_thread_state(const struct glwin_thread_state *state);
-
 bool glwin_is_button_pressed(struct glwin *win, int button_no);
 
 bool glwin_is_modifier_pressed(struct glwin *win, int modifier_no);
-
-extern int glwin_epoll_fd;
 
 #endif
