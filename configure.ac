@@ -3,7 +3,7 @@ AC_INIT([b2l-material-editor],[0.1])
 
 AC_CHECK_PROG(BISON,bison,bison)
 
-AM_INIT_AUTOMAKE([foreign subdir-objects])
+AM_INIT_AUTOMAKE([foreign subdir-objects no-define])
 
 AS_IF([test x$BISON != xbison],AC_MSG_ERROR([Could not find bison]))
 
