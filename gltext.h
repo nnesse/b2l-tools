@@ -159,8 +159,8 @@ const struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c);
   * -1 + (x*2.0/width)  ,-1 + (y*2.0/height) ,0 ,1};
   *
   * The mvp transform can scale or rotate the text or contain a perspective transform
-  * with limited distortion thanks to the use is signed distance field texture maps.
-  * Small font sizes however display best when aligned to exact window coordinates
+  * with limited text distortion thanks to the use is signed distance field texture maps.
+  * Small font sizes display best when aligned to exact window coordinates
   * with integral glyph positions.
   */
  void gltext_renderer_submit_render(gltext_renderer_t renderer, const struct gltext_color *color, const float *mvp);
