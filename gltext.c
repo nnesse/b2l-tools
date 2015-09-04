@@ -28,12 +28,21 @@ struct gltext_font {
 	GLuint atlas_texture;
 	GLuint glyph_size_texture;
 	GLuint glyph_size_texture_buffer;
+	int max_char;
 };
 
 struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c)
 {
 	struct gltext_font *font = (struct gltext_font *)(font_);
-	return font->glyph_array + c;
+	struct gltext_glyph *g;
+	if (c > font->max_char) {
+		return NULL;
+	}
+        g = font->glyph_array + c;
+	if (!g->valid) {
+		return NULL;
+	}
+	return g;
 }
 
 //
@@ -369,6 +378,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 
 	f->size = size;
 	f->typeface = typeface_;
+	f->max_char = inst->max_char;
 	FT_Face typeface = (FT_Face) f->typeface;
 
 	int total_glyphs = strlen(inst->charset);
@@ -399,6 +409,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 		g->advance_y = typeface->glyph->advance.y;
 		g->font = f;
 		g->typeface_index = index;
+		g->valid = true;
 		max_dim = g->bitmap_width > max_dim ? g->bitmap_width : max_dim;
 		max_dim = g->bitmap_height > max_dim ? g->bitmap_height : max_dim;
 	}
