@@ -31,7 +31,7 @@ struct gltext_font {
 	int max_char;
 };
 
-struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c)
+const struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c)
 {
 	struct gltext_font *font = (struct gltext_font *)(font_);
 	struct gltext_glyph *g;
