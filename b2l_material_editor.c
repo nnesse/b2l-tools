@@ -57,8 +57,8 @@ luaL_Reg lua_b2l_material_editor_capi[] = {
 
 static GLuint g_texture_names[MAX_TEXTURE_UNITS];
 
-static glwin_context_t g_ctx;
-static struct glwin *g_win;
+static glplatform_gl_context_t g_ctx;
+static struct glplatform_win *g_win;
 static lua_State *g_L;
 static bool g_need_redraw = true;
 static GSource *g_src;
@@ -67,15 +67,15 @@ static int g_dy[3];
 static float g_log_zoom = 0.3;
 static bool g_mouse_down[3] = {false, false, false};
 
-static void on_expose(struct glwin *win);
-static void on_destroy(struct glwin *win);
-static void on_mouse_button_up(struct glwin *, int, int, int);
-static void on_mouse_button_down(struct glwin *, int, int, int);
-static void on_mouse_move(struct glwin *, int, int);
-static void on_resize(struct glwin *);
-static void on_mouse_wheel(struct glwin *, int, int, int);
+static void on_expose(struct glplatform_win *win);
+static void on_destroy(struct glplatform_win *win);
+static void on_mouse_button_up(struct glplatform_win *, int, int, int);
+static void on_mouse_button_down(struct glplatform_win *, int, int, int);
+static void on_mouse_move(struct glplatform_win *, int, int);
+static void on_resize(struct glplatform_win *);
+static void on_mouse_wheel(struct glplatform_win *, int, int, int);
 
-static void redraw(struct glwin *win);
+static void redraw(struct glplatform_win *win);
 
 struct quaternion {
 	float x;
@@ -332,7 +332,7 @@ static void quaternion_unit_inv_mul_vec3(const struct quaternion *q, const float
 	mat3_mul_vec3(&temp, v1, v2);
 }
 
-static void on_mouse_button_up(struct glwin *win, int button, int x, int y)
+static void on_mouse_button_up(struct glplatform_win *win, int button, int x, int y)
 {
 	if (g_mouse_down[0] && button == 1) {
 		struct quaternion next;
@@ -357,7 +357,7 @@ static void on_mouse_button_up(struct glwin *win, int button, int x, int y)
 	on_mouse_move(win, x, y);
 }
 
-static void on_mouse_button_down(struct glwin *win, int button, int x, int y)
+static void on_mouse_button_down(struct glplatform_win *win, int button, int x, int y)
 {
 	g_mouse_down[button -1] = true;
 	g_dx[button - 1] = x;
@@ -370,7 +370,7 @@ static void print_quaternion(struct quaternion *q)
 	printf("%f %f %f %f\n", q->x, q->y, q->z, q->w);
 }
 
-static void on_mouse_move(struct glwin *win, int x, int y)
+static void on_mouse_move(struct glplatform_win *win, int x, int y)
 {
 	struct quaternion next;
 	quaternion_mul(&q_delta, &q_cur, &next);
@@ -401,12 +401,12 @@ static void on_mouse_move(struct glwin *win, int x, int y)
 	}
 }
 
-static void on_expose(struct glwin *win)
+static void on_expose(struct glplatform_win *win)
 {
 	need_redraw(g_L);
 }
 
-static void on_mouse_wheel(struct glwin *win, int x, int y, int direction)
+static void on_mouse_wheel(struct glplatform_win *win, int x, int y, int direction)
 {
 	g_log_zoom  += direction * 0.1;
 	need_redraw(g_L);
@@ -474,18 +474,17 @@ static int directory_name(lua_State *L)
 	return 1;
 }
 
-static void on_resize(struct glwin *win)
+static void on_resize(struct glplatform_win *win)
 {
 	need_redraw(g_L);
 }
 
-static void on_destroy(struct glwin *win)
+static void on_destroy(struct glplatform_win *win)
 {
-	//glwin_destroy_window(win);
 	exit(0);
 }
 
-struct glwin_callbacks cb;
+struct glplatform_win_callbacks cb;
 
 static uint8_t *get_file_buffer(const char *fname, size_t *size)
 {
@@ -567,10 +566,10 @@ static int create_glwin(lua_State *L)
 	if (!g_win)
 		exit(-1);
 
-	glwin_set_type(g_win, GLWIN_UTILITY);
-	glwin_set_transient_for(g_win, xid);
+	glplatform_set_win_type(g_win, GLWIN_UTILITY);
+	glplatform_set_win_transient_for(g_win, xid);
 
-	glwin_show_window(g_win);
+	glplatform_show_window(g_win);
 
 	g_ctx = glplatform_create_context(g_win, 3, 3);
 	if (!g_ctx)
@@ -769,7 +768,7 @@ int mesh_gc(lua_State *L)
 	return 0;
 }
 
-static void redraw(struct glwin *win)
+static void redraw(struct glplatform_win *win)
 {
 	struct glplatform_thread_state thread_state;
 	glplatform_get_thread_state(&thread_state);
@@ -1089,7 +1088,7 @@ end:
 		if (err)
 			printf("render_scene GL error = %d\n", err);
 	}
-	glwin_swap_buffers(g_win);
+	glplatform_swap_buffers(g_win);
 	glplatform_set_thread_state(&thread_state);
 	g_need_redraw = false;
 	return;
