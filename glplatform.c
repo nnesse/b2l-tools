@@ -13,6 +13,7 @@
 #include "glb-glx.h"
 
 int glplatform_epoll_fd;
+
 static int g_x11_fd;
 static int g_event_count;
 static struct epoll_event g_events[100];
@@ -20,13 +21,13 @@ static Display *g_display;
 static int g_screen;
 static Atom g_delete_atom;
 
-struct glwin *g_win_list = NULL;
-int g_glwin_count = 0;
-struct glwin **g_fd_binding;
+struct glplatform_win *g_win_list = NULL;
+int g_glplatform_win_count = 0;
+struct glplatform_win **g_fd_binding;
 
-static struct glwin *find_glwin(Window w)
+static struct glplatform_win *find_glplatform_win(Window w)
 {
-	struct glwin *win = g_win_list;
+	struct glplatform_win *win = g_win_list;
 	while (win) {
 		if (win->window == w)
 			return win;
@@ -35,39 +36,39 @@ static struct glwin *find_glwin(Window w)
 	return NULL;
 }
 
-static void retire_glwin(struct glwin *win)
+static void retire_glplatform_win(struct glplatform_win *win)
 {
-	struct glwin *pos = g_win_list;
+	struct glplatform_win *pos = g_win_list;
 	while (win) {
 		if (pos == win) {
 			*(pos->pprev) = pos->next;
 			if (pos->next)
 				pos->next->pprev = pos->pprev;
-			g_glwin_count--;
+			g_glplatform_win_count--;
 			break;
 		}
 		pos = pos->next;
 	}
 }
 
-static void register_glwin(struct glwin *win)
+static void register_glplatform_win(struct glplatform_win *win)
 {
-	struct glwin *test = find_glwin(win->window);
+	struct glplatform_win *test = find_glplatform_win(win->window);
 	if (test)
 		return;
-	g_glwin_count++;
+	g_glplatform_win_count++;
 	win->next = g_win_list;
 	win->pprev = &g_win_list;
 	g_win_list = win;
 }
 
-static void on_mouse_wheel(struct glwin *win, int x, int y, int a)
+static void on_mouse_wheel(struct glplatform_win *win, int x, int y, int a)
 {
 	if (win->callbacks.on_mouse_wheel)
 		win->callbacks.on_mouse_wheel(win, x, y, a);
 }
 
-bool glwin_is_button_pressed(struct glwin *win, int button)
+bool glplatform_is_button_pressed(struct glplatform_win *win, int button)
 {
 	switch (button)
 	{
@@ -84,7 +85,7 @@ bool glwin_is_button_pressed(struct glwin *win, int button)
 	return false;
 }
 
-bool glwin_is_modifier_pressed(struct glwin *win, int mod)
+bool glplatform_is_modifier_pressed(struct glplatform_win *win, int mod)
 {
 	switch (mod)
 	{
@@ -107,12 +108,7 @@ bool glwin_is_modifier_pressed(struct glwin *win, int mod)
 	return false;
 }
 
-bool glwin_is_shift_pressed(struct glwin *win)
-{
-	return win->x_state_mask & Mod1Mask;
-}
-
-static int handle_x_event(struct glwin *win, XEvent *event)
+static int handle_x_event(struct glplatform_win *win, XEvent *event)
 {
 	switch (event->type) {
 	case ConfigureNotify: {
@@ -214,7 +210,7 @@ bool glplatform_init()
 	if (rc)
 		return false;
 
-	g_fd_binding = (struct glwin **)calloc(rl.rlim_max, sizeof(struct glwin *));
+	g_fd_binding = (struct glplatform_win **)calloc(rl.rlim_max, sizeof(struct glplatform_win *));
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
 	ev.data.fd = g_x11_fd;
@@ -230,7 +226,7 @@ void glplatform_shutdown()
 	XCloseDisplay(g_display);
 }
 
-struct glwin *glplatform_create_window(const char *title, struct glwin_callbacks *callbacks, int width, int height)
+struct glplatform_win *glplatform_create_window(const char *title, struct glplatform_win_callbacks *callbacks, int width, int height)
 {
 	GLXFBConfig fb_config;
 	Window window;
@@ -305,7 +301,7 @@ struct glwin *glplatform_create_window(const char *title, struct glwin_callbacks
 		     StructureNotifyMask |
 		     SubstructureNotifyMask);
 
-	struct glwin *win = (struct glwin *) malloc(sizeof(struct glwin));
+	struct glplatform_win *win = (struct glplatform_win *) malloc(sizeof(struct glplatform_win));
 	win->width = width;
 	win->height = height;
 	win->fb_config = fb_config;
@@ -313,19 +309,19 @@ struct glwin *glplatform_create_window(const char *title, struct glwin_callbacks
 	win->glx_window = glx_window;
 	win->callbacks = *callbacks;
 
-	register_glwin(win);
+	register_glplatform_win(win);
 	if (win->callbacks.on_create)
 		win->callbacks.on_create(win);
 
 	return win;
 }
 
-void glwin_set_transient_for(struct glwin *win, intptr_t id)
+void glplatform_set_win_transient_for(struct glplatform_win *win, intptr_t id)
 {
 	XSetTransientForHint(g_display, win->window, id);
 }
 
-void glwin_set_type(struct glwin *win, enum glwin_types type)
+void glplatform_set_win_type(struct glplatform_win *win, enum glplatform_win_types type)
 {
 	Atom type_atom = 0;
 	switch (type) {
@@ -357,12 +353,12 @@ void glwin_set_type(struct glwin *win, enum glwin_types type)
 		1);
 }
 
-void glplatform_make_current(struct glwin *win, glwin_context_t context)
+void glplatform_make_current(struct glplatform_win *win, glplatform_gl_context_t context)
 {
 	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
 }
 
-glwin_context_t glplatform_create_context(struct glwin *win, int maj_ver, int min_ver)
+glplatform_gl_context_t glplatform_create_context(struct glplatform_win *win, int maj_ver, int min_ver)
 {
 	int attribList[] = {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
@@ -373,7 +369,7 @@ glwin_context_t glplatform_create_context(struct glwin *win, int maj_ver, int mi
 	return glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
 }
 
-void glwin_fullscreen(struct glwin *win, bool fullscreen)
+void glplatform_fullscreen_win(struct glplatform_win *win, bool fullscreen)
 {
 	XWindowAttributes attr;
 	bool mapped;
@@ -427,7 +423,7 @@ int glplatform_get_events(bool block)
 	if (g_event_count < 100) {
 		rc = epoll_wait(glplatform_epoll_fd, g_events + g_event_count, 100 - g_event_count, block ? -1 : 0);
 		if (rc == -1) {
-			fprintf(stderr, "glwin_get_events(): epoll_wait() failed: %s", strerror(errno));
+			fprintf(stderr, "glplatform_get_events(): epoll_wait() failed: %s", strerror(errno));
 		} else {
 			g_event_count += rc;
 		}
@@ -441,7 +437,7 @@ bool glplatform_process_events()
 	int i;
 	for (i = 0; i < g_event_count; i++) {
 		int fd = g_events[i].data.fd;
-		struct glwin *win = g_fd_binding[fd];
+		struct glplatform_win *win = g_fd_binding[fd];
 		if (win)
 			if (win->callbacks.on_fd_event)
 				win->callbacks.on_fd_event(win, fd, g_events[i].events);
@@ -449,29 +445,29 @@ bool glplatform_process_events()
 	g_event_count = 0;
 
 	while (XCheckIfEvent(g_display, &event, match_any_event, NULL) == True) {
-		struct glwin *win = find_glwin(event.xany.window);
+		struct glplatform_win *win = find_glplatform_win(event.xany.window);
 		if (win)
 			handle_x_event(win, &event);
 	}
-	return g_glwin_count > 0;
+	return g_glplatform_win_count > 0;
 }
 
-void glwin_swap_buffers(struct glwin *win)
+void glplatform_swap_buffers(struct glplatform_win *win)
 {
 	glXSwapBuffers(g_display, win->glx_window);
 	XSync(g_display, 0);
 }
 
-void glplatform_destroy_window(struct glwin *win)
+void glplatform_destroy_window(struct glplatform_win *win)
 {
 	glXMakeContextCurrent(g_display, None, None, NULL);
 	glXDestroyWindow(g_display, win->glx_window);
 	XSync(g_display, 0);
 	XDestroyWindow(g_display, win->window);
-	retire_glwin(win);
+	retire_glplatform_win(win);
 }
 
-void glplatform_fd_bind(int fd, struct glwin *win)
+void glplatform_fd_bind(int fd, struct glplatform_win *win)
 {
 	struct epoll_event ev;
 	ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
@@ -486,7 +482,7 @@ void glplatform_fd_unbind(int fd)
 	g_fd_binding[fd] = NULL;
 }
 
-void glwin_show_window(struct glwin *win)
+void glplatform_show_window(struct glplatform_win *win)
 {
 	XMapWindow(g_display, win->window);
 	XSync(g_display, 0);
