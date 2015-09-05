@@ -1,7 +1,7 @@
 AM_CPPFLAGS = -I$(top_builddir)
 
 lib_LTLIBRARIES = libglplatform.la
-libglplatform_la_SOURCES = glwin.c glb-glcore.c glb-glx.c
+libglplatform_la_SOURCES = glplatform.c glb-glcore.c glb-glx.c
 
 noinst_PROGRAMS = example
 example_SOURCES = example.c
