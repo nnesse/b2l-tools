@@ -24,7 +24,13 @@ static Atom g_delete_atom;
 static struct glplatform_win *g_win_list = NULL;
 static int g_glplatform_win_count = 0;
 static int g_max_fd = 0;
-static struct glplatform_win **g_fd_binding;
+
+struct fd_binding {
+	struct glplatform_win *win;
+	intptr_t user_data;
+};
+
+static struct fd_binding *g_fd_binding;
 
 static struct glplatform_win *find_glplatform_win(Window w)
 {
@@ -55,7 +61,7 @@ static void retire_glplatform_win(struct glplatform_win *win)
 	//Note: This is ineffient but we shouldn't be
 	//destroying windows very often.
 	for (i = 0; i < g_max_fd; i++) {
-		if (g_fd_binding[i] == win) {
+		if (g_fd_binding[i].win == win) {
 			glplatform_fd_unbind(i);
 		}
 	}
@@ -208,7 +214,7 @@ bool glplatform_init()
 		return false;
 
 	g_max_fd = rl.rlim_max;
-	g_fd_binding = (struct glplatform_win **)calloc(rl.rlim_max, sizeof(struct glplatform_win *));
+	g_fd_binding = (struct fd_binding *)calloc(rl.rlim_max, sizeof(struct fd_binding));
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
 	ev.data.fd = g_x11_fd;
@@ -435,10 +441,10 @@ bool glplatform_process_events()
 	int i;
 	for (i = 0; i < g_event_count; i++) {
 		int fd = g_events[i].data.fd;
-		struct glplatform_win *win = g_fd_binding[fd];
+		struct glplatform_win *win = g_fd_binding[fd].win;
 		if (win)
 			if (win->callbacks.on_fd_event)
-				win->callbacks.on_fd_event(win, fd, g_events[i].events);
+				win->callbacks.on_fd_event(win, fd, g_events[i].events, g_fd_binding[fd].user_data);
 	}
 	g_event_count = 0;
 
@@ -466,19 +472,21 @@ void glplatform_destroy_window(struct glplatform_win *win)
 	free(win);
 }
 
-void glplatform_fd_bind(int fd, struct glplatform_win *win)
+void glplatform_fd_bind(int fd, struct glplatform_win *win, intptr_t user_data)
 {
 	struct epoll_event ev;
 	ev.events = EPOLLIN | EPOLLOUT | EPOLLET;
 	ev.data.fd = fd;
 	epoll_ctl(glplatform_epoll_fd, EPOLL_CTL_ADD, fd, &ev);
-	g_fd_binding[fd] = win;
+	g_fd_binding[fd].win = win;
+	g_fd_binding[fd].user_data = user_data;
 }
 
 void glplatform_fd_unbind(int fd)
 {
 	epoll_ctl(glplatform_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-	g_fd_binding[fd] = NULL;
+	g_fd_binding[fd].win = NULL;
+	g_fd_binding[fd].user_data = 0;
 }
 
 void glplatform_show_window(struct glplatform_win *win)

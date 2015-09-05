@@ -170,8 +170,11 @@ struct glplatform_win_callbacks {
 	 * 	EPOLLERR: File descriptor encountered an error
 	 *
 	 * 	EPOLLRDHUP: Peer closed connection
+	 *
+	 * user_data - User data value passed to glplatform_fd_bind()
+	 *
 	 */
-	void (*on_fd_event)(struct glplatform_win *, int fd, uint32_t event);
+	void (*on_fd_event)(struct glplatform_win *, int fd, uint32_t event, intptr_t user_data);
 
 	/*
 	 * on_x_event(event)
@@ -311,8 +314,14 @@ bool glplatform_process_events();
  * supplied file descriptor's read, write, or error status
  * changes.
  *
+ * fd - File descriptor to bind
+ *
+ * win - Window to bind to the file descriptor
+ *
+ * user_data - Data to pass to the on_fd_event() callback
+ *
  */
-void glplatform_fd_bind(int fd, struct glplatform_win *win);
+void glplatform_fd_bind(int fd, struct glplatform_win *win, intptr_t user_data);
 
 
 /*
