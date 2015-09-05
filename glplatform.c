@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <errno.h>
 
-#define GLB_ENABLE_GLX_ARB_create_context
-#define GLB_ENABLE_GLX_ARB_create_context_profile
-#include "glb-glx.h"
+#define GLPLATFORM_ENABLE_GLX_ARB_create_context
+#define GLPLATFORM_ENABLE_GLX_ARB_create_context_profile
+#include "glplatform-glx.h"
 
 int glplatform_epoll_fd;
 
@@ -200,7 +200,7 @@ bool glplatform_init()
 	glplatform_epoll_fd = epoll_create1(0);
 	g_display = XOpenDisplay(NULL);
 	g_x11_fd = XConnectionNumber(g_display);
-	glb_glx_init(1, 4);
+	glplatform_glx_init(1, 4);
 
 	struct rlimit rl;
 	int rc = getrlimit(RLIMIT_NOFILE, &rl);

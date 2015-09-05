@@ -1,5 +1,5 @@
 #include "glplatform.h"
-#include "glb-glcore.h"
+#include "glplatform-glcore.h"
 
 #include <stdlib.h>
 
@@ -44,7 +44,7 @@ int main()
 	if (!ctx)
 		exit(-1);
 	glplatform_make_current(win, ctx);
-	if (!glb_glcore_init(3, 3)) {
+	if (!glplatform_glcore_init(3, 3)) {
 		exit(-1);
 	}
 	while (glplatform_process_events()) {
