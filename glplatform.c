@@ -21,9 +21,10 @@ static Display *g_display;
 static int g_screen;
 static Atom g_delete_atom;
 
-struct glplatform_win *g_win_list = NULL;
-int g_glplatform_win_count = 0;
-struct glplatform_win **g_fd_binding;
+static struct glplatform_win *g_win_list = NULL;
+static int g_glplatform_win_count = 0;
+static int g_max_fd = 0;
+static struct glplatform_win **g_fd_binding;
 
 static struct glplatform_win *find_glplatform_win(Window w)
 {
@@ -39,6 +40,7 @@ static struct glplatform_win *find_glplatform_win(Window w)
 static void retire_glplatform_win(struct glplatform_win *win)
 {
 	struct glplatform_win *pos = g_win_list;
+	int i;
 	while (win) {
 		if (pos == win) {
 			*(pos->pprev) = pos->next;
@@ -48,6 +50,14 @@ static void retire_glplatform_win(struct glplatform_win *win)
 			break;
 		}
 		pos = pos->next;
+	}
+
+	//Note: This is ineffient but we shouldn't be
+	//destroying windows very often.
+	for (i = 0; i < g_max_fd; i++) {
+		if (g_fd_binding[i] == win) {
+			glplatform_fd_unbind(i);
+		}
 	}
 }
 
@@ -85,27 +95,14 @@ bool glplatform_is_button_pressed(struct glplatform_win *win, int button)
 	return false;
 }
 
-bool glplatform_is_modifier_pressed(struct glplatform_win *win, int mod)
+bool glplatform_is_shift_pressed(struct glplatform_win *win)
 {
-	switch (mod)
-	{
-	case 1:
-		return win->x_state_mask & Mod1Mask;
-		break;
-	case 2:
-		return win->x_state_mask & Mod2Mask;
-		break;
-	case 3:
-		return win->x_state_mask & Mod3Mask;
-		break;
-	case 4:
-		return win->x_state_mask & Mod4Mask;
-		break;
-	case 5:
-		return win->x_state_mask & Mod5Mask;
-		break;
-	}
-	return false;
+	return win->x_state_mask & ShiftMask;
+}
+
+bool glplatform_is_control_pressed(struct glplatform_win *win)
+{
+	return win->x_state_mask & ControlMask;
 }
 
 static int handle_x_event(struct glplatform_win *win, XEvent *event)
@@ -210,6 +207,7 @@ bool glplatform_init()
 	if (rc)
 		return false;
 
+	g_max_fd = rl.rlim_max;
 	g_fd_binding = (struct glplatform_win **)calloc(rl.rlim_max, sizeof(struct glplatform_win *));
 	struct epoll_event ev;
 	ev.events = EPOLLIN;
@@ -465,6 +463,7 @@ void glplatform_destroy_window(struct glplatform_win *win)
 	XSync(g_display, 0);
 	XDestroyWindow(g_display, win->window);
 	retire_glplatform_win(win);
+	free(win);
 }
 
 void glplatform_fd_bind(int fd, struct glplatform_win *win)
