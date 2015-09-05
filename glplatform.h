@@ -3,31 +3,188 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <X11/Xlib.h>
 
 struct glplatform_win;
 
 typedef void * glplatform_gl_context_t;
 
 /*
- * epoll file descriptor used for event waiting. Can be used to integrate 
- * glplatform into a different event loop.
+ * int glplatform_epoll_fd;
+ *
+ * epoll file descriptor used by glplatform for event waiting. Can be used to
+ * integrate glplatform into a different event loop.
  *
  */
 extern int glplatform_epoll_fd;
 
+/*
+ * struct glplatform_win_callbacks
+ *
+ * Callbacks for windows created by glplatform
+ *
+ */
 struct glplatform_win_callbacks {
+	/*
+	 * on_create(win)
+	 *
+	 * Called when the window is created.
+	 *
+	 * win - Window
+	 *
+	 */
 	void (*on_create)(struct glplatform_win *win);
+
+	/*
+	 * on_resize(win)
+	 *
+	 * Called when window is resized. The new window
+	 * size can be read from the window structure.
+	 *
+	 * win - Window
+	 *
+	 */
 	void (*on_resize)(struct glplatform_win *win);
+
+	/*
+	 * on_expose(win)
+	 *
+	 * Called when a part of the window was hidden and is
+	 * now exposed.
+	 *
+	 * win - Window
+	 *
+	 */
 	void (*on_expose)(struct glplatform_win *win);
-	void (*on_mouse_button_up)(struct glplatform_win *, int, int, int);
-	void (*on_mouse_button_down)(struct glplatform_win *, int, int, int);
-	void (*on_mouse_move)(struct glplatform_win *, int, int);
-	void (*on_mouse_wheel)(struct glplatform_win *, int, int, int);
-	void (*on_key_down)(struct glplatform_win *, int);
-	void (*on_key_up)(struct glplatform_win *, int);
+
+	/*
+	 *
+	 * on_mouse_button_up(win, button_num, mouse_x, mouse_y)
+	 *
+	 * Called when a mouse button is released
+	 *
+	 * win - Window
+	 *
+	 * button_num - Button released
+	 *
+	 * mouse_x,mouse_y - Mouse position
+	 *
+	 */
+	void (*on_mouse_button_up)(struct glplatform_win *, int button_num, int mouse_x, int mouse_y);
+
+	/*
+	 *
+	 * on_mouse_button_down(win, button_num, mouse_x, mouse_y)
+	 *
+	 * Called when a mouse button is pressed
+	 *
+	 * win - Window
+	 *
+	 * button_num - Button pressed
+	 *
+	 * mouse_x,mouse_y - Mouse position
+	 *
+	 */
+	void (*on_mouse_button_down)(struct glplatform_win *, int button_num, int mouse_x, int mouse_y);
+
+	/*
+	 *
+	 * on_mouse_button_move(win, button_num, mouse_x, mouse_y)
+	 *
+	 * Called when the mouse moves in the window area
+	 *
+	 * win - Window
+	 *
+	 * mouse_x,mouse_y - Mouse position
+	 *
+	 */
+	void (*on_mouse_move)(struct glplatform_win *, int mouse_x, int mouse_y);
+
+	/*
+	 *
+	 * on_mouse_wheel(win, button_num, mouse_x, mouse_y, delta)
+	 *
+	 * Called when the mouse wheel changes position
+	 *
+	 * win - window
+	 *
+	 * mouse_x,mouse_y - Mouse position
+	 *
+	 * delta - Direction the mouse wheel moved.
+	 *
+	 * 	+1: Mouse wheel moved up
+	 *
+	 * 	-1: Mouse wheel moved down
+	 */
+	void (*on_mouse_wheel)(struct glplatform_win *, int mouse_x, int mouse_y, int delta);
+
+	/*
+	 * on_key_down(win, key)
+	 *
+	 * Called when a key is pressed
+	 *
+	 * win - Window
+	 *
+	 * key - ASCII value of key pressed
+	 *
+	 */
+	void (*on_key_down)(struct glplatform_win *, int key);
+
+	/*
+	 * on_key_down(win, key)
+	 *
+	 * Called when a key is released
+	 *
+	 * win - Window
+	 *
+	 * key - ASCII code of key released
+	 *
+	 */
+	void (*on_key_up)(struct glplatform_win *, int key);
+
+	/*
+	 * on_destroy(win)
+	 *
+	 * Called when the window's close button has been pressed
+	 *
+	 * win - Window
+	 *
+	 */
 	void (*on_destroy)(struct glplatform_win *);
-	void (*on_fd_event)(struct glplatform_win *, int, uint32_t);
-	void (*on_x_event)();
+
+	/*
+	 * on_fd_event(win, fd, event)
+	 *
+	 * Called when the window's close button has been pressed
+	 *
+	 * win - Window
+	 *
+	 * fd - File descriptor that changed status
+	 *
+	 * event - Event mask returned from epoll(). See 'man epoll_ctl' for full descriptions.
+	 *
+	 * 	EPOLLIN: File descriptor has become readable
+	 *
+	 * 	EPOLLOUT: File descriptor has become writable
+	 *
+	 * 	EPOLLERR: File descriptor encountered an error
+	 *
+	 * 	EPOLLRDHUP: Peer closed connection
+	 */
+	void (*on_fd_event)(struct glplatform_win *, int fd, uint32_t event);
+
+	/*
+	 * on_x_event(event)
+	 *
+	 * Called for all X event's processed. Can be used to process events
+	 * not processed by glplatform.
+	 *
+	 * win - Window
+	 *
+	 * event - X event
+	 *
+	 */
+	void (*on_x_event)(struct glplatform_win *, XEvent *event);
 };
 
 struct glplatform_win {

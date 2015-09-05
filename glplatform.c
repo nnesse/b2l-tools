@@ -190,7 +190,7 @@ static int handle_x_event(struct glplatform_win *win, XEvent *event)
 		break;
 	}
 	if (win->callbacks.on_x_event)
-		win->callbacks.on_x_event(win);
+		win->callbacks.on_x_event(win, event);
 	return 0;
 }
 
