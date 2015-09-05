@@ -8,7 +8,7 @@
 gltext_renderer_t g_renderer;
 gltext_font_t g_font;
 
-void on_expose(struct glwin *win)
+void on_expose(struct glplatform_win *win)
 {
 	int width, height;
 	width = win->width;
@@ -25,7 +25,7 @@ void on_expose(struct glwin *win)
 	const char *str = "The quick brown fox jumps over the lazy dog()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
 	struct gltext_glyph_instance *r = gltext_renderer_prepare_render(g_renderer, g_font, strlen(str));
 
-	struct gltext_glyph *g_prev = NULL;
+	const struct gltext_glyph *g_prev = NULL;
 	float x_pos = 0;
 	float y_pos = 0;
 	struct gltext_color color = {
@@ -35,7 +35,7 @@ void on_expose(struct glwin *win)
 		.a = 1
 	};
 	while (*str) {
-		struct gltext_glyph *g_cur = gltext_get_glyph(g_font, *str);
+		const struct gltext_glyph *g_cur = gltext_get_glyph(g_font, *str);
 		x_pos += gltext_get_advance(g_prev, g_cur);
 		r->pos[0] = x_pos;
 		r->pos[1] = y_pos;
@@ -45,17 +45,17 @@ void on_expose(struct glwin *win)
 		g_prev = g_cur;
 	}
 	gltext_renderer_submit_render(g_renderer, &color, mvp);
-	glwin_swap_buffers(win);
+	glplatform_swap_buffers(win);
 }
 
-void on_destroy(struct glwin *win)
+void on_destroy(struct glplatform_win *win)
 {
 	glplatform_destroy_window(win);
 }
 
 int main()
 {
-	struct glwin_callbacks cb = {
+	struct glplatform_win_callbacks cb = {
 		.on_expose = on_expose,
 		.on_destroy = on_destroy
 	};
@@ -67,13 +67,13 @@ int main()
 		exit(-1);
 	}
 
-	struct glwin *win = glplatform_create_window("Simple text test", &cb, 1024, 256);
+	struct glplatform_win *win = glplatform_create_window("Simple text test", &cb, 1024, 256);
 	if (!win) {
 		fprintf(stderr, "Failed to create OpenGL window\n");
 		exit(-1);
 	}
-	glwin_show_window(win);
-	glwin_context_t ctx = glplatform_create_context(win, 3, 3);
+	glplatform_show_window(win);
+	glplatform_gl_context_t ctx = glplatform_create_context(win, 3, 3);
 	if (!ctx) {
 		fprintf(stderr, "Failed to create OpenGL context\n");
 		return 0;
