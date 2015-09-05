@@ -3,7 +3,7 @@
 
 #include "glplatform.h"
 #include "gltext.h"
-#include "glb-glcore.h"
+#include "glplatform-glcore.h"
 
 void on_destroy(struct glplatform_win *win)
 {
@@ -38,7 +38,7 @@ int main()
 		return 0;
 	}
 	glplatform_make_current(win, ctx);
-	glb_glcore_init(3, 3);
+	glplatform_glcore_init(3, 3);
 
 	font = gltext_font_create(renderer, gltext_renderer_get_typeface(renderer, TTF_PATH "/LiberationSans-Regular.ttf"), 20);
 	if (!font) {

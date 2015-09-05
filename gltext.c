@@ -4,8 +4,8 @@
 
 #include "edtaa3func.c"
 
-#define GLB_GL_VERSION 33
-#include "glb-glcore.h"
+#define GLPLATFORM_GL_VERSION 33
+#include "glplatform-glcore.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
