@@ -1,7 +1,7 @@
 glplatform
 ==========
 
-`glplatform` provides framework for developing OpenGL applications without taking control over an application's main loop. It handles window creation, event processing, OpenGL context management, and OpenGL binding management. `glplatform` is only designed to make it easy to create an OpenGL application and does not serve as general purpose platform abstraction library. At present only GNU/Linux is supported. Support for other platforms may be added later as variants of the present interface.
+`glplatform` provides a framework for developing OpenGL applications without taking control over an application's main loop. It handles window creation, event processing, OpenGL context management, and OpenGL binding management. `glplatform` is only designed to make it easy to create an OpenGL application and does not serve as general purpose platform abstraction library. At present only GNU/Linux is supported. Support for other platforms may be added later as variants of the present interface.
 
 Creating a window
 -----------------
