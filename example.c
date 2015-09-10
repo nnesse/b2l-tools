@@ -35,7 +35,7 @@ int main()
 	if (!glplatform_init()) {
 		exit(-1);
 	}
-	struct glplatform_win *win = glplatform_create_window("Hello window", &cb, 512, 512);
+	struct glplatform_win *win = glplatform_create_window("Hello window", &cb, NULL, 512, 512);
 	if (!win)
 		exit(-1);
 

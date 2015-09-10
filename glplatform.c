@@ -1,5 +1,6 @@
 #include "glplatform.h"
 
+#ifndef _WIN32
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <sys/epoll.h>
@@ -20,10 +21,16 @@ static struct epoll_event g_events[100];
 static Display *g_display;
 static int g_screen;
 static Atom g_delete_atom;
+static int g_max_fd = 0;
+#else
+
+#define GLPLATFORM_ENABLE_WGL_ARB_create_context
+#define GLPLATFORM_ENABLE_WGL_ARB_create_context_profile
+#include "glplatform-wgl.h"
+#endif
 
 static struct glplatform_win *g_win_list = NULL;
 static int g_glplatform_win_count = 0;
-static int g_max_fd = 0;
 
 struct fd_binding {
 	struct glplatform_win *win;
@@ -32,11 +39,19 @@ struct fd_binding {
 
 static struct fd_binding *g_fd_binding;
 
+#ifndef _WIN32
 static struct glplatform_win *find_glplatform_win(Window w)
+#else
+static struct glplatform_win *find_glplatform_win(HWND hwnd)
+#endif
 {
 	struct glplatform_win *win = g_win_list;
 	while (win) {
+#ifndef _WIN32
 		if (win->window == w)
+#else
+		if (win->hwnd == hwnd)
+#endif
 			return win;
 		win = win->next;
 	}
@@ -46,7 +61,6 @@ static struct glplatform_win *find_glplatform_win(Window w)
 static void retire_glplatform_win(struct glplatform_win *win)
 {
 	struct glplatform_win *pos = g_win_list;
-	int i;
 	while (win) {
 		if (pos == win) {
 			*(pos->pprev) = pos->next;
@@ -58,18 +72,25 @@ static void retire_glplatform_win(struct glplatform_win *win)
 		pos = pos->next;
 	}
 
+#ifndef _WIN32
 	//Note: This is ineffient but we shouldn't be
 	//destroying windows very often.
+	int i;
 	for (i = 0; i < g_max_fd; i++) {
 		if (g_fd_binding[i].win == win) {
 			glplatform_fd_unbind(i);
 		}
 	}
+#endif
 }
 
 static void register_glplatform_win(struct glplatform_win *win)
 {
+#ifdef _WIN32
+	struct glplatform_win *test = find_glplatform_win(win->hwnd);
+#else
 	struct glplatform_win *test = find_glplatform_win(win->window);
+#endif
 	if (test)
 		return;
 	g_glplatform_win_count++;
@@ -84,6 +105,7 @@ static void on_mouse_wheel(struct glplatform_win *win, int x, int y, int a)
 		win->callbacks.on_mouse_wheel(win, x, y, a);
 }
 
+#ifndef _WIN32
 bool glplatform_is_button_pressed(struct glplatform_win *win, int button)
 {
 	switch (button)
@@ -199,9 +221,30 @@ static int handle_x_event(struct glplatform_win *win, XEvent *event)
 		win->callbacks.on_x_event(win, event);
 	return 0;
 }
+#endif
 
 bool glplatform_init()
 {
+#ifdef _WIN32
+	glplatform_wgl_init(1, 0);
+	WNDCLASSEX wc;
+	wc.cbSize = sizeof(WNDCLASSEX);
+	wc.style = CS_VREDRAW | CS_HREDRAW;
+	wc.lpfnWndProc = PlatformWndProc;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = 0;
+	wc.lpszClassName = "glplatform";
+	wc.hIcon = NULL;
+	wc.hIconSm = NULL;
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+	wc.lpszMenuName = NULL;
+
+	if (RegisterClassEx(&wc) == 0) {
+		return false;
+	}
+#else
 	g_event_count = 0;
 	glplatform_epoll_fd = epoll_create1(0);
 	g_display = XOpenDisplay(NULL);
@@ -223,15 +266,172 @@ bool glplatform_init()
 	g_screen = DefaultScreen(g_display);
 	g_delete_atom = XInternAtom(g_display, "WM_DELETE_WINDOW", True);
 	return true;
+#endif
 }
 
 void glplatform_shutdown()
 {
+#ifndef _WIN32
 	XCloseDisplay(g_display);
+#endif
 }
 
-struct glplatform_win *glplatform_create_window(const char *title, struct glplatform_win_callbacks *callbacks, int width, int height)
+#ifdef _WIN32
+
+static LRESULT CALLBACK windows_event(struct glplatform_win *win, HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+
+static LRESULT CALLBACK PlatformWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
+	struct glplatform_win *win;
+	if (Msg == WM_CREATE) {
+		CREATESTRUCT *cs = (CREATESTRUCT *) lParam;
+		win = (struct glplatform_win *)cs->lpCreateParams;
+		SetWindowLongPtr(hWnd, -21/* GLW_USERDATA */, (LONG_PTR)win);
+	} else {
+		win = (struct glplatform_win *)GetWindowLongPtr(hWnd, -21 /* GLW_USERDATA */);
+	}
+
+	if (win) {
+		return windows_event(win, hWnd, Msg, wParam, lParam);
+	} else {
+		return DefWindowProc(hWnd, Msg, wParam, lParam);;
+	}
+}
+
+static LRESULT CALLBACK windows_event(struct glplatform_win *win, HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
+{
+	RECT cr;
+
+	GetClientRect(hWnd, &cr);
+
+	switch (Msg) {
+	case WM_PAINT: {
+		//on_redraw();
+		ValidateRect(hWnd, NULL);
+	} break;
+	case WM_SIZE:{
+		int width = LOWORD(lParam);
+		int height = HIWORD(lParam);
+	} break;
+	case WM_CREATE:{
+		int width = cr.right;
+		int height = cr.bottom;
+		win->hdc = GetDC(hWnd);
+		win->hwnd = hWnd;
+		static PIXELFORMATDESCRIPTOR pfd;
+		memset(&pfd, 0, sizeof(PIXELFORMATDESCRIPTOR));
+		pfd.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+		pfd.nVersion = 1;
+		pfd.dwFlags = PFD_DRAW_TO_WINDOW |		//window drawing support
+			PFD_SUPPORT_OPENGL |	//opengl support
+			PFD_DOUBLEBUFFER;
+		pfd.iPixelType = PFD_TYPE_RGBA;
+		pfd.cColorBits = win->fbformat.color_bits;
+		pfd.cAlphaBits = win->fbformat.alpha_bits;
+		pfd.cStencilBits = win->fbformat.stencil_bits;
+		pfd.cAccumBits = win->fbformat.accum_bits;
+		pfd.cDepthBits = win->fbformat.depth_bits;
+
+		win->pixel_format = ChoosePixelFormat(win->hdc, &pfd);
+		if (win->pixel_format == 0) {
+			return -1;
+		}
+		if (SetPixelFormat(win->hdc, win->pixel_format, &pfd) == FALSE) {
+			return -1;
+		}
+	} break;
+	case WM_KEYDOWN:{
+		WPARAM key = wParam;
+	} break;
+	case WM_KEYUP:{
+		WPARAM key = wParam;
+	} break;
+	case WM_LBUTTONDOWN:{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+	} break;
+	case WM_LBUTTONUP:{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+	} break;
+	case WM_RBUTTONDOWN:{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+	} break;
+	case WM_RBUTTONUP:{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+	} break;
+	case WM_MOUSEMOVE:{
+		ShowCursor(FALSE);
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		int lbutton_down = wParam & MK_LBUTTON;
+	        int rbutton_down = wParam & MK_RBUTTON;
+	} break;
+	case WM_MOUSEWHEEL:{
+		int x = GET_X_LPARAM(lParam);
+		int y = GET_Y_LPARAM(lParam);
+		int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+	} break;
+	case WM_CLOSE:{
+	} break;
+	case WM_DESTROY:{
+		//PostQuitMessage(0);
+	} break;
+	default:{
+		return DefWindowProc(hWnd, Msg, wParam, lParam);
+	} break;
+	}
+	return 0;
+}
+#endif
+
+struct glplatform_win *glplatform_create_window(const char *title,
+		const struct glplatform_win_callbacks *callbacks,
+		const struct glplatform_fbformat *fbformat,
+		int width, int height)
+{
+	static struct glplatform_fbformat default_fbformat = {
+		.color_bits = 24,
+		.alpha_bits = 8,
+		.stencil_bits = 8,
+		.depth_bits = 24,
+		.accum_bits = 0
+	};
+
+	if (fbformat == NULL) {
+		fbformat = &default_fbformat;
+	}
+
+	if (fbformat->color_bits % 3)
+		return NULL;
+
+	struct glplatform_win *win = (struct glplatform_win *) malloc(sizeof(struct glplatform_win));
+	win->fbformat = *fbformat;
+	win->callbacks = *callbacks;
+
+#ifdef _WIN32
+	RECT wr = { 0, 0, width, height };
+	AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+
+	HWND hwnd = CreateWindow("glplatform",
+				 title,
+				 WS_OVERLAPPEDWINDOW,
+				 CW_USEDEFAULT,
+				 CW_USEDEFAULT,
+				 wr.right - wr.left,
+				 wr.bottom - wr.top,
+				 NULL,
+				 NULL,
+				 0,
+				 win);
+
+	if (hwnd == NULL) {
+		free(win);
+		return NULL;
+	}
+#else
 	GLXFBConfig fb_config;
 	Window window;
 	GLXWindow glx_window;
@@ -241,12 +441,12 @@ struct glplatform_win *glplatform_create_window(const char *title, struct glplat
 		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
 		GLX_RENDER_TYPE, GLX_RGBA_BIT,
 		GLX_DOUBLEBUFFER, 1,
-		GLX_RED_SIZE, 8,
-		GLX_GREEN_SIZE, 8,
-		GLX_BLUE_SIZE, 8,
-		GLX_ALPHA_SIZE, 8,
-		GLX_STENCIL_SIZE, 8,
-		GLX_DEPTH_SIZE, 24,
+		GLX_RED_SIZE, fbformat->color_bits / 3,
+		GLX_GREEN_SIZE, fbformat->color_bits / 3,
+		GLX_BLUE_SIZE, fbformat->color_bits / 3,
+		GLX_ALPHA_SIZE, fbformat->alpha_bits,
+		GLX_STENCIL_SIZE, fbformat->stencil_bits,
+		GLX_DEPTH_SIZE, fbformat->depth_bits,
 		GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT,
 
 		/* terminator */
@@ -305,14 +505,12 @@ struct glplatform_win *glplatform_create_window(const char *title, struct glplat
 		     StructureNotifyMask |
 		     SubstructureNotifyMask);
 
-	struct glplatform_win *win = (struct glplatform_win *) malloc(sizeof(struct glplatform_win));
 	win->width = width;
 	win->height = height;
 	win->fb_config = fb_config;
 	win->window = window;
 	win->glx_window = glx_window;
-	win->callbacks = *callbacks;
-
+#endif
 	register_glplatform_win(win);
 	if (win->callbacks.on_create)
 		win->callbacks.on_create(win);
@@ -320,6 +518,7 @@ struct glplatform_win *glplatform_create_window(const char *title, struct glplat
 	return win;
 }
 
+#ifndef _WIN32
 void glplatform_set_win_transient_for(struct glplatform_win *win, intptr_t id)
 {
 	XSetTransientForHint(g_display, win->window, id);
@@ -356,23 +555,41 @@ void glplatform_set_win_type(struct glplatform_win *win, enum glplatform_win_typ
 		(const unsigned char *)&type_atom,
 		1);
 }
+#endif
 
 void glplatform_make_current(struct glplatform_win *win, glplatform_gl_context_t context)
 {
-	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, context);
+#ifdef _WIN32
+	wglMakeCurrent(win->hdc, (HGLRC)context);
+#else
+	glXMakeContextCurrent(g_display, win->glx_window, win->glx_window, (void *)context);
+#endif
 }
 
 glplatform_gl_context_t glplatform_create_context(struct glplatform_win *win, int maj_ver, int min_ver)
 {
+#ifdef _WIN32
+	int attribList[] = {
+		WGL_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
+		WGL_CONTEXT_MINOR_VERSION_ARB, min_ver,
+		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+		0
+	};
+
+	HGLRC rc = wglCreateContextAttribsARB(win->hdc, 0, attribList);
+	return rc;
+#else
 	int attribList[] = {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
 		GLX_CONTEXT_MINOR_VERSION_ARB, min_ver,
 		GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
 		0
 	};
-	return glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
+	return (glplatform_gl_context_t)glXCreateContextAttribsARB(g_display, win->fb_config, 0, 1, attribList);
+#endif
 }
 
+#ifndef _WIN32
 void glplatform_fullscreen_win(struct glplatform_win *win, bool fullscreen)
 {
 	XWindowAttributes attr;
@@ -420,9 +637,22 @@ static Bool match_any_event(Display *display, XEvent *event, XPointer arg)
 {
 	return True;
 }
+#endif
 
 int glplatform_get_events(bool block)
 {
+#ifdef _WIN32
+	if (block) {
+		if (WaitMessage()) {
+			return -1;
+		} else {
+			return 1;
+		}
+	} else {
+		MSG Msg;
+		return PeekMessage(&Msg, NULL, 0, 0, PM_NOREMOVE);
+	}
+#else
 	int rc = 0;
 	if (g_event_count < 100) {
 		rc = epoll_wait(glplatform_epoll_fd, g_events + g_event_count, 100 - g_event_count, block ? -1 : 0);
@@ -433,10 +663,21 @@ int glplatform_get_events(bool block)
 		}
 	}
 	return rc;
+#endif
 }
 
 bool glplatform_process_events()
 {
+#ifdef _WIN32
+	MSG Msg;
+	while (PeekMessage(&Msg, NULL, 0, 0, PM_REMOVE)) {
+		if (Msg.message == WM_QUIT) {
+			return false;
+		}
+		TranslateMessage(&Msg);
+		DispatchMessage(&Msg);
+	}
+#else
 	XEvent event;
 	int i;
 	for (i = 0; i < g_event_count; i++) {
@@ -453,25 +694,36 @@ bool glplatform_process_events()
 		if (win)
 			handle_x_event(win, &event);
 	}
+#endif
 	return g_glplatform_win_count > 0;
 }
 
 void glplatform_swap_buffers(struct glplatform_win *win)
 {
+#ifdef _WIN32
+	SwapBuffers(win->hdc);
+#else
 	glXSwapBuffers(g_display, win->glx_window);
 	XSync(g_display, 0);
+#endif
 }
 
 void glplatform_destroy_window(struct glplatform_win *win)
 {
+#ifdef _WIN32
+	wglMakeCurrent(win->hdc, 0);
+	DestroyWindow(win->hwnd);
+#else
 	glXMakeContextCurrent(g_display, None, None, NULL);
 	glXDestroyWindow(g_display, win->glx_window);
 	XSync(g_display, 0);
 	XDestroyWindow(g_display, win->window);
+#endif
 	retire_glplatform_win(win);
 	free(win);
 }
 
+#ifndef _WIN32
 void glplatform_fd_bind(int fd, struct glplatform_win *win, intptr_t user_data)
 {
 	struct epoll_event ev;
@@ -488,13 +740,20 @@ void glplatform_fd_unbind(int fd)
 	g_fd_binding[fd].win = NULL;
 	g_fd_binding[fd].user_data = 0;
 }
+#endif
 
 void glplatform_show_window(struct glplatform_win *win)
 {
+#ifdef _WIN32
+	ShowWindow(win->hwnd, SW_SHOWNORMAL);
+	UpdateWindow(win->hwnd);
+#else
 	XMapWindow(g_display, win->window);
 	XSync(g_display, 0);
+#endif
 }
 
+#ifndef _WIN32
 void glplatform_get_thread_state(struct glplatform_thread_state *state)
 {
 	state->write_draw = glXGetCurrentDrawable();
@@ -510,3 +769,4 @@ void glplatform_set_thread_state(const struct glplatform_thread_state *state)
 			state->read_draw,
 			state->context);
 }
+#endif

@@ -3,11 +3,16 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#ifdef _WIN32
+#include <Windows.h>
+#else
 #include <X11/Xlib.h>
+#endif
 
 struct glplatform_win;
 
-typedef void * glplatform_gl_context_t;
+typedef intptr_t glplatform_gl_context_t;
 
 /*
  * int glplatform_epoll_fd;
@@ -176,6 +181,7 @@ struct glplatform_win_callbacks {
 	 */
 	void (*on_fd_event)(struct glplatform_win *, int fd, uint32_t event, intptr_t user_data);
 
+#ifndef _WIN32
 	/*
 	 * on_x_event(event)
 	 *
@@ -188,26 +194,44 @@ struct glplatform_win_callbacks {
 	 *
 	 */
 	void (*on_x_event)(struct glplatform_win *, XEvent *event);
+#endif
+};
+
+struct glplatform_fbformat {
+	int color_bits;
+	int alpha_bits;
+	int stencil_bits;
+	int depth_bits;
+	int accum_bits;
 };
 
 struct glplatform_win {
-	uint32_t window; //Window
+#ifdef _WIN32
+	int pixel_format;
+	HDC hdc;
+	HWND hwnd;
+#else
+	uint32_t window; //Window xid
 	void *fb_config; //GLXFBConfig
 	uint32_t glx_window; //GLXWindow
+	int x_state_mask;
+#endif
+	struct glplatform_fbformat fbformat;
 	struct glplatform_win_callbacks callbacks;
 	int width;
 	int height;
-	int x_state_mask;
 	struct glplatform_win *next;
 	struct glplatform_win **pprev;
 };
 
+#ifndef _WIN32
 struct glplatform_thread_state {
 	void *display;
 	void *context;
 	uint32_t read_draw;
 	uint32_t write_draw;
 };
+#endif
 
 /*
  * glplatform_init()
@@ -243,7 +267,8 @@ void glplatform_shutdown();
  *
  */
 struct glplatform_win *glplatform_create_window(const char *title,
-		struct glplatform_win_callbacks *callbacks,
+		const struct glplatform_win_callbacks *callbacks,
+		const struct glplatform_fbformat *fbformat,
 		int width,
 		int height);
 
@@ -283,7 +308,8 @@ void glplatform_set_thread_state(const struct glplatform_thread_state *state);
  * Collect events into glplatform's internal queue. If 'block' is set to true
  * then wait until an event occurs.
  *
- * Returns the number of events queued or -1 on error
+ * Returns non-zero if events have been queued. Returns zero if no events are queued
+ * and negative on error.
  *
  */
 int glplatform_get_events(bool block);
