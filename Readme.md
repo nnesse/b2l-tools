@@ -1,12 +1,12 @@
 glplatform
 ==========
 
-`glplatform` provides a framework for developing OpenGL applications without taking control over an application's main loop. It handles window creation, event processing, OpenGL context management, and OpenGL binding management. `glplatform` is only designed to make it easy to create an OpenGL application and does not serve as general purpose platform abstraction library. At present only GNU/Linux is supported. Support for other platforms may be added later as variants of the present interface.
+`glplatform` provides a framework for developing OpenGL applications without taking control over the application's main loop. It handles window creation, event processing, OpenGL context management, and OpenGL binding management. `glplatform` is designed to make it easy to create an OpenGL application but does not serve as general purpose platform abstraction library. At present only GNU/Linux is supported. Support for other platforms may be added later as variants of the present interface.
 
 Creating a window
 -----------------
 
-An window can be created in by calling glplatform_create_window() specifying its title, initial dimentions, and a structure containing event callbacks. The event callbacks will be called inside `glplatform_process_events()` (see below).
+An window can be created in by calling `glplatform_create_window()` specifying its title, initial dimentions, framebuffer format, and a structure containing event callbacks. If no framebuffer format is specified then a framebuffer 24-bit color buffer and a 24-bit depth buffer will be requested. The event callbacks will be called inside `glplatform_process_events()` (see below).  
 
 Example: Create a "Hello world" window
 
@@ -21,7 +21,7 @@ Example: Create a "Hello world" window
 			.on_key_down = on_key_down
 		};
 
-		struct glplatform_win *win = glplatform_create_window("Hello window", &cb, 512, 512);
+		struct glplatform_win *win = glplatform_create_window("Hello window", &cb, NULL, 512, 512);
 		//...
 	}
 
@@ -46,7 +46,7 @@ If false is passed into `glplatform_get_events()` then `glplatform` will not blo
 Creating an OpenGL context
 --------------------------
 
-When creating a context you must specify which OpenGL version your application requires and the window that the context will be rendering to. The version on the returned context may be higher but will be backwards compatible with the requested version. The returned context will always be a core profile context. Before OpenGL calls can be made the context must be made current with `glplatform_make_current()`. This causes call OpenGL commands on the current thread to operate in the context.
+When creating a context you must specify which OpenGL version your application requires and the window that the context will be rendering to. The version on the returned context may be higher but will be backwards compatible with the requested version. The returned context will always be a core profile context. Before OpenGL calls can be made the context must be made current with `glplatform_make_current()`. This causes OpenGL commands in the current thread to operate in the context.
 
 Example: Creating a OpenGL 3.3 core profile compatible context
 

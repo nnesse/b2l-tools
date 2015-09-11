@@ -261,6 +261,10 @@ void glplatform_shutdown();
  *
  * callbacks - Functions to call when window events occur
  *
+ * fbformat - Format of framebuffer requested. If NULL a 24-bit
+ * 	color buffer and 24-bit depth buffer will be requests with
+ *	no stencil, accumulation, or alpha bits.
+ *
  * width - Desired width of window
  *
  * height - Desired height of window
