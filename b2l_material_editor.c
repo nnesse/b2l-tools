@@ -11,9 +11,9 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-#define GLB_ENABLE_GL_ARB_vertex_attrib_binding
-#define GLB_ENABLE_GL_ARB_buffer_storage
-#include "glb-glcore.h"
+#define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
+#define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
+#include "glplatform-glcore.h"
 #include "glsl.tab.h"
 #include "glsl_common.h"
 
@@ -562,7 +562,7 @@ int luaopen_material_editor_capi(lua_State *L)
 static int create_glwin(lua_State *L)
 {
 	int xid = lua_tointeger(L, -1);
-	g_win = glplatform_create_window("B2L 3D View", &cb, 512, 512);
+	g_win = glplatform_create_window("B2L 3D View", &cb, NULL, 512, 512);
 	if (!g_win)
 		exit(-1);
 
@@ -780,18 +780,18 @@ static void redraw(struct glplatform_win *win)
 	static bool gl_init_result = false;
 
 	if (!gl_init_attempted) {
-		gl_init_result = glb_glcore_init(3, 3);
+		gl_init_result = glplatform_glcore_init(3, 3);
 	}
 	if (!gl_init_result) {
 		fprintf(stderr, "Failed to initialize OpenGL bindings\n");
 		exit(-1);
 		return;
 	}
-	if (!GLB_GL_ARB_buffer_storage) {
+	if (!GLPLATFORM_GL_ARB_buffer_storage) {
 		fprintf(stderr, "Missing GL extension: GL_ARB_buffer_storage\n");
 		exit(-1);
 	}
-	if (!GLB_GL_ARB_vertex_attrib_binding) {
+	if (!GLPLATFORM_GL_ARB_vertex_attrib_binding) {
 		fprintf(stderr, "Missing GL extension: GL_ARB_vertex_attrib_binding\n");
 		exit(-1);
 	}

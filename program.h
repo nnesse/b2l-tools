@@ -1,7 +1,7 @@
 #ifndef PROGRAM_H
 #define PROGRAM_H
 
-#include "glb-glcore.h"
+#include "glplatform-glcore.h"
 
 struct program {
 	const char *vertex_text;

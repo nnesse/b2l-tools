@@ -1,9 +1,9 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
-#define GLB_ENABLE_GL_ARB_vertex_attrib_binding
-#define GLB_ENABLE_GL_ARB_buffer_storage
-#include "glb-glcore.h"
+#define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
+#define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
+#include "glplatform-glcore.h"
 
 #include <stdint.h>
 enum attributes {
