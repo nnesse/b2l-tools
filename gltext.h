@@ -123,7 +123,7 @@ bool gltext_font_free(gltext_font_t font);
  * gltext_get_glyph()
  *
  * Returns a pointer to gltext_glyph structure for a specific character. The returned structure
- * does not need to be free'd and will be valid until the font is free'd. If the character is not in
+ * does not need to be deallocated and will be valid until the font is destroyed. If the character is not in
  * the renderer's charset the return value will be NULL.
  *
  */
@@ -133,11 +133,11 @@ const struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c);
  * gltext_renderer_prepare_render()
  *
  * Returns an array of uninitialized gltext_glyph_instance structures. After the values are filled
- * out the glyphs can be rendered using gltext_renderer_submit_render(). The positions of the glyphs
- * glyphs can be computed using gltext_get_advance(). The 'w' texture layer field values should
- * be taken from the 'w' field of the supplied font's associated gltext_glyph structures.
- * Undefined behavior will result if gltext_renderer_prepare_render() is called more than once
- * before calling gltext_renderer_submit_render().
+ * out by the application the glyphs can be rendered using gltext_renderer_submit_render(). The
+ * positions of the glyphs can be computed by using gltext_get_advance(). The 'w' texture layer
+ * field values should be taken from the 'w' field of the supplied font's associated gltext_glyph
+ * structures. Undefined behavior will result if gltext_renderer_prepare_render() is called more
+ * than once before calling gltext_renderer_submit_render().
  */
  struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t renderer, gltext_font_t font, int num_chars);
 
@@ -151,7 +151,7 @@ const struct gltext_glyph *gltext_get_glyph(gltext_font_t font_, char c);
   * mvp - 4x4 column order "Model-View-Proection" matrix to position the glyphs.
   *
   * To position a glyph at (0,0) to window coordinate (x,y) you would use the mvp
-  * matrix where (width,height) is the dimentions of the display:
+  * matrix where (width, height) is the dimentions of the display:
   *
   * {2.0/width          , 0,                 ,0 ,0,
   *  0                  , 2.0/height         ,0 ,0,
