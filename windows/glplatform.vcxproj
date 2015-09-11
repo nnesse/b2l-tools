@@ -133,7 +133,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\glplatform.c" />
+    <ClCompile Include="..\glplatform-win32.c" />
     <ClCompile Include="glplatform-glcore.c" />
     <ClCompile Include="glplatform-wgl.c" />
   </ItemGroup>

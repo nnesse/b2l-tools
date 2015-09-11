@@ -21,7 +21,7 @@
     <ClCompile Include="glplatform-wgl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\glplatform.c">
+    <ClCompile Include="..\glplatform-win32.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
