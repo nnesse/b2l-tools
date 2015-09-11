@@ -87,3 +87,20 @@ Example: Initializing OpenGL bindings
 
 See the `glbindify` documentation for details. Note that `glplatform` uses the namespace feature of `glbindify` so where the documentation refers to `glb` or `GLB` you should substitute `glplatform` or `GLPLATFORM`
 respectively.
+
+Building
+--------
+
+On GNU/Linux systems `glplatform` can be built with it's autotools build system.
+
+	./autogen.sh
+	./configure <options>
+	make
+	make install
+
+On GNU/Linux systems `glbindify` must be installed to generate the OpenGL and glX bindings.
+
+On Windows systems `glplatform` can be built as a static library using the Visual Studio solution found in the `windows` folder. As a convienence the `windows` folder also contains pre-generated bindings for OpenGL and wgl. If you have `glbindify` you can regenerate them by running: 
+
+	glbindify.exe -a gl -n glplatform
+	glbindify.exe -a wgl -n glplatform
