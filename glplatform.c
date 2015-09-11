@@ -146,10 +146,12 @@ static int handle_x_event(struct glplatform_win *win, XEvent *event)
 				win->callbacks.on_mouse_button_down(win, button_event->button, button_event->x, button_event->y);
 			break;
 		case 4:
-			on_mouse_wheel(win, button_event->x, button_event->y, -1);
+			if (win->callbacks.on_mouse_wheel)
+				win->callbacks.on_mouse_wheel(win, button_event->x, button_event->y, -1);
 			break;
 		case 5:
-			on_mouse_wheel(win, button_event->x, button_event->y, 1);
+			if (win->callbacks.on_mouse_wheel)
+				win->callbacks.on_mouse_wheel(win, button_event->x, button_event->y, 1);
 			break;
 		}
 	} break;
