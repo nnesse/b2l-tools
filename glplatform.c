@@ -27,6 +27,11 @@ static int g_max_fd = 0;
 #define GLPLATFORM_ENABLE_WGL_ARB_create_context
 #define GLPLATFORM_ENABLE_WGL_ARB_create_context_profile
 #include "glplatform-wgl.h"
+
+#include <windowsx.h>
+
+static LRESULT CALLBACK PlatformWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+
 #endif
 
 static struct glplatform_win *g_win_list = NULL;
@@ -226,7 +231,6 @@ static int handle_x_event(struct glplatform_win *win, XEvent *event)
 bool glplatform_init()
 {
 #ifdef _WIN32
-	glplatform_wgl_init(1, 0);
 	WNDCLASSEX wc;
 	wc.cbSize = sizeof(WNDCLASSEX);
 	wc.style = CS_VREDRAW | CS_HREDRAW;
@@ -244,6 +248,7 @@ bool glplatform_init()
 	if (RegisterClassEx(&wc) == 0) {
 		return false;
 	}
+	return true;
 #else
 	g_event_count = 0;
 	glplatform_epoll_fd = epoll_create1(0);
@@ -306,12 +311,17 @@ static LRESULT CALLBACK windows_event(struct glplatform_win *win, HWND hWnd, UIN
 
 	switch (Msg) {
 	case WM_PAINT: {
-		//on_redraw();
+		if (win->callbacks.on_expose)
+			win->callbacks.on_expose(win);
 		ValidateRect(hWnd, NULL);
 	} break;
 	case WM_SIZE:{
 		int width = LOWORD(lParam);
 		int height = HIWORD(lParam);
+		win->width = width;
+		win->height = height;
+		if (win->callbacks.on_resize)
+			win->callbacks.on_resize(win);
 	} break;
 	case WM_CREATE:{
 		int width = cr.right;
@@ -342,43 +352,63 @@ static LRESULT CALLBACK windows_event(struct glplatform_win *win, HWND hWnd, UIN
 	} break;
 	case WM_KEYDOWN:{
 		WPARAM key = wParam;
+		if (win->callbacks.on_key_down)
+			win->callbacks.on_key_down(win, (int)key);
 	} break;
 	case WM_KEYUP:{
 		WPARAM key = wParam;
+		if (win->callbacks.on_key_up)
+			win->callbacks.on_key_up(win, (int)key);
 	} break;
 	case WM_LBUTTONDOWN:{
 		int x = GET_X_LPARAM(lParam);
 		int y = GET_Y_LPARAM(lParam);
+		if (win->callbacks.on_mouse_button_down)
+			win->callbacks.on_mouse_button_down(win, 0, x, y);
 	} break;
 	case WM_LBUTTONUP:{
 		int x = GET_X_LPARAM(lParam);
 		int y = GET_Y_LPARAM(lParam);
+		if (win->callbacks.on_mouse_button_up)
+			win->callbacks.on_mouse_button_up(win, 0, x, y);
 	} break;
 	case WM_RBUTTONDOWN:{
 		int x = GET_X_LPARAM(lParam);
 		int y = GET_Y_LPARAM(lParam);
+		if (win->callbacks.on_mouse_button_down)
+			win->callbacks.on_mouse_button_down(win, 2, x, y);
 	} break;
 	case WM_RBUTTONUP:{
 		int x = GET_X_LPARAM(lParam);
 		int y = GET_Y_LPARAM(lParam);
+		if (win->callbacks.on_mouse_button_up)
+			win->callbacks.on_mouse_button_up(win, 2, x, y);
 	} break;
 	case WM_MOUSEMOVE:{
 		ShowCursor(FALSE);
 		int x = GET_X_LPARAM(lParam);
 		int y = GET_Y_LPARAM(lParam);
 		int lbutton_down = wParam & MK_LBUTTON;
-	        int rbutton_down = wParam & MK_RBUTTON;
+	    int rbutton_down = wParam & MK_RBUTTON;
+		if (win->callbacks.on_mouse_move)
+			win->callbacks.on_mouse_move(win, x, y);
 	} break;
 	case WM_MOUSEWHEEL:{
 		int x = GET_X_LPARAM(lParam);
 		int y = GET_Y_LPARAM(lParam);
 		int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+		if (win->callbacks.on_mouse_wheel)
+			win->callbacks.on_mouse_wheel(win, x, y, delta/WHEEL_DELTA);
 	} break;
 	case WM_CLOSE:{
+		if (win->callbacks.on_destroy)
+			win->callbacks.on_destroy(win);
 	} break;
+	/*
 	case WM_DESTROY:{
-		//PostQuitMessage(0);
+		PostQuitMessage(0);
 	} break;
+	*/
 	default:{
 		return DefWindowProc(hWnd, Msg, wParam, lParam);
 	} break;
@@ -569,6 +599,12 @@ void glplatform_make_current(struct glplatform_win *win, glplatform_gl_context_t
 glplatform_gl_context_t glplatform_create_context(struct glplatform_win *win, int maj_ver, int min_ver)
 {
 #ifdef _WIN32
+
+	HGLRC temp = wglCreateContext(win->hdc);
+	wglMakeCurrent(win->hdc, temp);
+	glplatform_wgl_init(1, 0);
+	wglDeleteContext(temp);
+
 	int attribList[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
 		WGL_CONTEXT_MINOR_VERSION_ARB, min_ver,
@@ -577,7 +613,7 @@ glplatform_gl_context_t glplatform_create_context(struct glplatform_win *win, in
 	};
 
 	HGLRC rc = wglCreateContextAttribsARB(win->hdc, 0, attribList);
-	return rc;
+	return (glplatform_gl_context_t)rc;
 #else
 	int attribList[] = {
 		GLX_CONTEXT_MAJOR_VERSION_ARB, maj_ver,
@@ -643,7 +679,7 @@ int glplatform_get_events(bool block)
 {
 #ifdef _WIN32
 	if (block) {
-		if (WaitMessage()) {
+		if (!WaitMessage()) {
 			return -1;
 		} else {
 			return 1;
@@ -746,7 +782,6 @@ void glplatform_show_window(struct glplatform_win *win)
 {
 #ifdef _WIN32
 	ShowWindow(win->hwnd, SW_SHOWNORMAL);
-	UpdateWindow(win->hwnd);
 #else
 	XMapWindow(g_display, win->window);
 	XSync(g_display, 0);

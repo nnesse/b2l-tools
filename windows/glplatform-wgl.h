@@ -109,8 +109,11 @@ typedef ptrdiff_t GLsizeiptr;
 
 #define wglCopyContext _glplatform_wglCopyContext
 extern BOOL (*wglCopyContext)(HGLRC, HGLRC, UINT);
+/*
+#define wglCreateContext__org wglCreateContext
 #define wglCreateContext _glplatform_wglCreateContext
 extern HGLRC (*wglCreateContext)(HDC);
+*/
 #define wglCreateLayerContext _glplatform_wglCreateLayerContext
 extern HGLRC (*wglCreateLayerContext)(HDC, int );
 #define wglDeleteContext _glplatform_wglDeleteContext
@@ -125,8 +128,11 @@ extern HDC (*wglGetCurrentDC)();
 extern int (*wglGetLayerPaletteEntries)(HDC, int , int , int , const COLORREF *);
 #define wglGetProcAddress _glplatform_wglGetProcAddress
 extern PROC (*wglGetProcAddress)(LPCSTR);
+/*
+#define wglMakeCurrent__org wglMakeCurrent
 #define wglMakeCurrent _glplatform_wglMakeCurrent
 extern BOOL (*wglMakeCurrent)(HDC, HGLRC);
+*/
 #define wglRealizeLayerPalette _glplatform_wglRealizeLayerPalette
 extern BOOL (*wglRealizeLayerPalette)(HDC, int , BOOL);
 #define wglSetLayerPaletteEntries _glplatform_wglSetLayerPaletteEntries
@@ -301,6 +307,7 @@ extern bool GLPLATFORM_WGL_ARB_create_context;
 #define WGL_CONTEXT_MINOR_VERSION_ARB 0x2092
 
 #define wglCreateContextAttribsARB _glplatform_wglCreateContextAttribsARB
+#define wglCreateContextAttribsARB__org wglCreateContextAttribsARB
 extern HGLRC (*wglCreateContextAttribsARB)(HDC, HGLRC, const int *);
 #endif
 

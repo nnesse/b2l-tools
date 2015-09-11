@@ -14,10 +14,13 @@ void on_expose(struct glplatform_win *win)
 
 void on_key_down(struct glplatform_win *win, int k)
 {
+	//TODO: No fullscreen support for windows yet
+#ifndef _WIN32
 	if (k == 'f') {
 		fullscreen = !fullscreen;
 		glplatform_fullscreen_win(win, fullscreen);
 	}
+#endif
 }
 
 void on_destroy(struct glplatform_win *win)
