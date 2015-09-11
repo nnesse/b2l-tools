@@ -26,7 +26,7 @@ int main()
 		exit(-1);
 	}
 
-	struct glplatform_win *win = glplatform_create_window("Simple text test", &cb, 1024, 256);
+	struct glplatform_win *win = glplatform_create_window("Simple text test", &cb, NULL, 1024, 256);
 	if (!win) {
 		fprintf(stderr, "Failed to create OpenGL window\n");
 		exit(-1);
