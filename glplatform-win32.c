@@ -4,6 +4,16 @@
 #define GLPLATFORM_ENABLE_WGL_ARB_create_context_profile
 #include "glplatform-wgl.h"
 
+//
+// wglGetProcAddress() only works if a WGL context is current so
+// we need to create a context *before* we call glplatform_wgl_init().
+// So we need to undefine wglMakeCurrent and wglCreateContext to
+// we can call these functions directly and break the circular
+// dependency.
+//
+#undef wglMakeCurrent
+#undef wglCreateContext
+
 #include <windowsx.h>
 
 static LRESULT CALLBACK PlatformWndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);

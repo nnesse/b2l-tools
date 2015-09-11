@@ -86,6 +86,7 @@ HDC (*wglCreateAffinityDCNV)(const HGPUNV *) = NULL;
 HGLRC (*wglCreateAssociatedContextAMD)(UINT) = NULL;
 HGLRC (*wglCreateAssociatedContextAttribsAMD)(UINT, HGLRC, const int *) = NULL;
 HANDLE (*wglCreateBufferRegionARB)(HDC, int , UINT) = NULL;
+HGLRC (*wglCreateContext)(HDC) = NULL;
 HGLRC (*wglCreateContextAttribsARB)(HDC, HGLRC, const int *) = NULL;
 GLboolean (*wglCreateDisplayColorTableEXT)(GLushort) = NULL;
 LPVOID (*wglCreateImageBufferI3D)(HDC, DWORD, UINT) = NULL;
@@ -164,6 +165,7 @@ BOOL (*wglLockVideoCaptureDeviceNV)(HDC, HVIDEOINPUTDEVICENV) = NULL;
 BOOL (*wglMakeAssociatedContextCurrentAMD)(HGLRC) = NULL;
 BOOL (*wglMakeContextCurrentARB)(HDC, HDC, HGLRC) = NULL;
 BOOL (*wglMakeContextCurrentEXT)(HDC, HDC, HGLRC) = NULL;
+BOOL (*wglMakeCurrent)(HDC, HGLRC) = NULL;
 BOOL (*wglQueryCurrentContextNV)(int , int *) = NULL;
 BOOL (*wglQueryFrameCountNV)(HDC, GLuint *) = NULL;
 BOOL (*wglQueryFrameLockMasterI3D)(BOOL *) = NULL;
@@ -283,6 +285,7 @@ bool glplatform_wgl_init(int maj, int min)
 	wglCreateAssociatedContextAMD = (HGLRC (*)(UINT) ) LoadProcAddress("wglCreateAssociatedContextAMD");
 	wglCreateAssociatedContextAttribsAMD = (HGLRC (*)(UINT, HGLRC, const int *) ) LoadProcAddress("wglCreateAssociatedContextAttribsAMD");
 	wglCreateBufferRegionARB = (HANDLE (*)(HDC, int , UINT) ) LoadProcAddress("wglCreateBufferRegionARB");
+	wglCreateContext = (HGLRC (*)(HDC) ) LoadProcAddress("wglCreateContext");
 	wglCreateContextAttribsARB = (HGLRC (*)(HDC, HGLRC, const int *) ) LoadProcAddress("wglCreateContextAttribsARB");
 	wglCreateDisplayColorTableEXT = (GLboolean (*)(GLushort) ) LoadProcAddress("wglCreateDisplayColorTableEXT");
 	wglCreateImageBufferI3D = (LPVOID (*)(HDC, DWORD, UINT) ) LoadProcAddress("wglCreateImageBufferI3D");
@@ -361,6 +364,7 @@ bool glplatform_wgl_init(int maj, int min)
 	wglMakeAssociatedContextCurrentAMD = (BOOL (*)(HGLRC) ) LoadProcAddress("wglMakeAssociatedContextCurrentAMD");
 	wglMakeContextCurrentARB = (BOOL (*)(HDC, HDC, HGLRC) ) LoadProcAddress("wglMakeContextCurrentARB");
 	wglMakeContextCurrentEXT = (BOOL (*)(HDC, HDC, HGLRC) ) LoadProcAddress("wglMakeContextCurrentEXT");
+	wglMakeCurrent = (BOOL (*)(HDC, HGLRC) ) LoadProcAddress("wglMakeCurrent");
 	wglQueryCurrentContextNV = (BOOL (*)(int , int *) ) LoadProcAddress("wglQueryCurrentContextNV");
 	wglQueryFrameCountNV = (BOOL (*)(HDC, GLuint *) ) LoadProcAddress("wglQueryFrameCountNV");
 	wglQueryFrameLockMasterI3D = (BOOL (*)(BOOL *) ) LoadProcAddress("wglQueryFrameLockMasterI3D");
@@ -494,10 +498,10 @@ bool glplatform_wgl_init(int maj, int min)
 		 && wglSwapBuffersMscOML && wglSwapLayerBuffersMscOML && wglWaitForMscOML
 		 && wglWaitForSbcOML;
 	
-	return wglCopyContext
+	return wglCopyContext && wglCreateContext
 	 && wglCreateLayerContext && wglDeleteContext && wglDescribeLayerPlane
 	 && wglGetCurrentContext && wglGetCurrentDC && wglGetLayerPaletteEntries
-	 && wglGetProcAddress && wglRealizeLayerPalette
+	 && wglGetProcAddress && wglMakeCurrent && wglRealizeLayerPalette
 	 && wglSetLayerPaletteEntries && wglShareLists && wglSwapLayerBuffers
 	 && wglUseFontBitmaps && wglUseFontBitmapsA && wglUseFontBitmapsW
 	 && wglUseFontOutlines && wglUseFontOutlinesA && wglUseFontOutlinesW;
