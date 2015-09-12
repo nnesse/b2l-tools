@@ -40,7 +40,8 @@ extern char *metalval;
 
 static int set_b2l_file(lua_State *L);
 static int need_redraw(lua_State *L);
-static int set_shaders(lua_State *L);
+static int get_shader_uniforms(lua_State *L);
+static int filter_shader_text(lua_State *L);
 static int make_path_relative(lua_State *L);
 static int directory_name(lua_State *L);
 static int create_glwin(lua_State *L);
@@ -50,7 +51,8 @@ luaL_Reg lua_b2l_material_editor_capi[] = {
 	{ "make_path_relative", make_path_relative },
 	{ "set_b2l_file", set_b2l_file},
 	{ "need_redraw", need_redraw},
-	{ "set_shaders", set_shaders },
+	{ "get_shader_uniforms", get_shader_uniforms},
+	{ "filter_shader_text", filter_shader_text},
 	{ "create_glwin", create_glwin},
 	{ NULL, NULL }
 };
@@ -512,18 +514,8 @@ struct gl_state {
 	bool program_valid;
 	bool blob_updated;
 
-	/*
-	const char *fragment_shader_text;
-	const char *vertex_shader_text;
-	GLuint vertex_shader;
-	GLuint fragment_shader;
-	*/
-
 	struct program program;
 
-	/*
-	GLuint program;
-	*/
 	GLuint vao;
 	GLuint vbo;
 	GLint groups_index;
@@ -587,65 +579,7 @@ static int need_redraw(lua_State *L)
 	return 0;
 }
 
-static void process_declaration(lua_State *L, int uniform_table_idx, struct declaration *d)
-{
-	if (d->gen.code == DECLARATION_NODE) {
-		bool uniform = false;
-		const char *type_string = "";
-		int type_code;
-		if (d->type) {
-			struct generic_list *gl = (struct generic_list *)d->type->qualifiers;
-			while (gl != NULL) {
-				switch(gl->ent->code) {
-				case UNIFORM:
-					uniform = true;
-					break;
-				}
-				gl = gl->next;
-			}
-			if (d->type->specifier && ((struct type_specifier *)d->type->specifier)->nonarray) {
-				type_code = ((struct type_specifier *)d->type->specifier)->nonarray->code;
-				switch (type_code) {
-				case FLOAT:
-					type_string = "float";
-					break;
-				case VEC3:
-					type_string = "vec3";
-					break;
-				case MAT4:
-					type_string = "mat4";
-					break;
-				case BOOL:
-					type_string = "bool";
-					break;
-				case SAMPLER2D:
-					type_string = "sampler2D";
-					break;
-				}
-			}
-		}
-		if (uniform) {
-			lua_getfield(L, uniform_table_idx, d->name);
-			if (lua_isnil(L, -1)) {
-				lua_newtable(L);
-				lua_pushstring(L, type_string);
-				lua_setfield(L, -2, "datatype");
-				if (d->tag) {
-					lua_pushstring(L, d->tag->name);
-					lua_setfield(L, -2, "tag");
-				}
-				lua_setfield(L, uniform_table_idx, d->name);
-			}
-			lua_pushstring(L, d->name);
-			lua_rawseti(L, uniform_table_idx, lua_rawlen(L, uniform_table_idx) + 1);
-			lua_pop(L, 1);
-		}
-	} else if (d->gen.code == FUNCTION_NODE) {
-		//printf("function %s\n", d->name);
-	}
-}
-
-static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
+int insert_shader_uniforms(lua_State *L, int text_idx, int uniform_table_idx)
 {
 	struct declaration *d;
 	char *text;
@@ -661,13 +595,79 @@ static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
 	rc = glslparse();
 	if (rc) {
 		free(text);
-		return NULL;
+		return -1;
 	}
 	d = g_decls;
 	while (d) {
-		process_declaration(L, uniform_text_idx, d);
+		if (d->gen.code == DECLARATION_NODE) {
+			bool uniform = false;
+			const char *type_string = "";
+			int type_code;
+			if (d->type) {
+				struct generic_list *gl = (struct generic_list *)d->type->qualifiers;
+				while (gl != NULL) {
+					switch(gl->ent->code) {
+					case UNIFORM:
+						uniform = true;
+						break;
+					}
+					gl = gl->next;
+				}
+				if (d->type->specifier && ((struct type_specifier *)d->type->specifier)->nonarray) {
+					type_code = ((struct type_specifier *)d->type->specifier)->nonarray->code;
+					switch (type_code) {
+					case FLOAT:
+						type_string = "float";
+						break;
+					case VEC3:
+						type_string = "vec3";
+						break;
+					case MAT4:
+						type_string = "mat4";
+						break;
+					case BOOL:
+						type_string = "bool";
+						break;
+					case SAMPLER2D:
+						type_string = "sampler2D";
+						break;
+					}
+				}
+			}
+			if (uniform) {
+				lua_getfield(L, uniform_table_idx, d->name);
+				if (lua_isnil(L, -1)) {
+					lua_newtable(L);
+					lua_pushstring(L, type_string);
+					lua_setfield(L, -2, "datatype");
+					if (d->tag) {
+						lua_pushstring(L, d->tag->name);
+						lua_setfield(L, -2, "tag");
+					}
+					lua_setfield(L, uniform_table_idx, d->name);
+				}
+				lua_pushstring(L, d->name);
+				lua_rawseti(L, uniform_table_idx, lua_rawlen(L, uniform_table_idx) + 1);
+				lua_pop(L, 1);
+			}
+		} else if (d->gen.code == FUNCTION_NODE) {
+			//printf("function %s\n", d->name);
+		}
 		d = d->next;
 	}
+	return 0;
+}
+
+//
+// Strip text between @ tokens from shader text
+//
+int filter_shader_text(lua_State *L)
+{
+	const char *temp = lua_tostring(L, -1);
+	int sz = strlen(temp);
+	char *text = malloc(sz + 2);
+	strcpy(text, temp);
+	text[sz + 1] = 0;
 	meta_scan_buffer(text, sz + 2);
 	int filtered_sz = 0;
 	while (metalex()) {
@@ -686,40 +686,28 @@ static char *parse_shader(lua_State *L, int text_idx, int uniform_text_idx)
 	*c = 0;
 	metalex_destroy();
 	free(text);
-	return out_text;
+	lua_pushstring(L, out_text);
+	free(out_text);
+	return 1;
 }
 
-static int set_shaders(lua_State *L)
+static int get_shader_uniforms(lua_State *L)
 {
 	int vertex_text_index = lua_gettop(L) - 1;
 	int fragment_text_index = lua_gettop(L);
-	char *vertex_text;
-	char *fragment_text;
-
 	lua_newtable(L);
 
-	vertex_text = parse_shader(L, vertex_text_index, lua_gettop(L));
-	if (!vertex_text) {
+	if (insert_shader_uniforms(L, vertex_text_index, lua_gettop(L))) {
 		lua_pop(L, 1);
 		lua_pushnil(L);
 		return 1;
 	}
 
-	fragment_text = parse_shader(L, fragment_text_index, lua_gettop(L));
-	if (!fragment_text) {
-		free(vertex_text);
+	if (insert_shader_uniforms(L, fragment_text_index, lua_gettop(L))) {
 		lua_pop(L, 1);
 		lua_pushnil(L);
 		return 1;
 	}
-
-	if (g_gl_state.program.fragment_text)
-		free((char *)g_gl_state.program.fragment_text);
-	if (g_gl_state.program.vertex_text)
-		free((char *)g_gl_state.program.vertex_text);
-	g_gl_state.program.fragment_text = fragment_text;
-	g_gl_state.program.vertex_text = vertex_text;
-	g_gl_state.recompile_shaders = true;
 	return 1;
 }
 
@@ -838,6 +826,20 @@ static void redraw(struct glplatform_win *win)
 
 	if (!g_gl_state.initialized)
 		init_gl_state();
+
+	lua_getglobal(L, "active_material");
+	lua_getfield(L, -1, "shaders");
+	lua_getfield(L, -1, "vs_text");
+	lua_getfield(L, -2, "fs_text");
+	const char *vs_text = lua_tostring(L, -2);
+	const char *fs_text = lua_tostring(L, -1);
+
+	if (strcmp(g_gl_state.program.vertex_text, vs_text) || strcmp(g_gl_state.program.fragment_text, fs_text)) {
+		g_gl_state.program.vertex_text = strdup(vs_text);
+		g_gl_state.program.fragment_text = strdup(fs_text);
+		g_gl_state.recompile_shaders = true;
+	}
+	lua_pop(L, 4);
 
 	if (g_gl_state.recompile_shaders)
 		g_gl_state.program_valid = recompile_shaders();

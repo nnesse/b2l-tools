@@ -70,11 +70,10 @@ function setting_changed()
 	save_toolbutton.sensitive = true
 end
 
-function update_shaders()
+function update_controls(uniforms)
 	if not b2l_data then
 		return
 	end
-	local uniforms = capi.set_shaders(vs_text, fs_text)
 	if not uniforms then
 		local dialog = Gtk.MessageDialog {
 			parent = window,
@@ -415,14 +414,18 @@ fs_chooser = Gtk.FileChooserButton {
 				setting_changed()
 			end
 			reload_fs(abs_filename)
-			update_shaders()
-			if filename then
-				fs_edit_button.sensitive = true
-			else
-				fs_edit_button.sensitive = false
-			end
-			if filename then
-				active_material.shaders['fs_filename'] = filename
+			local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
+			if uniforms then
+				update_controls(uniforms)
+				if filename then
+					fs_edit_button.sensitive = true
+				else
+					fs_edit_button.sensitive = false
+				end
+				if filename then
+					active_material.shaders['fs_filename'] = filename
+					active_material.shaders['fs_text'] = capi.filter_shader_text(fs_text)
+				end
 			end
 		end,
 	}
@@ -462,14 +465,18 @@ vs_chooser = Gtk.FileChooserButton {
 			setting_changed()
 		end
 		reload_vs(abs_filename)
-		update_shaders()
-		if filename then
-			vs_edit_button.sensitive = true
-		else
-			vs_edit_button.sensitive = false
-		end
-		if filename then
-			active_material.shaders.vs_filename = filename
+		local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
+		if uniforms then
+			update_controls(uniforms)
+			if filename then
+				vs_edit_button.sensitive = true
+			else
+				vs_edit_button.sensitive = false
+			end
+			if filename then
+				active_material.shaders.vs_filename = filename
+				active_material.shaders['vs_text'] = capi.filter_shader_text(vs_text)
+			end
 		end
 	end,
 }
@@ -699,7 +706,10 @@ local vbox_main = Gtk.VBox {
 				on_clicked = function()
 					reload_fs(fs_chooser:get_filename())
 					reload_vs(vs_chooser:get_filename())
-					update_shaders()
+					local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
+					if uniforms then
+						update_controls(uniforms)
+					end
 				end,
 			},
 		},

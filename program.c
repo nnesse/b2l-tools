@@ -7,6 +7,8 @@ void program_init(struct program *p)
 	p->program = glCreateProgram();
 	p->vertex_shader = glCreateShader(GL_VERTEX_SHADER);
 	p->fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	p->vertex_text = "";
+	p->fragment_text = "";
 	glAttachShader(p->program, p->vertex_shader);
 	glAttachShader(p->program, p->fragment_shader);
 }
