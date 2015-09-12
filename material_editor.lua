@@ -58,7 +58,6 @@ void main()\
 }"
 
 controls = {}
-texture_units = {}
 settings_expanders = {}
 settings_grids = {}
 
@@ -98,7 +97,6 @@ function update_controls(uniforms)
 		vbox_settings:remove(v)
 	end
 
-	texture_units = {}
 	settings_grids = {}
 	settings_expanders = {}
 
@@ -194,12 +192,7 @@ function update_controls(uniforms)
 			if value ~= nil then
 				active_material.params[k].value = value
 			end
-			local t = 1;
-			while texture_units[t] == true do
-				t = t + 1
-			end
-			texture_units[t] = true
-			controls[k] = { texunit= t }
+			controls[k] = { }
 			local widget = Gtk.FileChooserButton {
 				title = id,
 				action = "OPEN",
@@ -213,8 +206,8 @@ function update_controls(uniforms)
 						local pbuf,err = GdkPixbuf.Pixbuf.new_from_file(abs_filename)
 						if pbuf then
 							active_material.params[k].value = filename
-							controls[k].pbuf = pbuf
-							controls[k].needs_upload = true
+							active_material.params[k]._pbuf = pbuf
+							active_material.params[k]._needs_upload = true
 							queue_render()
 						else
 							local dialog = Gtk.MessageDialog {
@@ -424,7 +417,7 @@ fs_chooser = Gtk.FileChooserButton {
 				end
 				if filename then
 					active_material.shaders['fs_filename'] = filename
-					active_material.shaders['fs_text'] = capi.filter_shader_text(fs_text)
+					active_material.shaders['_fs_text'] = capi.filter_shader_text(fs_text)
 				end
 			end
 		end,
@@ -475,7 +468,7 @@ vs_chooser = Gtk.FileChooserButton {
 			end
 			if filename then
 				active_material.shaders.vs_filename = filename
-				active_material.shaders['vs_text'] = capi.filter_shader_text(vs_text)
+				active_material.shaders['_vs_text'] = capi.filter_shader_text(vs_text)
 			end
 		end
 	end,

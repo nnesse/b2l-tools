@@ -79,6 +79,18 @@ static void on_mouse_wheel(struct glplatform_win *, int, int, int);
 
 static void redraw(struct glplatform_win *win);
 
+struct lua_program {
+	struct program program;
+};
+
+int program_gc(lua_State *L)
+{
+	struct program *p = lua_touserdata(L, -1);
+	if (p)
+		program_destroy(p);
+	return 0;
+}
+
 struct quaternion {
 	float x;
 	float y;
@@ -510,15 +522,8 @@ struct gl_state {
 	uint8_t *blob;
 	size_t blob_size;
 	bool initialized;
-	bool recompile_shaders;
-	bool program_valid;
 	bool blob_updated;
-
-	struct program program;
-
 	GLuint vao;
-	GLuint vbo;
-	GLint groups_index;
 } g_gl_state;
 
 static bool recompile_shaders();
@@ -711,40 +716,12 @@ static int get_shader_uniforms(lua_State *L)
 	return 1;
 }
 
-static bool recompile_shaders()
-{
-	program_compile(&g_gl_state.program);
-
-	GLuint program = g_gl_state.program.program;
-	glBindAttribLocation(program, ATTRIBUTE_VERTEX, "vertex");
-	glBindAttribLocation(program, ATTRIBUTE_NORMAL, "normal");
-	glBindAttribLocation(program, ATTRIBUTE_UV, "uv");
-	glBindAttribLocation(program, ATTRIBUTE_TANGENT, "tangent");
-	glBindAttribLocation(program, ATTRIBUTE_WEIGHT0, "weight[0]");
-	glBindAttribLocation(program, ATTRIBUTE_WEIGHT1, "weight[1]");
-	glBindAttribLocation(program, ATTRIBUTE_WEIGHT2, "weight[2]");
-	glBindAttribLocation(program, ATTRIBUTE_WEIGHT3, "weight[3]");
-	glBindAttribLocation(program, ATTRIBUTE_WEIGHT4, "weight[4]");
-	glBindAttribLocation(program, ATTRIBUTE_WEIGHT5, "weight[5]");
-
-	program_link(&g_gl_state.program);
-
-	g_gl_state.groups_index	= glGetUniformLocation(program, "groups");
-	return true;
-}
-
 static void init_gl_state()
 {
 	printf("OpenGL version %s\n", glGetString(GL_VERSION));
 	glGenVertexArrays(1, &g_gl_state.vao);
 	glBindVertexArray(g_gl_state.vao);
 	glGenTextures(MAX_TEXTURE_UNITS, g_texture_names);
-
-	program_init(&g_gl_state.program);
-
-	glGenBuffers(1, &g_gl_state.vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, g_gl_state.vbo);
-
 	g_gl_state.initialized = true;
 }
 
@@ -827,24 +804,7 @@ static void redraw(struct glplatform_win *win)
 	if (!g_gl_state.initialized)
 		init_gl_state();
 
-	lua_getglobal(L, "active_material");
-	lua_getfield(L, -1, "shaders");
-	lua_getfield(L, -1, "vs_text");
-	lua_getfield(L, -2, "fs_text");
-	const char *vs_text = lua_tostring(L, -2);
-	const char *fs_text = lua_tostring(L, -1);
-
-	if (strcmp(g_gl_state.program.vertex_text, vs_text) || strcmp(g_gl_state.program.fragment_text, fs_text)) {
-		g_gl_state.program.vertex_text = strdup(vs_text);
-		g_gl_state.program.fragment_text = strdup(fs_text);
-		g_gl_state.recompile_shaders = true;
-	}
-	lua_pop(L, 4);
-
-	if (g_gl_state.recompile_shaders)
-		g_gl_state.program_valid = recompile_shaders();
-
-	if (!g_gl_state.initialized || !g_gl_state.program_valid) {
+	if (!g_gl_state.initialized) {
 		goto end;
 	}
 
@@ -875,10 +835,6 @@ static void redraw(struct glplatform_win *win)
 		lua_pop(L, 1);
 	}
 
-	g_gl_state.recompile_shaders = false;
-
-	glUseProgram(g_gl_state.program.program);
-
 	lua_getfield(L, object_idx, "vertex_groups");
 	int num_vertex_groups;
 	if (lua_isnil(L, -1)) {
@@ -891,7 +847,9 @@ static void redraw(struct glplatform_win *win)
 
 	struct mat4 view;
 	struct mat4 model;
+	struct mat4 proj;
 	struct quaternion next;
+
 	quaternion_mul(&q_delta, &q_cur, &next);
 	quaternion_to_mat4(&next, &view);
 	view.v[3][3] = 1;
@@ -900,131 +858,180 @@ static void redraw(struct glplatform_win *win)
 	model.v[3][1] = g_offset[1] + g_offset_next[1];
 	model.v[3][2] = g_offset[2] + g_offset_next[2];
 
-	GLuint program = g_gl_state.program.program;
-
-	glUniformMatrix4fv(glGetUniformLocation(program, "model"), 1, GL_FALSE, (GLfloat *)&model);
-	struct mat4 ident;
-	mat4_identity(&ident);
-	glUniformMatrix4fv(glGetUniformLocation(program, "view"), 1, GL_FALSE, (GLfloat *)&view);
-
 	float zoom = exp(g_log_zoom);
 	float zr = 100;
-	struct mat4 proj;
 	mat4_zero(&proj);
 	proj.v[0][0] = 1.0/zoom;
 	proj.v[1][1] = 1.0*win->width/(zoom*win->height);
 	proj.v[2][2] = 1.0/zr;
 	proj.v[3][3] = 1.0;
-	glUniformMatrix4fv(glGetUniformLocation(program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
 
-	if (g_gl_state.groups_index >= 0 && g->type->attribute[ATTRIBUTE_WEIGHT0].size > 0) {
-		static int render_count = 0;
-		render_count++;
-		double frame;
-		int frame_start;
-		int frame_end;
-		lua_getglobal(L, "frame_start");
-		frame_start = lua_tointeger(L, -1);
-		lua_getglobal(L, "frame_end");
-		frame_end = lua_tointeger(L, -1);
-		lua_getglobal(L, "frame_delta");
-		frame = frame_start + lua_tonumber(L, -1);
-		int frame_i = floorf(frame);
-		double frame_fract = frame - frame_i;
-
-		lua_getfield(L, b2l_data_idx, "scenes");
-		lua_getglobal(L, "current_scene");
-		lua_getfield(L, -2, lua_tostring(L, -1));
-		if (!lua_istable(L, -1)) {
-			goto end;
-		}
-		lua_getfield(L, -1, "objects");
-		lua_getfield(L, -1, current_object);
-		lua_getfield(L, -1, "vertex_group_transform_array_offset");
-		int offset = lua_tointeger(L, -1);
-		lua_pop(L, 9);
-		int stride = sizeof(float) * 4 * 4 * num_vertex_groups;
-		int i;
-		for (i = 0; i < num_vertex_groups; i++) {
-			struct mat4 res;
-			struct mat4 M1;
-			struct mat4 M2;
-			struct mat4 *base = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + frame_i * stride);
-			struct mat4 *next = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
-
-			if (frame_i == (frame_end-1)) {
-				next = (struct mat4 *)(g_gl_state.blob + offset + i * sizeof(float) * 4 * 4 + (frame_start) * stride);
-			} else if (frame_fract == 0) {
-				next = base;
-			}
-
-#if USE_SLERP
-			struct mat4 temp;
-			mat4_zero(&temp);
-			temp.v[3][3] = 1;
-			M1 = *base;
-			M2 = *next;
-			spherical_lerp(M1.v[0], M2.v[0], frame_fract, temp.v[0]);
-			spherical_lerp(M1.v[1], M2.v[1], frame_fract, temp.v[1]);
-			spherical_lerp(M1.v[2], M2.v[2], frame_fract, temp.v[2]);
-			mat4_transpose(&temp, &res);
-			float v1[3];
-			float v2[3];
-			v1[0] = M1.v[0][3];
-			v1[1] = M1.v[1][3];
-			v1[2] = M1.v[2][3];
-			v2[0] = M2.v[0][3];
-			v2[1] = M2.v[1][3];
-			v2[2] = M2.v[2][3];
-			lerp(v1, v2, frame_fract, res.v[3]);
-#else
-			mat4_zero(&res);
-			res.v[3][3] = 1;
-			mat4_transpose(base, &M1);
-			mat4_transpose(next, &M2);
-			lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
-			lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
-			lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
-			lerp(M1.v[3], M2.v[3], frame_fract, res.v[3]);
-#endif
-
-			glUniformMatrix4fv(g_gl_state.groups_index + i,
-					1, /*num_vertex_groups, */
-					GL_FALSE,
-					(GLfloat *)&res);
-		}
-	}
-
-	lua_getglobal(L, "controls");
-	int controls = lua_gettop(L);
 	lua_getglobal(L, "materials");
 	int materials = lua_gettop(L);
 
 	int i;
 	for (i = 0; i < g->num_submesh; i++) {
 		lua_getfield(L, materials, g->submesh[i].material_name);
-		lua_getfield(L, -1, "params");
+		int material_idx = lua_gettop(L);
+		lua_getfield(L, material_idx, "program");
+
+		//
+		// Create material program object if it's missing
+		//
+		struct program *program = lua_touserdata(L, -1);
+		if (!program) {
+			program = lua_newuserdata(L, sizeof(struct program));
+			program_init(program);
+			int program_idx = lua_gettop(L);
+			lua_newtable(L);
+			lua_pushcfunction(L, program_gc);
+			lua_setfield(L, -2, "__gc");
+			lua_setmetatable(L, program_idx);
+			lua_setfield(L, material_idx, "program");
+		}
+
+		//
+		// Recompile material program if shader text has changed
+		//
+		lua_getfield(L, material_idx, "shaders");
+		lua_getfield(L, -1, "_vs_text");
+		lua_getfield(L, -2, "_fs_text");
+		const char *vs_text = lua_tostring(L, -2);
+		const char *fs_text = lua_tostring(L, -1);
+		if (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text)) {
+			program->vertex_text = strdup(vs_text);
+			program->fragment_text = strdup(fs_text);
+			program_compile(program);
+			glBindAttribLocation(program->program, ATTRIBUTE_VERTEX, "vertex");
+			glBindAttribLocation(program->program, ATTRIBUTE_NORMAL, "normal");
+			glBindAttribLocation(program->program, ATTRIBUTE_UV, "uv");
+			glBindAttribLocation(program->program, ATTRIBUTE_TANGENT, "tangent");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weight[0]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weight[1]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weight[2]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weight[3]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weight[4]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weight[5]");
+			program_link(program);
+		}
+
+		glUseProgram(program->program);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "model"), 1, GL_FALSE, (GLfloat *)&model);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "view"), 1, GL_FALSE, (GLfloat *)&view);
+
+		//
+		// Compute armature matrix transforms
+		//
+		GLint groups_index = glGetUniformLocation(program->program, "groups");
+		if (groups_index >= 0 && g->type->attribute[ATTRIBUTE_WEIGHT0].size > 0) {
+			static int render_count = 0;
+			render_count++;
+			double frame;
+			int frame_start;
+			int frame_end;
+
+			int prev_top = lua_gettop(L);
+
+			lua_getglobal(L, "frame_start");
+			frame_start = lua_tointeger(L, -1);
+			lua_getglobal(L, "frame_end");
+			frame_end = lua_tointeger(L, -1);
+			lua_getglobal(L, "frame_delta");
+			frame = frame_start + lua_tonumber(L, -1);
+			int frame_i = floorf(frame);
+			double frame_fract = frame - frame_i;
+
+			lua_getfield(L, b2l_data_idx, "scenes");
+			lua_getglobal(L, "current_scene");
+			lua_getfield(L, -2, lua_tostring(L, -1));
+			if (!lua_istable(L, -1)) {
+				goto end;
+			}
+			lua_getfield(L, -1, "objects");
+			lua_getfield(L, -1, current_object);
+			lua_getfield(L, -1, "vertex_group_transform_array_offset");
+			int offset = lua_tointeger(L, -1);
+			int stride = sizeof(float) * 4 * 4 * num_vertex_groups;
+			int i;
+			for (i = 0; i < num_vertex_groups; i++) {
+				struct mat4 res;
+				struct mat4 M1;
+				struct mat4 M2;
+				struct mat4 *base = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + frame_i * stride);
+				struct mat4 *next = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
+
+				if (frame_i == (frame_end-1)) {
+					next = (struct mat4 *)(g_gl_state.blob + offset + i * sizeof(float) * 4 * 4 + (frame_start) * stride);
+				} else if (frame_fract == 0) {
+					next = base;
+				}
+
+#if USE_SLERP
+				struct mat4 temp;
+				mat4_zero(&temp);
+				temp.v[3][3] = 1;
+				M1 = *base;
+				M2 = *next;
+				spherical_lerp(M1.v[0], M2.v[0], frame_fract, temp.v[0]);
+				spherical_lerp(M1.v[1], M2.v[1], frame_fract, temp.v[1]);
+				spherical_lerp(M1.v[2], M2.v[2], frame_fract, temp.v[2]);
+				mat4_transpose(&temp, &res);
+				float v1[3];
+				float v2[3];
+				v1[0] = M1.v[0][3];
+				v1[1] = M1.v[1][3];
+				v1[2] = M1.v[2][3];
+				v2[0] = M2.v[0][3];
+				v2[1] = M2.v[1][3];
+				v2[2] = M2.v[2][3];
+				lerp(v1, v2, frame_fract, res.v[3]);
+#else
+				mat4_zero(&res);
+				res.v[3][3] = 1;
+				mat4_transpose(base, &M1);
+				mat4_transpose(next, &M2);
+				lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
+				lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
+				lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
+				lerp(M1.v[3], M2.v[3], frame_fract, res.v[3]);
+#endif
+
+				glUniformMatrix4fv(groups_index + i,
+						1,
+						GL_FALSE,
+						(GLfloat *)&res);
+			}
+			lua_settop(L, prev_top);
+		}
+
+		int texunit = 0;
+
+		//
+		// Grab material state from LUA controls
+		//
+		lua_getfield(L, material_idx, "params");
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, -2)) {
-			int variable = lua_gettop(L);
-			const char *variable_name = lua_tostring(L, variable - 1);
-			int uniform_loc = glGetUniformLocation(program, variable_name);
+			int variable_idx = lua_gettop(L);
+			const char *variable_name = lua_tostring(L, variable_idx - 1);
+			int uniform_loc = glGetUniformLocation(program->program, variable_name);
 			if (uniform_loc == -1) {
 				lua_pop(L, 1);
 				continue;
 			}
-			lua_getfield(L, variable, "value");
-			int value = variable + 1;
-			lua_getfield(L, variable, "datatype");
+			lua_getfield(L, variable_idx, "value");
+			int value_idx = variable_idx + 1;
+			lua_getfield(L, variable_idx, "datatype");
 			const char *datatype = strdup(lua_tostring(L, -1));
 			lua_pop(L, 1);
 			if (!strcmp(datatype, "bool")) {
-				int bool_value = lua_toboolean(L, value);
+				int bool_value = lua_toboolean(L, value_idx);
 				glUniform1i(uniform_loc, bool_value);
 			} else if (!strcmp(datatype, "vec3")) {
-				lua_rawgeti(L, value, 1);
-				lua_rawgeti(L, value, 2);
-				lua_rawgeti(L, value, 3);
+				lua_rawgeti(L, value_idx, 1);
+				lua_rawgeti(L, value_idx, 2);
+				lua_rawgeti(L, value_idx, 3);
 				float val[3];
 				val[0] = (float)lua_tonumber(L, -3);
 				val[1] = (float)lua_tonumber(L, -2);
@@ -1032,27 +1039,40 @@ static void redraw(struct glplatform_win *win)
 				glUniform3fv(uniform_loc, 1, val);
 				lua_pop(L, 3);
 			} else if (!strcmp(datatype, "float")) {
-				float fval = lua_tonumber(L, value);
+				float fval = lua_tonumber(L, value_idx);
 				glUniform1f(uniform_loc, fval);
 			} else if (!strcmp(datatype, "sampler2D")) {
-				lua_getfield(L, controls, variable_name);
-				int control = lua_gettop(L);
-				lua_getfield(L, control, "needs_upload");
+				lua_getfield(L, variable_idx, "_needs_upload");
 				int needs_upload = lua_toboolean(L, -1);
 				lua_pop(L, 1);
-				if (needs_upload) {
-					int texunit;
-					GdkPixbuf *pbuf;
-					lua_getfield(L, control, "texunit");
-					texunit = lua_tointeger(L, -1) - 1;
-					lua_pop(L, 1);
 
-					lua_getfield(L, control, "pbuf");
+				GLuint texid = 0;
+				if (needs_upload) {
+					GdkPixbuf *pbuf;
+
+					//
+					// Delete existing texture if there is one
+					//
+					lua_getfield(L, variable_idx, "_texid");
+					if (lua_isnumber(L, -1)) {
+						texid = lua_tointeger(L, -1);
+						glDeleteTextures(1, &texid);
+					}
+
+					//
+					// Upload pbuf to texture
+					//
+					lua_getfield(L, variable_idx, "_pbuf");
 					lua_getfield(L, -1, "_native");
 					pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
 					lua_pop(L, 2);
 					glActiveTexture(GL_TEXTURE0 + texunit);
-					glBindTexture(GL_TEXTURE_2D, g_texture_names[texunit]);
+
+					glGenTextures(1, &texid);
+					glBindTexture(GL_TEXTURE_2D, texid);
+					lua_pushinteger(L, texid);
+					lua_setfield(L, variable_idx, "_texid");
+
 					int width = gdk_pixbuf_get_width(pbuf);
 					int height = gdk_pixbuf_get_height(pbuf);
 					int n_chan = gdk_pixbuf_get_n_channels(pbuf);
@@ -1071,14 +1091,25 @@ static void redraw(struct glplatform_win *win)
 					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 					glGenerateMipmap(GL_TEXTURE_2D);
 					glUniform1i(uniform_loc, texunit);
-
 					lua_pushboolean(L, 0);
-					lua_setfield(L, control, "needs_upload");
+					lua_setfield(L, variable_idx, "_needs_upload");
+				} else {
+					//
+					// Bind previously generated texture if present
+					//
+					lua_getfield(L, variable_idx, "_texid");
+					if (lua_isnumber(L, -1)) {
+						texid = lua_tointeger(L, -1);
+						glActiveTexture(GL_TEXTURE0 + texunit);
+						glBindTexture(GL_TEXTURE_2D, texid);
+						glUniform1i(uniform_loc, texunit);
+					}
+					lua_pop(L, 1);
 				}
-				lua_pop(L, 1);
+				texunit++;
 			}
 			free((void *)datatype);
-			lua_pop(L, 2);
+			lua_settop(L, variable_idx - 1);
 		} //while (lua_next(L, -2) != 0)
 		render_geometry(g, i);
 		lua_pop(L, 1);
@@ -1107,9 +1138,6 @@ static int set_b2l_file(lua_State *L)
 	g_gl_state.blob = blob;
 	g_gl_state.blob_size = blob_size;
 	g_gl_state.blob_updated = true;
-	g_gl_state.program.fragment_text = NULL;
-	g_gl_state.program.vertex_text = NULL;
-	g_gl_state.program_valid = false;
 	return 0;
 }
 

@@ -15,7 +15,9 @@ pprint.defaults = {
     show_metatable = false,     -- show metatable
     show_all = false,           -- override other show settings and show everything
     use_tostring = false,       -- use __tostring to print table if available
-    filter_function = nil,      -- called like callback(value[,key, parent]), return truty value to hide
+    filter_function = function (value, key, parent)
+	return key and type(key) == "string" and key:sub(1,1) == '_'
+    end,      -- called like callback(value[,key, parent]), return truty value to hide
     object_cache = 'local',     -- cache blob and table to give it a id, 'local' cache per print, 'global' cache
                                 -- per process, falsy value to disable (might cause infinite loop)
     -- format settings
