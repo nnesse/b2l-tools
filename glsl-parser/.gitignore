@@ -1,0 +1,6 @@
+glsl.parser.c
+glsl.parser.h
+glsl.lexer.c
+glsl.lexer.h
+glsl_parser_test
+*.o
