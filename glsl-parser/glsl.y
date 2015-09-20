@@ -12,7 +12,7 @@
 #include "glsl.parser.h" //For GLSLSTYPE
 #include "glsl.lexer.h" //For glsllex()
 
-void glslerror(struct glsl_parse_context *c, const char *s);
+void glsl_error(struct glsl_parse_context *c, const char *s);
 
 #define GLSL_STACK_BUFFER_SIZE (1024*1024)
 #define GLSL_STACK_BUFFER_PAYLOAD_SIZE (GLSL_STACK_BUFFER_SIZE - sizeof(intptr_t))
@@ -102,9 +102,9 @@ struct glsl_node *new_null_glsl_identifier(struct glsl_parse_context *context)
 
 %}
 
-%defines "glsl.parser.h"
+%defines "glsl-parser/glsl.parser.h"
 
-%define api.prefix {glsl}
+%define api.prefix {glsl_}
 
 %define api.value.type union
 
@@ -1034,7 +1034,7 @@ primary_expression	: variable_identifier { $$ = $1; }
 
 #include "glsl_ast.h"
 
-void glslerror(struct glsl_parse_context *c, const char *s)
+void glsl_error(struct glsl_parse_context *c, const char *s)
 {
 	fprintf(stderr, "GLSL parse error: %s\n", s);
 }
@@ -1089,7 +1089,7 @@ static void list_collapse(struct glsl_parse_context *context, struct glsl_node *
 
 static void parse_internal(struct glsl_parse_context *context)
 {
-	glslparse(context);
+	glsl_parse(context);
 	if (context->root) {
 		if (glsl_is_list_node(context->root)) {
 			//
@@ -1115,13 +1115,13 @@ static void parse_internal(struct glsl_parse_context *context)
 
 void glsl_parse_file(struct glsl_parse_context *context, FILE *file)
 {
-	glsllex_init(&(context->scanner));
+	glsl_lex_init(&(context->scanner));
 
-	glslset_in(file, context->scanner);
+	glsl_set_in(file, context->scanner);
 
 	parse_internal(context);
 
-	glsllex_destroy(context->scanner);
+	glsl_lex_destroy(context->scanner);
 	context->scanner = NULL;
 }
 
@@ -1130,18 +1130,18 @@ void glsl_parse_string(struct glsl_parse_context *context, const char *str)
 	char *text;
 	size_t sz;
 
-	glsllex_init(&(context->scanner));
+	glsl_lex_init(&(context->scanner));
 
 	sz = strlen(str);
 	text = malloc(sz + 2);
 	strcpy(text, str);
 	text[sz + 1] = 0;
-	glsl_scan_buffer(text, sz + 2, context->scanner);
+	glsl__scan_buffer(text, sz + 2, context->scanner);
 
 	parse_internal(context);
 
 	free(text);
-	glsllex_destroy(context->scanner);
+	glsl_lex_destroy(context->scanner);
 	context->scanner = NULL;
 }
 

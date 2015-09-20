@@ -5,6 +5,8 @@ AM_CFLAGS+= -DLUA_USE_LINUX \
 	-DDATA_DIR=\"$(datadir)/b2l\"
 
 AM_CFLAGS+= -I$(builddir) \
+	-I$(builddir)/glsl-parser \
+	-I$(srcdir)/glsl-parser \
 	-I$(srcdir) \
 	-I${srcdir}/lua/src \
 	-I${srcdir}/lgi/lgi
@@ -64,8 +66,13 @@ LGI_SRC := lgi/lgi/buffer.c \
 	lgi/lgi/object.c \
 	lgi/lgi/record.c
 
-BUILT_SOURCES=lex.glsl.c lex.meta.c glsl.tab.c
-CLEAN_FILES=$(BUILT_SOURCES) lex.glsl.h lex.meta.h glsl.tab.h
+GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
+	glsl-parser/glsl.lexer.c \
+	glsl-parser/glsl_regen.c \
+	glsl-parser/glsl_ast.c
+
+BUILT_SOURCES=lex.glsl.c lex.meta.c glsl.tab.c glsl-parser/glsl.lexer.c glsl-parser/glsl.parser.c
+CLEAN_FILES=$(BUILT_SOURCES) lex.glsl.h lex.meta.h glsl.tab.h glsl-parser/glsl.lexer.h glsl-parser/glsl.parser.h
 
 lex.glsl.c lex.glsl.h: glsl.lex
 	$(FLEX) --header-file=lex.glsl.h -P glsl -o lex.glsl.c $<
@@ -75,6 +82,12 @@ lex.meta.c lex.meta.h: glsl_meta_filter.lex
 
 glsl.tab.c glsl.tab.h: glsl.y
 	$(BISON) $<
+
+glsl-parser/glsl.lexer.c: glsl-parser/glsl.lex
+	flex -o $@ $<
+
+glsl-parser/glsl.parser.c: glsl-parser/glsl.y
+	bison $< -o $@
 
 luadir = $(datadir)/b2l/
 lgidir = $(datadir)/b2l/lgi
@@ -121,6 +134,7 @@ lgi_lgi_override_DATA := lgi/lgi/override/Clutter.lua \
 bin_PROGRAMS=b2l_material_editor
 b2l_material_editor_SOURCES:= $(LUA_SRC) \
 	$(LGI_SRC) \
+	$(GLSL_PARSER_SRC) \
 	b2l_material_editor.c \
 	glsl.tab.c \
 	lex.meta.c \

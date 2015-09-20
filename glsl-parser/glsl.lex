@@ -4,11 +4,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define YYSTYPE GLSLSTYPE
+#define YYSTYPE GLSL_STYPE
 #include "glsl_parser.h"
 #include "glsl.parser.h"
-
-GLSLSTYPE glsllval;
 
 %}
 
@@ -16,8 +14,8 @@ GLSLSTYPE glsllval;
 %option reentrant
 %option bison-bridge
 %option noyywrap
-%option header-file="glsl.lexer.h"
-%option prefix="glsl"
+%option header-file="glsl-parser/glsl.lexer.h"
+%option prefix="glsl_"
 
 ws			[ \t]+
 digit			[0-9]
