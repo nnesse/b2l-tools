@@ -210,7 +210,6 @@ static const char *code_to_str[4096] = {
 	[MEDIUMP] = "MEDIUMP",
 	[LOWP] = "LOWP",
 	[PRECISION] = "PRECISION",
-	[AT] = "AT",
 
 	[UNARY_PLUS] = "UNARY_PLUS",
 	[UNARY_DASH] = "UNARY_DASH",
@@ -268,6 +267,9 @@ static const char *code_to_str[4096] = {
 	[SUBROUTINE_TYPE] = "SUBROUTINE_TYPE",
 	[PAREN_EXPRESSION] = "PAREN_EXPRESSION",
 	[DECLARATION_STATEMENT] = "DECLARATION_STATEMENT",
+	[SECTION] = "SECTION",
+	[DECLARATION_STATEMENT_LIST] = "DECLARATION_STATEMENT_LIST",
+	[SECTION_STATEMENT] = "SECTION_STATEMENT",
 	[NUM_GLSL_TOKEN] = ""
 };
 
@@ -286,6 +288,7 @@ bool glsl_is_list_node(struct glsl_node *n)
 	case STRUCT_DECLARATION_LIST:
 	case TRANSLATION_UNIT:
 	case FUNCTION_CALL_PARAMETER_LIST:
+	case DECLARATION_STATEMENT_LIST:
 		return true;
 	default:
 		return false;

@@ -14,12 +14,7 @@
 #define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
 #define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
-#include "glsl.tab.h"
-#include "glsl_common.h"
-
-#include "lex.glsl.h"
-#undef yytext_ptr
-#include "lex.meta.h"
+#include "glsl_parser.h"
 
 #include "geometry.h"
 #include "program.h"
@@ -584,115 +579,186 @@ static int need_redraw(lua_State *L)
 	return 0;
 }
 
+struct tree_walk_data {
+	struct glsl_node *node_stack[1024];
+	int node_stack_level;
+
+	struct glsl_node *parent_stack[1024];
+	int parent_stack_idx[1024];
+	int parent_stack_level;
+};
+
+static void tree_walk_push(struct tree_walk_data *data, struct glsl_node *n)
+{
+	data->node_stack[data->node_stack_level] = n;
+	data->parent_stack[data->parent_stack_level] = n;
+	data->parent_stack_idx[data->parent_stack_level] = data->node_stack_level;
+	data->parent_stack_level++;
+	data->node_stack_level++;
+}
+
+static void tree_walk(struct tree_walk_data *data, intptr_t state,
+		void (*enter_node)(struct tree_walk_data *data, struct glsl_node *n, intptr_t state),
+		void (*exit_node)(struct tree_walk_data *data, struct glsl_node *n, intptr_t state))
+{
+	while (1) {
+		struct glsl_node *n;
+
+		while (data->parent_stack_level && data->parent_stack_idx[data->parent_stack_level - 1] == data->node_stack_level) {
+			data->parent_stack_level--;
+			exit_node(data, data->parent_stack[data->parent_stack_level], state);
+		}
+
+		data->node_stack_level--;
+
+		if (data->node_stack_level < 0)
+			break;
+
+		n = data->node_stack[data->node_stack_level];
+
+		enter_node(data, n, state);
+	}
+}
+
+struct insert_shader_uniforms_state {
+	const char *tag;
+	const char *name;
+	int type_code;
+	bool uniform;
+	lua_State *L;
+	int uniform_table_idx;
+};
+
+static void insert_shader_uniforms_enter(struct tree_walk_data *data, struct glsl_node *n, intptr_t state_)
+{
+	int i;
+	struct insert_shader_uniforms_state *state = (struct insert_shader_uniforms_state *) state_;
+	switch(n->code) {
+	case TRANSLATION_UNIT:
+	case DECLARATION_STATEMENT_LIST:
+		for (i = n->child_count - 1; i >= 0; i--) {
+			tree_walk_push(data, n->children[i]); //DECLARATION_STATEMENT
+		}
+		break;
+	case TYPE_QUALIFIER_LIST:
+		for (i = 0; i < n->child_count; i++) {
+			if (n->children[i]->code == UNIFORM) {
+				state->uniform = true;
+			}
+		}
+		break;
+	case DECLARATION_STATEMENT:
+		tree_walk_push(data, n->children[0]); //declaration
+		break;
+	case SECTION_STATEMENT:
+		state->tag = n->children[0]->data.str; //IDENTIFIER
+		tree_walk_push(data, n->children[1]);
+		break;
+	case SINGLE_DECLARATION:
+		state->name = n->children[1]->data.str; //IDENTIFIER
+		tree_walk_push(data, n->children[0]);
+		break;
+	case FULLY_SPECIFIED_TYPE:
+		tree_walk_push(data, n->children[1]);
+		tree_walk_push(data, n->children[0]);
+		break;
+	case TYPE_SPECIFIER:
+		state->type_code = n->children[0]->code; //type_specifier_nonarray
+		break;
+	}
+}
+
+static void insert_shader_uniforms_exit(struct tree_walk_data *data, struct glsl_node *n, intptr_t state_)
+{
+	struct insert_shader_uniforms_state *state = (struct insert_shader_uniforms_state *) state_;
+
+	switch (n->code) {
+	case SECTION_STATEMENT:
+		state->tag = NULL;
+		break;
+	case DECLARATION_STATEMENT: {
+		const char *type_string;
+		switch (state->type_code) {
+		case FLOAT:
+			type_string = "float";
+			break;
+		case VEC3:
+			type_string = "vec3";
+			break;
+		case MAT4:
+			type_string = "mat4";
+			break;
+		case BOOL:
+			type_string = "bool";
+			break;
+		case SAMPLER2D:
+			type_string = "sampler2D";
+			break;
+		default:
+			type_string = NULL;
+		}
+		if (state->uniform && type_string && state->name) {
+			lua_getfield(state->L, state->uniform_table_idx, state->name);
+			if (lua_isnil(state->L, -1)) {
+				lua_newtable(state->L);
+				lua_pushstring(state->L, type_string);
+				lua_setfield(state->L, -2, "datatype");
+				if (state->tag) {
+					lua_pushstring(state->L, state->tag);
+					lua_setfield(state->L, -2, "tag");
+				}
+				lua_setfield(state->L, state->uniform_table_idx, state->name);
+			}
+			lua_pushstring(state->L, state->name);
+			lua_rawseti(state->L, state->uniform_table_idx, lua_rawlen(state->L, state->uniform_table_idx) + 1);
+			lua_pop(state->L, 1);
+		}
+		state->uniform = false;
+		state->type_code = -1;
+		state->name = NULL;
+	} break;
+	}
+}
+
 int insert_shader_uniforms(lua_State *L, int text_idx, int uniform_table_idx)
 {
-	struct declaration *d;
-	char *text;
-	int sz;
-	int rc;
-	g_decls = NULL;
 	const char *temp = lua_tostring(L, text_idx);
-	sz = strlen(temp);
-	text = malloc(sz + 2);
-	strcpy(text, temp);
-	text[sz + 1] = 0;
-	glsl_scan_buffer(text, sz + 2);
-	rc = glslparse();
-	if (rc) {
-		free(text);
-		return -1;
-	}
-	d = g_decls;
-	while (d) {
-		if (d->gen.code == DECLARATION_NODE) {
-			bool uniform = false;
-			const char *type_string = "";
-			int type_code;
-			if (d->type) {
-				struct generic_list *gl = (struct generic_list *)d->type->qualifiers;
-				while (gl != NULL) {
-					switch(gl->ent->code) {
-					case UNIFORM:
-						uniform = true;
-						break;
-					}
-					gl = gl->next;
-				}
-				if (d->type->specifier && ((struct type_specifier *)d->type->specifier)->nonarray) {
-					type_code = ((struct type_specifier *)d->type->specifier)->nonarray->code;
-					switch (type_code) {
-					case FLOAT:
-						type_string = "float";
-						break;
-					case VEC3:
-						type_string = "vec3";
-						break;
-					case MAT4:
-						type_string = "mat4";
-						break;
-					case BOOL:
-						type_string = "bool";
-						break;
-					case SAMPLER2D:
-						type_string = "sampler2D";
-						break;
-					}
-				}
-			}
-			if (uniform) {
-				lua_getfield(L, uniform_table_idx, d->name);
-				if (lua_isnil(L, -1)) {
-					lua_newtable(L);
-					lua_pushstring(L, type_string);
-					lua_setfield(L, -2, "datatype");
-					if (d->tag) {
-						lua_pushstring(L, d->tag->name);
-						lua_setfield(L, -2, "tag");
-					}
-					lua_setfield(L, uniform_table_idx, d->name);
-				}
-				lua_pushstring(L, d->name);
-				lua_rawseti(L, uniform_table_idx, lua_rawlen(L, uniform_table_idx) + 1);
-				lua_pop(L, 1);
-			}
-		} else if (d->gen.code == FUNCTION_NODE) {
-			//printf("function %s\n", d->name);
-		}
-		d = d->next;
-	}
+	struct glsl_parse_context context;
+
+	glsl_parse_context_init(&context);
+
+	glsl_parse_string(&context, temp);
+
+	struct tree_walk_data td;
+	struct insert_shader_uniforms_state lstate;
+
+	td.node_stack_level = 0;
+	td.parent_stack_level = 0;
+
+	//Data we need during traversal
+	lstate.L = L;
+	lstate.uniform_table_idx = uniform_table_idx;
+	lstate.type_code = -1;
+	lstate.uniform = false;
+	lstate.name = NULL;
+	lstate.tag = NULL;
+
+	tree_walk_push(&td, context.root);
+
+	tree_walk(&td, (intptr_t)&lstate, insert_shader_uniforms_enter, insert_shader_uniforms_exit);
+
+	glsl_parse_context_destroy(&context);
 	return 0;
 }
 
 //
-// Strip text between @ tokens from shader text
+// Strip meta-data from shader text
 //
 int filter_shader_text(lua_State *L)
 {
 	const char *temp = lua_tostring(L, -1);
-	int sz = strlen(temp);
-	char *text = malloc(sz + 2);
-	strcpy(text, temp);
-	text[sz + 1] = 0;
-	meta_scan_buffer(text, sz + 2);
-	int filtered_sz = 0;
-	while (metalex()) {
-		filtered_sz += strlen(metalval);
-	}
-	metalex_destroy();
-
-	char *out_text = malloc(filtered_sz + 1);
-	char *c = out_text;
-	meta_scan_buffer(text, sz + 2);
-	while (metalex()) {
-		int s = strlen(metalval);
-		memcpy(c, metalval, s);
-		c += s;
-	}
-	*c = 0;
-	metalex_destroy();
-	free(text);
-	lua_pushstring(L, out_text);
-	free(out_text);
+	//TODO
+	lua_pushstring(L, temp);
 	return 1;
 }
 

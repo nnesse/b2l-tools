@@ -215,6 +215,7 @@ static const char *token_to_str[4096] = {
 	[PRECISION] = "precision",
 	[UNARY_PLUS] = "+",
 	[UNARY_DASH] = "-",
+	[SECTION] = "section",
 	[NUM_GLSL_TOKEN] = ""
 };
 
@@ -499,6 +500,8 @@ static void _glsl_regen_tree(struct glsl_node *n, struct string *out, int depth)
 	case DECLARATION_STATEMENT:
 		_glsl_regen_tree(n->children[0], out, depth);
 		break;
+	case SECTION_STATEMENT:
+	case DECLARATION_STATEMENT_LIST:
 	case TYPE_SPECIFIER:
 	case POSTFIX_EXPRESSION:
 	case CONDITION_OPT:

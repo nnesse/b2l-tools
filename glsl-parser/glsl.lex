@@ -196,6 +196,7 @@ image2DMSArray		return IMAGE2DMSARRAY;
 iimage2DMSArray		return IIMAGE2DMSARRAY;
 uimage2DMSArray		return UIMAGE2DMSARRAY;
 struct			return STRUCT;
+section			return SECTION;
 
 \<\< return LEFT_OP;
 \>\> return RIGHT_OP;

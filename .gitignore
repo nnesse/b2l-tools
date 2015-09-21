@@ -1,12 +1,5 @@
 ignore
 
-#bison
-glsl.tab.?
-
-#flex
-lex.glsl.?
-lex.meta.?
-
 #glbindify
 glbindify
 glb-*.?

@@ -71,23 +71,14 @@ GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
 	glsl-parser/glsl_regen.c \
 	glsl-parser/glsl_ast.c
 
-BUILT_SOURCES=lex.glsl.c lex.meta.c glsl.tab.c glsl-parser/glsl.lexer.c glsl-parser/glsl.parser.c
-CLEAN_FILES=$(BUILT_SOURCES) lex.glsl.h lex.meta.h glsl.tab.h glsl-parser/glsl.lexer.h glsl-parser/glsl.parser.h
-
-lex.glsl.c lex.glsl.h: glsl.lex
-	$(FLEX) --header-file=lex.glsl.h -P glsl -o lex.glsl.c $<
-
-lex.meta.c lex.meta.h: glsl_meta_filter.lex
-	$(FLEX) --header-file=lex.meta.h -P meta -o lex.meta.c $<
-
-glsl.tab.c glsl.tab.h: glsl.y
-	$(BISON) $<
+BUILT_SOURCES=glsl-parser/glsl.lexer.c glsl-parser/glsl.parser.c
+CLEAN_FILES=$(BUILT_SOURCES) glsl-parser/glsl.lexer.h glsl-parser/glsl.parser.h
 
 glsl-parser/glsl.lexer.c: glsl-parser/glsl.lex
-	flex -o $@ $<
+	$(FLEX) -o $@ $<
 
 glsl-parser/glsl.parser.c: glsl-parser/glsl.y
-	bison $< -o $@
+	$(BISON) $< -o $@
 
 luadir = $(datadir)/b2l/
 lgidir = $(datadir)/b2l/lgi
@@ -136,8 +127,5 @@ b2l_material_editor_SOURCES:= $(LUA_SRC) \
 	$(LGI_SRC) \
 	$(GLSL_PARSER_SRC) \
 	b2l_material_editor.c \
-	glsl.tab.c \
-	lex.meta.c \
-	lex.glsl.c \
 	geometry.c \
 	program.c

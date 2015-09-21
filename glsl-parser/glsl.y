@@ -210,6 +210,8 @@ struct glsl_node *new_null_glsl_identifier(struct glsl_parse_context *context)
 %type <struct glsl_node *> field_selection
 %type <struct glsl_node *> type_specifier_identifier
 %type <struct glsl_node *> layout_identifier
+%type <struct glsl_node *> section_statement
+%type <struct glsl_node *> declaration_statement_list
 
 %type <int> assignment_operator
 %type <int> unary_operator
@@ -425,7 +427,6 @@ struct glsl_node *new_null_glsl_identifier(struct glsl_parse_context *context)
 %token MEDIUMP
 %token LOWP
 %token PRECISION
-%token AT
 
 %token UNARY_PLUS
 %token UNARY_DASH
@@ -483,8 +484,10 @@ struct glsl_node *new_null_glsl_identifier(struct glsl_parse_context *context)
 %token LAYOUT_QUALIFIER_ID_LIST
 %token SUBROUTINE_TYPE
 %token PAREN_EXPRESSION
+%token SECTION
+%token DECLARATION_STATEMENT_LIST
+%token SECTION_STATEMENT
 %token NUM_GLSL_TOKEN
-
 %%
 
 root			: { context->root = new_glsl_node(context, TRANSLATION_UNIT, NULL); }
@@ -493,6 +496,10 @@ root			: { context->root = new_glsl_node(context, TRANSLATION_UNIT, NULL); }
 
 translation_unit	: external_declaration { $$ = new_glsl_node(context,TRANSLATION_UNIT, $1, NULL); }
 			| translation_unit external_declaration { $$ = new_glsl_node(context,TRANSLATION_UNIT, $1, $2, NULL); }
+			| section_statement { $$ = $1; }
+			;
+
+section_statement 	: SECTION IDENTIFIER LEFT_BRACE DECLARATION_STATEMENT_LIST RIGHT_BRACE SEMICOLON
 			;
 
 block_identifier	: IDENTIFIER { $$ = new_glsl_node(context,IDENTIFIER, NULL); $$->data.str = glsl_parse_strdup(context, $1); }
@@ -527,6 +534,7 @@ type_specifier_identifier : IDENTIFIER { $$ = new_glsl_node(context,IDENTIFIER, 
 
 external_declaration	: function_definition { $$ = $1; }
 			| declaration_statement { $$ = $1; }
+			| section_statement { $$ = $1; }
 			;
 
 function_definition	: function_prototype compound_statement_no_new_scope { $$ = new_glsl_node(context,FUNCTION_DEFINITION, $1, $2, NULL); }
@@ -559,6 +567,9 @@ simple_statement	: declaration_statement { $$ = $1; }
 			;
 
 declaration_statement	: declaration { $$ = new_glsl_node(context,DECLARATION_STATEMENT, $1, NULL); }
+
+declaration_statement_list : declaration_statement { $$ = new_glsl_node(context, DECLARATION_STATEMENT_LIST, $1, NULL); }
+			| declaration_statement_list declaration_statement { $$ = new_glsl_node(context, $1, $2); }
 			;
 
 declaration		: function_prototype SEMICOLON { $$ = $1; }
