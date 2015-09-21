@@ -157,8 +157,8 @@ static const char *code_to_str[4096] = {
 	[STRUCT] = "STRUCT",
 	[VOID] = "VOID",
 	[WHILE] = "WHILE",
-	[TRUE] = "TRUE",
-	[FALSE] = "FALSE",
+	[TRUE_VALUE] = "TRUE_VALUE",
+	[FALSE_VALUE] = "FALSE_VALUE",
 	[LEFT_OP] = "LEFT_OP",
 	[RIGHT_OP] = "RIGHT_OP",
 	[INC_OP] = "INC_OP",
@@ -268,7 +268,7 @@ static const char *code_to_str[4096] = {
 	[SUBROUTINE_TYPE] = "SUBROUTINE_TYPE",
 	[PAREN_EXPRESSION] = "PAREN_EXPRESSION",
 	[DECLARATION_STATEMENT] = "DECLARATION_STATEMENT",
-	[NUM_TOKEN] = ""
+	[NUM_GLSL_TOKEN] = ""
 };
 
 bool glsl_is_list_node(struct glsl_node *n)
