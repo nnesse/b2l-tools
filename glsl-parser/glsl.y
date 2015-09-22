@@ -203,6 +203,7 @@ struct glsl_node *new_null_glsl_identifier(struct glsl_parse_context *context)
 %type <struct glsl_node *> variable_identifier
 %type <struct glsl_node *> decl_identifier
 %type <struct glsl_node *> block_identifier
+%type <struct glsl_node *> section_identifier
 %type <struct glsl_node *> struct_name
 %type <struct glsl_node *> type_name
 %type <struct glsl_node *> param_name
@@ -496,10 +497,9 @@ root			: { context->root = new_glsl_node(context, TRANSLATION_UNIT, NULL); }
 
 translation_unit	: external_declaration { $$ = new_glsl_node(context,TRANSLATION_UNIT, $1, NULL); }
 			| translation_unit external_declaration { $$ = new_glsl_node(context,TRANSLATION_UNIT, $1, $2, NULL); }
-			| section_statement { $$ = $1; }
 			;
 
-section_statement 	: SECTION IDENTIFIER LEFT_BRACE DECLARATION_STATEMENT_LIST RIGHT_BRACE SEMICOLON
+section_statement 	: SECTION section_identifier LEFT_BRACE declaration_statement_list RIGHT_BRACE SEMICOLON {$$ = new_glsl_node(context,SECTION_STATEMENT, $2, $4, NULL); }
 			;
 
 block_identifier	: IDENTIFIER { $$ = new_glsl_node(context,IDENTIFIER, NULL); $$->data.str = glsl_parse_strdup(context, $1); }
@@ -530,6 +530,9 @@ layout_identifier	: IDENTIFIER { $$ = new_glsl_node(context,IDENTIFIER, NULL); $
 			;
 
 type_specifier_identifier : IDENTIFIER { $$ = new_glsl_node(context,IDENTIFIER, NULL); $$->data.str = glsl_parse_strdup(context, $1); }
+			;
+
+section_identifier : IDENTIFIER { $$ = new_glsl_node(context,IDENTIFIER, NULL); $$->data.str = glsl_parse_strdup(context, $1); }
 			;
 
 external_declaration	: function_definition { $$ = $1; }
@@ -569,7 +572,7 @@ simple_statement	: declaration_statement { $$ = $1; }
 declaration_statement	: declaration { $$ = new_glsl_node(context,DECLARATION_STATEMENT, $1, NULL); }
 
 declaration_statement_list : declaration_statement { $$ = new_glsl_node(context, DECLARATION_STATEMENT_LIST, $1, NULL); }
-			| declaration_statement_list declaration_statement { $$ = new_glsl_node(context, $1, $2); }
+			| declaration_statement_list declaration_statement { $$ = new_glsl_node(context, DECLARATION_STATEMENT_LIST, $1, $2, NULL); }
 			;
 
 declaration		: function_prototype SEMICOLON { $$ = $1; }
@@ -1088,6 +1091,7 @@ static void list_collapse(struct glsl_parse_context *context, struct glsl_node *
 			g->code = list_token;
 			g->child_count = 0;
 			list_gather(child, g, list_token);
+			assert(g->child_count == length);
 			n->children[i] = g;
 			child = g;
 		}
@@ -1111,7 +1115,7 @@ static void parse_internal(struct glsl_parse_context *context)
 			int list_code = context->root->code;
 			int length = list_length(context->root, list_code);
 			struct glsl_node *new_root = (struct glsl_node *)glsl_parse_alloc(context, offsetof(struct glsl_node, children[length]), 8);
-			new_root->code = TRANSLATION_UNIT;
+			new_root->code = list_code;
 			new_root->child_count = 0;
 			list_gather(context->root, new_root, list_code);
 			assert(new_root->child_count == length);
@@ -1120,6 +1124,7 @@ static void parse_internal(struct glsl_parse_context *context)
 		//
 		// Collapse other list nodes
 		//
+
 		list_collapse(context, context->root);
 	}
 }

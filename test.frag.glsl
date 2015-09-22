@@ -7,20 +7,20 @@ in FS_IN {
 } fs_in;
 out vec4 color;
 
-//section Material {
+section Material {
 	uniform sampler2D diffuse_texture;
 	uniform sampler2D normal_texture;
 	uniform bool bump;
 	uniform float bump_depth;
-//};
+};
 
-//section Lighting {
+section Lighting {
 	uniform float ambient_light;
 	uniform float light_angle_a;
 	uniform float light_angle_b;
 	uniform float light_intensity;
 	uniform vec3 light_color;
-//};
+};
 
 vec4 shade(vec3 normal, vec3 tangent, vec3 bitangent, vec3 light_color, vec3 light_dir, float light_intensity)
 {

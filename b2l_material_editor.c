@@ -711,11 +711,21 @@ int insert_shader_uniforms(lua_State *L, int text_idx, int uniform_table_idx)
 //
 // Strip meta-data from shader text
 //
+
 int filter_shader_text(lua_State *L)
 {
-	const char *temp = lua_tostring(L, -1);
-	//TODO
-	lua_pushstring(L, temp);
+	const char *input = lua_tostring(L, -1);
+	char *output;
+	struct glsl_parse_context context;
+	glsl_parse_context_init(&context);
+	glsl_parse_string(&context, input);
+	output = glsl_regen_tree(context.root);
+	glsl_parse_context_destroy(&context);
+	lua_pushstring(L, "#version 330\n"); //TODO: we need to grab the actual text for this
+	lua_pushstring(L, output);
+	lua_concat(L, 2);
+	printf("%s\n", output);
+	free(output);
 	return 1;
 }
 
