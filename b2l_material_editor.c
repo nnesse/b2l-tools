@@ -15,6 +15,7 @@
 #define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
 #include "glsl_parser.h"
+#include "glsl_ast.h"
 
 #include "geometry.h"
 #include "program.h"
@@ -579,47 +580,6 @@ static int need_redraw(lua_State *L)
 	return 0;
 }
 
-struct tree_walk_data {
-	struct glsl_node *node_stack[1024];
-	int node_stack_level;
-
-	struct glsl_node *parent_stack[1024];
-	int parent_stack_idx[1024];
-	int parent_stack_level;
-};
-
-static void tree_walk_push(struct tree_walk_data *data, struct glsl_node *n)
-{
-	data->node_stack[data->node_stack_level] = n;
-	data->parent_stack[data->parent_stack_level] = n;
-	data->parent_stack_idx[data->parent_stack_level] = data->node_stack_level;
-	data->parent_stack_level++;
-	data->node_stack_level++;
-}
-
-static void tree_walk(struct tree_walk_data *data, intptr_t state,
-		void (*enter_node)(struct tree_walk_data *data, struct glsl_node *n, intptr_t state),
-		void (*exit_node)(struct tree_walk_data *data, struct glsl_node *n, intptr_t state))
-{
-	while (1) {
-		struct glsl_node *n;
-
-		while (data->parent_stack_level && data->parent_stack_idx[data->parent_stack_level - 1] == data->node_stack_level) {
-			data->parent_stack_level--;
-			exit_node(data, data->parent_stack[data->parent_stack_level], state);
-		}
-
-		data->node_stack_level--;
-
-		if (data->node_stack_level < 0)
-			break;
-
-		n = data->node_stack[data->node_stack_level];
-
-		enter_node(data, n, state);
-	}
-}
-
 struct insert_shader_uniforms_state {
 	const char *tag;
 	const char *name;
@@ -629,7 +589,7 @@ struct insert_shader_uniforms_state {
 	int uniform_table_idx;
 };
 
-static void insert_shader_uniforms_enter(struct tree_walk_data *data, struct glsl_node *n, intptr_t state_)
+static void insert_shader_uniforms_enter(struct glsl_ast_walk_data *data, struct glsl_node *n, intptr_t state_)
 {
 	int i;
 	struct insert_shader_uniforms_state *state = (struct insert_shader_uniforms_state *) state_;
@@ -637,7 +597,7 @@ static void insert_shader_uniforms_enter(struct tree_walk_data *data, struct gls
 	case TRANSLATION_UNIT:
 	case DECLARATION_STATEMENT_LIST:
 		for (i = n->child_count - 1; i >= 0; i--) {
-			tree_walk_push(data, n->children[i]); //DECLARATION_STATEMENT
+			glsl_ast_walk_push_node(data, n->children[i]); //DECLARATION_STATEMENT
 		}
 		break;
 	case TYPE_QUALIFIER_LIST:
@@ -648,19 +608,19 @@ static void insert_shader_uniforms_enter(struct tree_walk_data *data, struct gls
 		}
 		break;
 	case DECLARATION_STATEMENT:
-		tree_walk_push(data, n->children[0]); //declaration
+		glsl_ast_walk_push_node(data, n->children[0]); //declaration
 		break;
 	case SECTION_STATEMENT:
 		state->tag = n->children[0]->data.str; //IDENTIFIER
-		tree_walk_push(data, n->children[1]);
+		glsl_ast_walk_push_node(data, n->children[1]);
 		break;
 	case SINGLE_DECLARATION:
 		state->name = n->children[1]->data.str; //IDENTIFIER
-		tree_walk_push(data, n->children[0]);
+		glsl_ast_walk_push_node(data, n->children[0]);
 		break;
 	case FULLY_SPECIFIED_TYPE:
-		tree_walk_push(data, n->children[1]);
-		tree_walk_push(data, n->children[0]);
+		glsl_ast_walk_push_node(data, n->children[1]); //TYPE_SPECIFIER
+		glsl_ast_walk_push_node(data, n->children[0]); //TYPE_QUALIFIER_LIST
 		break;
 	case TYPE_SPECIFIER:
 		state->type_code = n->children[0]->code; //type_specifier_nonarray
@@ -668,7 +628,7 @@ static void insert_shader_uniforms_enter(struct tree_walk_data *data, struct gls
 	}
 }
 
-static void insert_shader_uniforms_exit(struct tree_walk_data *data, struct glsl_node *n, intptr_t state_)
+static void insert_shader_uniforms_exit(struct glsl_ast_walk_data *data, struct glsl_node *n, intptr_t state_)
 {
 	struct insert_shader_uniforms_state *state = (struct insert_shader_uniforms_state *) state_;
 
@@ -729,11 +689,7 @@ int insert_shader_uniforms(lua_State *L, int text_idx, int uniform_table_idx)
 
 	glsl_parse_string(&context, temp);
 
-	struct tree_walk_data td;
 	struct insert_shader_uniforms_state lstate;
-
-	td.node_stack_level = 0;
-	td.parent_stack_level = 0;
 
 	//Data we need during traversal
 	lstate.L = L;
@@ -743,9 +699,10 @@ int insert_shader_uniforms(lua_State *L, int text_idx, int uniform_table_idx)
 	lstate.name = NULL;
 	lstate.tag = NULL;
 
-	tree_walk_push(&td, context.root);
-
-	tree_walk(&td, (intptr_t)&lstate, insert_shader_uniforms_enter, insert_shader_uniforms_exit);
+	struct glsl_ast_walk_data wd;
+	glsl_ast_walk_init(&wd);
+	glsl_ast_walk_push_node(&wd, context.root);
+	glsl_ast_walk(&wd, (intptr_t)&lstate, insert_shader_uniforms_enter, insert_shader_uniforms_exit);
 
 	glsl_parse_context_destroy(&context);
 	return 0;
