@@ -232,7 +232,7 @@ function update_controls(uniforms)
 			if not grid then
 				grid = Gtk.Grid {
 					row_spacing = 5,
-					margin_left = 30,
+					margin_start = 30,
 				}
 				local expander = Gtk.Expander {
 					label = tag,
@@ -244,7 +244,7 @@ function update_controls(uniforms)
 				settings_expanders[tag] = expander
 				grids_pos[tag] = 0
 			end
-			controls[k].widget.margin_left = 30
+			controls[k].widget.margin_start = 30
 			grid:attach(Gtk.Label { label = k, xalign = 0 } , 0, grids_pos[tag], 1, 1)
 			grid:attach(controls[k].widget, 1, grids_pos[tag], 1, 1)
 			grids_pos[tag] = grids_pos[tag] + 1
