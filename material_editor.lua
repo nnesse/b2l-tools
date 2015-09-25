@@ -488,9 +488,7 @@ function open_b2l_chooser_dialog()
 	chooser:add_filter(b2l_filter)
 	local res = chooser:run()
 	if res == Gtk.ResponseType.ACCEPT then
-		b2l_filename = chooser:get_filename()
-		load_b2l_file(b2l_filename)
-		b2l_file_button:set_filename(b2l_filename)
+		b2l_file_button:set_filename(chooser:get_filename())
 	end
 end
 
