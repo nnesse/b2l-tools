@@ -724,7 +724,6 @@ int filter_shader_text(lua_State *L)
 	lua_pushstring(L, "#version 330\n"); //TODO: we need to grab the actual text for this
 	lua_pushstring(L, output);
 	lua_concat(L, 2);
-	printf("%s\n", output);
 	free(output);
 	return 1;
 }
