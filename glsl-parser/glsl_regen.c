@@ -504,6 +504,8 @@ static void _glsl_regen_tree(struct glsl_node *n, struct string *out, int depth)
 		_glsl_regen_tree(n->children[1], out, depth);
 		break;
 	case DECLARATION_STATEMENT_LIST:
+		print_list_as_glsl(n, "", "\n", "", out, depth);
+		break;
 	case TYPE_SPECIFIER:
 	case POSTFIX_EXPRESSION:
 	case CONDITION_OPT:
