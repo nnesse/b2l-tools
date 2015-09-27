@@ -497,8 +497,9 @@ static void _glsl_regen_tree(struct glsl_node *n, struct string *out, int depth)
 			_glsl_regen_tree(n->children[1], out, depth);
 		}
 		break;
-	case DECLARATION_STATEMENT:
+	case DECLARATION:
 		_glsl_regen_tree(n->children[0], out, depth);
+		string_cat(out,"; ");
 		break;
 	case SECTION_STATEMENT:
 		_glsl_regen_tree(n->children[1], out, depth);

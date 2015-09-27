@@ -607,7 +607,7 @@ static void insert_shader_uniforms_enter(struct glsl_ast_walk_data *data, struct
 			}
 		}
 		break;
-	case DECLARATION_STATEMENT:
+	case DECLARATION:
 		glsl_ast_walk_push_node(data, n->children[0]); //declaration
 		break;
 	case SECTION_STATEMENT:
@@ -636,7 +636,7 @@ static void insert_shader_uniforms_exit(struct glsl_ast_walk_data *data, struct 
 	case SECTION_STATEMENT:
 		state->tag = NULL;
 		break;
-	case DECLARATION_STATEMENT: {
+	case DECLARATION: {
 		const char *type_string;
 		switch (state->type_code) {
 		case FLOAT:
@@ -719,11 +719,13 @@ int filter_shader_text(lua_State *L)
 	struct glsl_parse_context context;
 	glsl_parse_context_init(&context);
 	glsl_parse_string(&context, input);
-	output = glsl_regen_tree(context.root);
+	output = glsl_ast_generate_glsl(context.root);
 	glsl_parse_context_destroy(&context);
 	lua_pushstring(L, "#version 330\n"); //TODO: we need to grab the actual text for this
 	lua_pushstring(L, output);
 	lua_concat(L, 2);
+	//glsl_ast_print(context.root, 0);
+	//printf("%s\n", output);
 	free(output);
 	return 1;
 }

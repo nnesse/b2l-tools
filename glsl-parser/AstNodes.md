@@ -3,13 +3,11 @@ AST structure
 
 Each node in the AST has the same type `struct glsl_node`. The `glsl_node` struct stores a variable number of children in an array past the end of the structure. It also contains a `code` field that identifies what type of node it is and how to interpret it's child nodes. The node types are documented in the list below.
 
-In each entry below the value on the left side of the ":" is a node type and the values on the right define the type of child nodes the type can have. Nodes surrounded by brackets are optional and a "|" separated list denotes that the child can be any one of the types in the list. If a node is followed by `...` then it matches an arbitrary number of nodes (including zero) of that type. Entries in all lower case are simply assign a label to an "|" list and do not define a node type.
+In each entry below the value on the left side of the ":" is a node type and the values on the right define the type of child nodes the type has. Nodes surrounded by brackets are optional and a "|" separated list denotes that the child can be any one of the types in the list. If a node is followed by `...` then it matches an arbitrary number of nodes (including zero) of that type. Entries in all lower case simply assign a label to an "|" list and do not define a node type.
 
 AST node types
 --------------
-	TRANSLATION_UNIT        : DECLARATION_STATEMENT | FUNCTION_DEFINITON
-
-	DECLARATION_STATEMENT   : declaration
+	TRANSLATION_UNIT        : DECLARATION | FUNCTION_DEFINITON
 
 	FUNCTION_DEFINITION     : FUNCTION_DECLARATION STATEMENT_LIST
 
@@ -17,7 +15,7 @@ AST node types
 
 	FUNCTION_HEADER         : FULLY_SPECIFIED_TYPE IDENTIFIER
 
-	FUNCTION_PARAMETER_LIST : PARAMETER_DECLARATOR ...
+	FUNCTION_PARAMETER_LIST : PARAMETER_DECLARATION ...
 
 	PARAMETER_DECLARATION   : TYPE_QUALIFIER_LIST PARAMETER_DECLARATOR
 
@@ -103,11 +101,11 @@ AST node types
 
 	STATEMENT_LIST          : statement ...
 
-	statement               : DECLARATION_STATEMENT | EXPRESSION_STATEMENT | SELECTION_STATEMENT
+	statement               : DECLARATION | EXPRESSION_STATEMENT | SELECTION_STATEMENT
 	                        | RETURN | RETURN_VALUE | BREAK | FOR_STATEMENT | WHILE_STATEMENT
 	                        | DO_STATEMENT
 
-	declaration             : SINGLE_DECLARATION | SINGLE_INIT_DECLARATION | BLOCK_DECLARATION
+	DECLARATION		: SINGLE_DECLARATION | SINGLE_INIT_DECLARATION | BLOCK_DECLARATION | FUNCTION_DECLARATION
 
 	EXPRESSION_STATEMENT	: expression
 
@@ -155,7 +153,7 @@ AST node types
 
 	FOR_STATEMENT           : for_init_statement FOR_REST_STATEMENT
 
-	for_init_statement      : EXPRESSION_STATEMENT | declaration
+	for_init_statement      : EXPRESSION_STATEMENT | DECLARATION
 
 	FOR_REST_STATEMENT      : CONDITION_OPT [expression]
 
