@@ -7,6 +7,8 @@ AM_CFLAGS+= -DLUA_USE_LINUX \
 AM_CFLAGS+= -I$(builddir) \
 	-I$(builddir)/glsl-parser \
 	-I$(srcdir)/glsl-parser \
+	-I$(builddir)/glplatform \
+	-I$(srcdir)/glplatform \
 	-I$(srcdir) \
 	-I${srcdir}/lua/src \
 	-I${srcdir}/lgi/lgi
@@ -71,14 +73,32 @@ GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
 	glsl-parser/glsl_regen.c \
 	glsl-parser/glsl_ast.c
 
-BUILT_SOURCES=glsl-parser/glsl.lexer.c glsl-parser/glsl.parser.c
-CLEAN_FILES=$(BUILT_SOURCES) glsl-parser/glsl.lexer.h glsl-parser/glsl.parser.h
+GLPLATFORM_SRC := glplatform/glplatform-linux.c \
+	glplatform/glplatform-glcore.c \
+	glplatform/glplatform-glx.c
+
+BUILT_SOURCES=glsl-parser/glsl.lexer.c \
+	      glsl-parser/glsl.parser.c \
+	      glplatform/glplatform-glcore.c \
+	      glplatform/glplatform-glx.c
+
+CLEAN_FILES=$(BUILT_SOURCES) \
+	    glsl-parser/glsl.lexer.h \
+	    glsl-parser/glsl.parser.h \
+	    glplatform/glplatform-glcore.h \
+	    glplatform/glplatform-glx.h
 
 glsl-parser/glsl.lexer.c: glsl-parser/glsl.lex
 	$(FLEX) -o $@ $<
 
 glsl-parser/glsl.parser.c: glsl-parser/glsl.y
 	$(BISON) $< -o $@
+
+glplatform/glplatform-glcore.c:
+	cd glplatform && $(GLBINDIFY) -a gl -n glplatform
+
+glplatform/glplatform-glx.c:
+	cd glplatform && $(GLBINDIFY) -a glx -n glplatform
 
 luadir = $(datadir)/b2l/
 lgidir = $(datadir)/b2l/lgi
@@ -126,6 +146,7 @@ bin_PROGRAMS=b2l_material_editor
 b2l_material_editor_SOURCES:= $(LUA_SRC) \
 	$(LGI_SRC) \
 	$(GLSL_PARSER_SRC) \
+	$(GLPLATFORM_SRC) \
 	b2l_material_editor.c \
 	geometry.c \
 	program.c

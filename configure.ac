@@ -11,9 +11,12 @@ AC_CHECK_PROG(FLEX,flex,flex)
 
 AS_IF([test x$FLEX != xflex],AC_MSG_ERROR([Could not find flex]))
 
+AC_CHECK_PROG(GLBINDIFY,glbindify,glbindify,no)
+
+AS_IF([test x$GLBINDIFY = xno],AC_MSG_ERROR([Could not find glbindify]))
+
 AC_CHECK_LIB([X11],[XOpenDisplay],,AC_MSG_ERROR([Could not find libX11]))
 AC_CHECK_LIB([GL],[glXGetProcAddress],,AC_MSG_ERROR([Could not find libGL]))
-AC_CHECK_LIB([glplatform],[glplatform_init],,AC_MSG_ERROR([Could not find libglplatform]))
 AC_CHECK_LIB([dl],[dlopen],,AC_MSG_ERROR([Could not find libdl]))
 AC_CHECK_LIB([m],[sin],,AC_MSG_ERROR([Could not find libm]))
 
