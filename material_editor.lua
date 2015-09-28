@@ -709,7 +709,7 @@ local vbox_main = Gtk.VBox {
 	},
 	{
 		Gtk.Grid {
-			margin_left= 30,
+			margin_start = 30,
 			row_spacing = 3,
 			column_spacing = 30,
 			{
