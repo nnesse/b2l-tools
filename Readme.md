@@ -41,7 +41,7 @@ Example: A simple main loop
 		}
 	}
 
-If false is passed into `glplatform_get_events()` then `glplatform` will not block and returns the number of events queued, allowing the user to poll for events. `glplatform` uses `epoll()` to wait for events and it exposes the epoll file descriptor it uses to the application as `glplatform_epoll_fd`. This may allow for `glplatform` event processing to be performed in combination with other event processing systems without polling.
+If false is passed into `glplatform_get_events()` then `glplatform` will not block and returns the number of events queued, allowing the user to poll for events. On Linux `glplatform` uses `epoll()` to wait for events and it exposes the epoll file descriptor it uses to the application as `glplatform_epoll_fd`. This may allow for `glplatform` event processing to be performed in combination with other event processing systems without polling.
 
 Creating an OpenGL context
 --------------------------
