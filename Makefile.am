@@ -78,27 +78,17 @@ GLPLATFORM_SRC := glplatform/glplatform-linux.c \
 	glplatform/glplatform-glx.c
 
 BUILT_SOURCES=glsl-parser/glsl.lexer.c \
-	      glsl-parser/glsl.parser.c \
-	      glplatform/glplatform-glcore.c \
-	      glplatform/glplatform-glx.c
+	      glsl-parser/glsl.parser.c
 
 CLEAN_FILES=$(BUILT_SOURCES) \
 	    glsl-parser/glsl.lexer.h \
-	    glsl-parser/glsl.parser.h \
-	    glplatform/glplatform-glcore.h \
-	    glplatform/glplatform-glx.h
+	    glsl-parser/glsl.parser.h
 
 glsl-parser/glsl.lexer.c: glsl-parser/glsl.lex
 	$(FLEX) -o $@ $<
 
 glsl-parser/glsl.parser.c: glsl-parser/glsl.y
 	$(BISON) $< -o $@
-
-glplatform/glplatform-glcore.c:
-	cd glplatform && $(GLBINDIFY) -a gl -n glplatform
-
-glplatform/glplatform-glx.c:
-	cd glplatform && $(GLBINDIFY) -a glx -n glplatform
 
 luadir = $(datadir)/b2l/
 lgidir = $(datadir)/b2l/lgi
