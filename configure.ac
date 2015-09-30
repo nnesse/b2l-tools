@@ -1,5 +1,5 @@
 AC_PREREQ(2.59)
-AC_INIT(glplatform, 0.1)
+AC_INIT(glplatform, 0.2)
 
 AC_CHECK_LIB([X11],[XOpenDisplay],,AC_MSG_ERROR([Could not find libX11]))
 AC_CHECK_LIB([GL],[glXGetProcAddress],,AC_MSG_ERROR([Could not find libGL]))
