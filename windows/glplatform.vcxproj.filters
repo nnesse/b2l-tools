@@ -15,25 +15,25 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="glplatform-glcore.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="glplatform-wgl.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\glplatform-win32.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glplatform-glcore.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glplatform-wgl.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="glplatform-glcore.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="glplatform-wgl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\glplatform.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glplatform-glcore.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glplatform-wgl.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
