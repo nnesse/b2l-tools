@@ -85,10 +85,10 @@ CLEAN_FILES=$(BUILT_SOURCES) \
 	    glsl-parser/glsl.parser.h
 
 glsl-parser/glsl.lexer.c: glsl-parser/glsl.lex
-	$(FLEX) -o $@ $<
+	$(FLEX) --header-file=glsl-parser/glsl.lexer.h -o $@ $<
 
 glsl-parser/glsl.parser.c: glsl-parser/glsl.y
-	$(BISON) $< -o $@
+	$(BISON) --defines=glsl-parser/glsl.parser.h  $< -o $@
 
 luadir = $(datadir)/b2l/
 lgidir = $(datadir)/b2l/lgi

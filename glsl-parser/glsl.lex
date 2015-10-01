@@ -5,6 +5,24 @@
 #include <string.h>
 
 #define YYSTYPE GLSL_STYPE
+#define YYLTYPE GLSL_LTYPE
+
+#define YY_USER_ACTION \
+    yylloc->first_line = yylloc->last_line; \
+    yylloc->first_column = yylloc->last_column; \
+    { \
+        int i; \
+        for(i = 0; yytext[i] != '\0'; i++) { \
+            if(yytext[i] == '\n') { \
+                yylloc->last_line++; \
+                yylloc->last_column = 0; \
+            } \
+            else { \
+                yylloc->last_column++; \
+            } \
+        } \
+    }
+
 #include "glsl_parser.h"
 #include "glsl.parser.h"
 
@@ -13,8 +31,9 @@
 
 %option reentrant
 %option bison-bridge
+%option bison-locations
+%option yylineno
 %option noyywrap
-%option header-file="glsl-parser/glsl.lexer.h"
 %option prefix="glsl_"
 
 ws			[ \t]+
