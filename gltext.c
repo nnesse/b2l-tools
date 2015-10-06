@@ -26,8 +26,8 @@ struct gltext_font {
 	gltext_renderer_t renderer;
 	int total_glyphs;
 	GLuint atlas_texture;
-	GLuint glyph_size_texture;
-	GLuint glyph_size_texture_buffer;
+	GLuint glyph_metric_texture;
+	GLuint glyph_metric_texture_buffer;
 	int max_char;
 };
 
@@ -66,7 +66,7 @@ struct renderer
 	GLuint stream_vbo;
 	int sampler_loc;
 	int color_loc;
-	int glyph_size_sampler_loc;
+	int glyph_metric_sampler_loc;
 	int mvp_loc;
 	int num_chars;
 
@@ -107,7 +107,7 @@ struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t r
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, font->atlas_texture);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_BUFFER, font->glyph_size_texture);
+	glBindTexture(GL_TEXTURE_BUFFER, font->glyph_metric_texture);
 
 	//Orphan previous buffer
 	int buffer_size = sizeof(struct gltext_glyph_instance) * num_chars;
@@ -214,7 +214,7 @@ static bool init_program(struct renderer *inst)
 		"in vec2 pos[1];\n"
 		"in int glyph_index[1];\n"
 		"uniform mat4 mvp;\n"
-		"uniform isamplerBuffer glyph_size_sampler;\n"
+		"uniform isamplerBuffer glyph_metric_sampler;\n"
 		"out vec3 texcoord_f;\n"
 		"\n"
 		"void genVertex(vec2 ul, vec2 corner, vec2 size, vec3 texcoord)\n"
@@ -227,7 +227,7 @@ static bool init_program(struct renderer *inst)
 		"void main()\n"
 		"{\n"
 			"if (glyph_index[0] >= 0) {\n"
-				"vec4 glyph_metrics = texelFetch(glyph_size_sampler, glyph_index[0]);\n"
+				"vec4 glyph_metrics = texelFetch(glyph_metric_sampler, glyph_index[0]);\n"
 				"vec2 size = glyph_metrics.xy + vec2(16,16);\n"
 				"vec2 ul = pos[0] + vec2(glyph_metrics.z, -glyph_metrics.w);\n"
 				"vec3 texcoord = vec3(0, 0, glyph_index[0]);\n"
@@ -345,11 +345,11 @@ static bool init_program(struct renderer *inst)
 	inst->mvp_loc = glGetUniformLocation(inst->glsl_program, "mvp");
 	inst->sampler_loc = glGetUniformLocation(inst->glsl_program, "sampler");
 	inst->color_loc = glGetUniformLocation(inst->glsl_program, "color");
-	inst->glyph_size_sampler_loc = glGetUniformLocation(inst->glsl_program, "glyph_size_sampler");
+	inst->glyph_metric_sampler_loc = glGetUniformLocation(inst->glsl_program, "glyph_metric_sampler");
 
 	glUseProgram(inst->glsl_program);
 	glUniform1i(inst->sampler_loc, 0);
-	glUniform1i(inst->glyph_size_sampler_loc, 1);
+	glUniform1i(inst->glyph_metric_sampler_loc, 1);
 	return true;
 }
 
@@ -427,8 +427,8 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 
 	int texels_per_layer = pot_size * pot_size;
 	uint8_t *atlas_buffer = (uint8_t *)calloc(total_glyphs, texels_per_layer);
-	int8_t *glyph_size_array = (int8_t *)malloc(total_glyphs * sizeof(int16_t) * 4);
-	int8_t *glyph_size_ptr = glyph_size_array;
+	int8_t *glyph_metric_array = (int8_t *)malloc(total_glyphs * sizeof(int16_t) * 4);
+	int8_t *glyph_metric_ptr = glyph_metric_array;
 
 	double *srcf = (double *)malloc(texels_per_layer * sizeof(double));
 	short *distx = (short *)malloc(texels_per_layer * sizeof(short));
@@ -471,10 +471,10 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 			}
 			temp += pot_size;
 		}
-		*(glyph_size_ptr++) = (int8_t)g->bitmap_width;
-		*(glyph_size_ptr++) = (int8_t)g->bitmap_height;
-		*(glyph_size_ptr++) = (int8_t)g->left;
-		*(glyph_size_ptr++) = (int8_t)g->top;
+		*(glyph_metric_ptr++) = (int8_t)g->bitmap_width;
+		*(glyph_metric_ptr++) = (int8_t)g->bitmap_height;
+		*(glyph_metric_ptr++) = (int8_t)g->left;
+		*(glyph_metric_ptr++) = (int8_t)g->top;
 		layer_ptr += texels_per_layer;
 	}
 
@@ -488,13 +488,13 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	//
 	//Setup glyph size texture buffer
 	//
-	glGenBuffers(1, &f->glyph_size_texture_buffer);
-	glBindBuffer(GL_TEXTURE_BUFFER, f->glyph_size_texture_buffer);
-	glBufferData(GL_TEXTURE_BUFFER, total_glyphs * 4, glyph_size_array, GL_STATIC_DRAW);
-	glGenTextures(1, &f->glyph_size_texture);
-	glBindTexture(GL_TEXTURE_BUFFER, f->glyph_size_texture);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8I, f->glyph_size_texture_buffer);
-	free(glyph_size_array);
+	glGenBuffers(1, &f->glyph_metric_texture_buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, f->glyph_metric_texture_buffer);
+	glBufferData(GL_TEXTURE_BUFFER, total_glyphs * 4, glyph_metric_array, GL_STATIC_DRAW);
+	glGenTextures(1, &f->glyph_metric_texture);
+	glBindTexture(GL_TEXTURE_BUFFER, f->glyph_metric_texture);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8I, f->glyph_metric_texture_buffer);
+	free(glyph_metric_array);
 
 	//
 	// Allocate and altas texture and setup texture filtering
@@ -521,8 +521,8 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 bool gltext_font_free(gltext_font_t font_)
 {
 	struct gltext_font *font = (struct gltext_font *)(font_);
-	glDeleteBuffers(1, &font->glyph_size_texture_buffer);
-	glDeleteTextures(1, &font->glyph_size_texture);
+	glDeleteBuffers(1, &font->glyph_metric_texture_buffer);
+	glDeleteTextures(1, &font->glyph_metric_texture);
 	glDeleteTextures(1, &font->atlas_texture);
 	free(font);
 }
