@@ -23,8 +23,10 @@ struct gltext_font {
 	int size;
 	gltext_typeface_t typeface;
 	struct gltext_glyph *glyph_array;
-	gltext_renderer_t renderer;
 	int total_glyphs;
+	int8_t *glyph_metric_array;
+	uint8_t *atlas_buffer;
+	int pot_size;
 	GLuint atlas_texture;
 	GLuint glyph_metric_texture;
 	GLuint glyph_metric_texture_buffer;
@@ -76,6 +78,8 @@ struct renderer
 	bool initialized;
 };
 
+static bool init_program(struct renderer *inst);
+
 float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_glyph *next)
 {
 	float ret = 0;
@@ -101,8 +105,16 @@ struct gltext_glyph_instance *gltext_renderer_prepare_render(gltext_renderer_t r
 {
 	struct gltext_font *font = (struct gltext_font *)(font_);
 	struct renderer *inst = (struct renderer *)renderer_;
-	if (!inst->initialized)
-		return NULL;
+
+	//Create GLSL program if neccisary
+	if (!inst->initialized) {
+		if (!init_program(inst))
+			return false;
+		inst->initialized = true;
+	}
+
+	if (!font->atlas_texture)
+		gltext_font_create_texture(font_);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, font->atlas_texture);
@@ -353,18 +365,58 @@ static bool init_program(struct renderer *inst)
 	return true;
 }
 
+void gltext_font_create_texture(gltext_font_t font_)
+{
+	struct gltext_font *f = (struct gltext_font *)(font_);
+	if (!f->atlas_texture) {
+		//
+		//Setup glyph size texture buffer
+		//
+		glGenBuffers(1, &f->glyph_metric_texture_buffer);
+		glBindBuffer(GL_TEXTURE_BUFFER, f->glyph_metric_texture_buffer);
+		glBufferData(GL_TEXTURE_BUFFER, f->total_glyphs * 4, f->glyph_metric_array, GL_STATIC_DRAW);
+		glGenTextures(1, &f->glyph_metric_texture);
+		glBindTexture(GL_TEXTURE_BUFFER, f->glyph_metric_texture);
+		glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8I, f->glyph_metric_texture_buffer);
+
+		//
+		// Allocate and altas texture and setup texture filtering
+		//
+		glGenTextures(1, &f->atlas_texture);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, f->atlas_texture);
+		glTexImage3D(GL_TEXTURE_2D_ARRAY,
+			0, /* layer */
+			GL_R8,
+			f->pot_size, f->pot_size, f->total_glyphs /* uvw size */,
+			0, /* border */
+			GL_RED,
+			GL_UNSIGNED_BYTE,
+			f->atlas_buffer);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	}
+}
+
+void gltext_font_destroy_texture(gltext_font_t font_)
+{
+	struct gltext_font *font = (struct gltext_font *)(font_);
+	if (font->atlas_texture) {
+		glDeleteBuffers(1, &font->glyph_metric_texture_buffer);
+		glDeleteTextures(1, &font->glyph_metric_texture);
+		glDeleteTextures(1, &font->atlas_texture);
+		font->glyph_metric_texture_buffer = 0;
+		font->glyph_metric_texture = 0;
+		font->atlas_buffer = 0;
+	}
+}
+
 gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t typeface_, int size)
 {
 	struct renderer *inst = (struct renderer *)renderer;
-
 	if (!inst->ft_library)
 		return false;
-
-	//Create GLSL program if neccisary
-	if (!inst->initialized)
-		if (!init_program(inst))
-			return false;
-	inst->initialized = true;
 
 	struct gltext_font *f = (struct gltext_font *)calloc(1, sizeof(struct gltext_font));
 
@@ -374,12 +426,12 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	FT_Face typeface = (FT_Face) f->typeface;
 
 	int total_glyphs = strlen(inst->charset);
+	f->total_glyphs = total_glyphs;
 
 	if (!typeface)
 		return false;
 
 	f->glyph_array = calloc((inst->max_char + 1), sizeof(struct gltext_glyph));
-	f->renderer = renderer;
 	FT_Set_Pixel_Sizes(typeface, size, size);
 
 	int max_dim = 0;
@@ -415,7 +467,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	} else {
 		pot_size = 1 << (32 - __builtin_clz(max_dim));
 	}
-
+	f->pot_size = pot_size;
 	f->glyph_array['\n'].c = '\n';
 	f->glyph_array['\n'].font = f;
 	int w = 0;
@@ -427,7 +479,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 
 	int texels_per_layer = pot_size * pot_size;
 	uint8_t *atlas_buffer = (uint8_t *)calloc(total_glyphs, texels_per_layer);
-	int8_t *glyph_metric_array = (int8_t *)malloc(total_glyphs * sizeof(int16_t) * 4);
+	int8_t *glyph_metric_array = (int8_t *)malloc(total_glyphs * sizeof(int8_t) * 4);
 	int8_t *glyph_metric_ptr = glyph_metric_array;
 
 	double *srcf = (double *)malloc(texels_per_layer * sizeof(double));
@@ -485,44 +537,17 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	free(gy);
 	free(dist);
 
-	//
-	//Setup glyph size texture buffer
-	//
-	glGenBuffers(1, &f->glyph_metric_texture_buffer);
-	glBindBuffer(GL_TEXTURE_BUFFER, f->glyph_metric_texture_buffer);
-	glBufferData(GL_TEXTURE_BUFFER, total_glyphs * 4, glyph_metric_array, GL_STATIC_DRAW);
-	glGenTextures(1, &f->glyph_metric_texture);
-	glBindTexture(GL_TEXTURE_BUFFER, f->glyph_metric_texture);
-	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8I, f->glyph_metric_texture_buffer);
-	free(glyph_metric_array);
+	f->glyph_metric_array = glyph_metric_array;
+	f->atlas_buffer = atlas_buffer;
 
-	//
-	// Allocate and altas texture and setup texture filtering
-	//
-	glGenTextures(1, &f->atlas_texture);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, f->atlas_texture);
-	glTexImage3D(GL_TEXTURE_2D_ARRAY,
-		0, /* layer */
-		GL_R8,
-		pot_size, pot_size, total_glyphs /* uvw size */,
-		0, /* border */
-		GL_RED,
-		GL_UNSIGNED_BYTE,
-		atlas_buffer);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	free(atlas_buffer);
 	return f;
 }
-
 
 bool gltext_font_free(gltext_font_t font_)
 {
 	struct gltext_font *font = (struct gltext_font *)(font_);
-	glDeleteBuffers(1, &font->glyph_metric_texture_buffer);
-	glDeleteTextures(1, &font->glyph_metric_texture);
-	glDeleteTextures(1, &font->atlas_texture);
+	gltext_font_destroy_texture(font_);
+	free(font->atlas_buffer);
+	free(font->glyph_metric_array);
 	free(font);
 }

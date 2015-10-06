@@ -104,11 +104,33 @@ void gltext_renderer_free(gltext_renderer_t renderer);
  *
  * gltext_font_create()
  *
- * Create a font for a specific typeface. Must be called in a thread with a current OpenGL context.
- * The GL_TEXTURE_2D_ARRAY and GL_TEXTURE_BUFFER bindings are affected.
+ * Create a font for a specific typeface.
  *
  */
 gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t typeface, int font_size);
+
+
+/*
+ *
+ * gltext_font_create_texture()
+ *
+ * Create a GL texture for the font. This can be done anytime after a font is created. Must be called
+ * in a thread with a current OpenGL context. The GL_TEXTURE_2D_ARRAY and GL_TEXTURE_BUFFER bindings
+ * are affected. The texture will be created automatically on the first render that specifies this font
+ * if this call is not made.
+ *
+ */
+void gltext_font_create_texture(gltext_font_t font);
+
+/*
+ *
+ * gltext_font_destroy_texture()
+ *
+ * Destroy a previously created GL texture for the font. This can be done anytime after a font's texture
+ * is created. Textures will automatically be destroyed when the font is free'd.
+ *
+ */
+void gltext_font_destroy_texture(gltext_font_t font);
 
 /*
  * gltext_font_free()
