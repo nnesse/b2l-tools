@@ -5,13 +5,6 @@
 
 bool fullscreen = false;
 
-void on_expose(struct glplatform_win *win)
-{
-	glClearColor(0,0,1,1);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glplatform_swap_buffers(win);
-}
-
 void on_key_down(struct glplatform_win *win, int k)
 {
 	//TODO: No fullscreen support for windows yet
@@ -31,7 +24,6 @@ void on_destroy(struct glplatform_win *win)
 int main()
 {
 	struct glplatform_win_callbacks cb = {
-		.on_expose = on_expose,
 		.on_destroy = on_destroy,
 		.on_key_down = on_key_down
 	};
@@ -51,6 +43,10 @@ int main()
 		exit(-1);
 	}
 	while (glplatform_process_events()) {
+		glClearColor(0,0,1,1);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glplatform_swap_buffers(win);
+
 		if (glplatform_get_events(true) < 0)
 			break;
 	}
