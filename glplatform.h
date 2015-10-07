@@ -215,6 +215,7 @@ struct glplatform_win {
 	void *fb_config; //GLXFBConfig
 	uint32_t glx_window; //GLXWindow
 	int x_state_mask;
+	uint32_t colormap; //Colormap
 #endif
 	struct glplatform_fbformat fbformat;
 	struct glplatform_win_callbacks callbacks;

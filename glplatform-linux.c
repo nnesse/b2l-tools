@@ -108,6 +108,9 @@ bool glplatform_is_control_pressed(struct glplatform_win *win)
 static int handle_x_event(struct glplatform_win *win, XEvent *event)
 {
 	switch (event->type) {
+	case KeymapNotify: {
+		XRefreshKeyboardMapping(&event->xmapping);
+	} break;
 	case ConfigureNotify: {
 		XConfigureEvent *configure_event = (XConfigureEvent *)event;
 		if (win->width != configure_event->width || win->height != configure_event->height) {
@@ -215,7 +218,6 @@ bool glplatform_init()
 	ev.events = EPOLLIN;
 	ev.data.fd = g_x11_fd;
 	epoll_ctl(glplatform_epoll_fd, EPOLL_CTL_ADD, g_x11_fd, &ev); //TODO: check for errors
-
 	g_screen = DefaultScreen(g_display);
 	g_delete_atom = XInternAtom(g_display, "WM_DELETE_WINDOW", True);
 	return true;
@@ -246,9 +248,6 @@ struct glplatform_win *glplatform_create_window(const char *title,
 	if (fbformat->color_bits % 3)
 		return NULL;
 
-	struct glplatform_win *win = (struct glplatform_win *) malloc(sizeof(struct glplatform_win));
-	win->fbformat = *fbformat;
-	win->callbacks = *callbacks;
 	GLXFBConfig fb_config;
 	Window window;
 	GLXWindow glx_window;
@@ -270,9 +269,9 @@ struct glplatform_win *glplatform_create_window(const char *title,
 		None
 	};
 
-	XVisualInfo *visual_info;
+	XVisualInfo *visual_info = NULL;
 	int fb_count;
-	GLXFBConfig *fb_config_a;
+	GLXFBConfig *fb_config_a = NULL;
 
 	fb_config_a = glXChooseFBConfig(g_display, g_screen, fb_attributes, &fb_count);
 
@@ -281,38 +280,16 @@ struct glplatform_win *glplatform_create_window(const char *title,
 	}
 
 	fb_config = fb_config_a[0];
+	XFree(fb_config_a);
 
 	visual_info = glXGetVisualFromFBConfig(g_display, fb_config);
 
 	XSetWindowAttributes w_attr;
+	Colormap colormap = XCreateColormap(g_display, RootWindow(g_display, g_screen), visual_info->visual, AllocNone);
 	w_attr.background_pixel = 0;
 	w_attr.border_pixel = 0;
-	w_attr.colormap = XCreateColormap(g_display, RootWindow(g_display, g_screen), visual_info->visual, AllocNone);
-
-	window = XCreateWindow(g_display,
-			       RootWindow(g_display, g_screen), /* parent */
-			       0, 0,	/* x,y */
-			       width, height, 0,	/* border width */
-			       visual_info->depth,	/* depth */
-			       InputOutput,	/* class */
-			       visual_info->visual, CWColormap,	/* attribute valuemask */
-			       &w_attr);	/*attributes */
-
-	if (!window) {
-		return NULL;
-	}
-
-	glx_window = glXCreateWindow(g_display, fb_config, window, NULL);
-
-	XStoreName(g_display, window, title);
-
-	//Tell X that we want to process delete window client messages
-	Atom wm_atoms[] = { g_delete_atom };
-	XSetWMProtocols(g_display, window, wm_atoms, 1);
-
-	//Choose what X events we want to recieve
-	XSelectInput(g_display,
-		     window,
+	w_attr.colormap = colormap;
+	w_attr.event_mask = KeymapStateMask |
 		     KeyPressMask |
 		     ExposureMask |
 		     KeyReleaseMask |
@@ -320,18 +297,53 @@ struct glplatform_win *glplatform_create_window(const char *title,
 		     ButtonReleaseMask |
 		     PointerMotionMask |
 		     StructureNotifyMask |
-		     SubstructureNotifyMask);
+		     SubstructureNotifyMask;
 
+	window = XCreateWindow(g_display,
+			RootWindow(g_display, g_screen), /* parent */
+			0, 0,    /* position */
+			width, height, /* size */
+			0, /* border width */
+			visual_info->depth, /* depth */
+			InputOutput, /* class */
+			visual_info->visual,
+			CWBackPixel | CWColormap | CWBorderPixel | CWEventMask, /* attribute valuemask */
+			&w_attr);        /*attributes */
+
+	XFree(visual_info);
+
+	if (!window) {
+		XFreeColormap(g_display, colormap);
+		return NULL;
+	}
+
+	XStoreName(g_display, window, title);
+
+	//Tell X that we want to process delete window client messages
+	Atom wm_atoms[] = { g_delete_atom };
+	XSetWMProtocols(g_display, window, wm_atoms, 1);
+
+	glx_window = glXCreateWindow(g_display, fb_config, window, NULL);
+
+	if (!glx_window) {
+		XDestroyWindow(g_display, window);
+		XFreeColormap(g_display, colormap);
+		return NULL;
+	}
+
+	struct glplatform_win *win = (struct glplatform_win *) malloc(sizeof(struct glplatform_win));
+	win->fbformat = *fbformat;
+	win->callbacks = *callbacks;
 	win->width = width;
 	win->height = height;
 	win->fb_config = fb_config;
 	win->window = window;
 	win->glx_window = glx_window;
+	win->colormap = colormap;
 
 	register_glplatform_win(win);
 	if (win->callbacks.on_create)
 		win->callbacks.on_create(win);
-
 	return win;
 }
 
@@ -483,6 +495,7 @@ void glplatform_destroy_window(struct glplatform_win *win)
 	glXDestroyWindow(g_display, win->glx_window);
 	XSync(g_display, 0);
 	XDestroyWindow(g_display, win->window);
+	XFreeColormap(g_display, win->colormap);
 	retire_glplatform_win(win);
 	free(win);
 }
@@ -506,7 +519,7 @@ void glplatform_fd_unbind(int fd)
 
 void glplatform_show_window(struct glplatform_win *win)
 {
-	XMapWindow(g_display, win->window);
+	XMapRaised(g_display, win->window);
 	XSync(g_display, 0);
 }
 
