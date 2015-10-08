@@ -5,6 +5,7 @@ extern "C" {
 #endif
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#define GLX_EXTENSION_NAME "GLX"
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
