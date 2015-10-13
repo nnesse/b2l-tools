@@ -12,7 +12,7 @@
 #include "glsl.parser.h" //For GLSL_STYPE and GLSL_LTYPE
 #include "glsl.lexer.h" //For glsl_lex()
 
-void glsl_error(GLSL_LTYPE *loc, struct glsl_parse_context *c, const char *s);
+static void glsl_error(GLSL_LTYPE *loc, struct glsl_parse_context *c, const char *s);
 
 #define GLSL_STACK_BUFFER_SIZE (1024*1024)
 #define GLSL_STACK_BUFFER_PAYLOAD_SIZE (GLSL_STACK_BUFFER_SIZE - sizeof(intptr_t))
@@ -487,11 +487,14 @@ static struct glsl_node *new_glsl_identifier(struct glsl_parse_context *context,
 %token LAYOUT_QUALIFIER_ID_LIST
 %token SUBROUTINE_TYPE
 %token PAREN_EXPRESSION
+%token INIT_DECLARATOR
+%token INITIALIZER
+%token TERNARY_EXPRESSION
 %token SECTION
 %token DECLARATION_STATEMENT_LIST
 %token SECTION_STATEMENT
 %token INITIALIZER_OPT
-%token INIT_DECLARATOR
+
 %token NUM_GLSL_TOKEN
 %%
 
@@ -666,7 +669,6 @@ init_declarator_list	: single_declaration { $$ = $1; }
 						new_glsl_node(context, INIT_DECLARATOR,
 							$3,
 							new_glsl_node(context, ARRAY_SPECIFIER_LIST, NULL),
-							new_glsl_node(context, INITIALIZER_OPT, NULL),
 							NULL),
 						NULL); }
 			| init_declarator_list COMMA decl_identifier array_specifier_list
@@ -675,7 +677,6 @@ init_declarator_list	: single_declaration { $$ = $1; }
 						new_glsl_node(context, INIT_DECLARATOR,
 							$3,
 							$4,
-							new_glsl_node(context, INITIALIZER_OPT, NULL),
 							NULL),
 						NULL); }
 			| init_declarator_list COMMA decl_identifier array_specifier_list EQUAL initializer
@@ -684,7 +685,7 @@ init_declarator_list	: single_declaration { $$ = $1; }
 						new_glsl_node(context, INIT_DECLARATOR,
 							$3,
 							$4,
-							new_glsl_node(context, INITIALIZER_OPT, $6, NULL),
+							$6,
 							NULL),
 						NULL); }
 			| init_declarator_list COMMA decl_identifier EQUAL initializer
@@ -693,7 +694,7 @@ init_declarator_list	: single_declaration { $$ = $1; }
 						new_glsl_node(context, INIT_DECLARATOR,
 							$3,
 							new_glsl_node(context, ARRAY_SPECIFIER_LIST, NULL),
-							new_glsl_node(context, INITIALIZER_OPT, $5, NULL),
+							$5,
 							NULL),
 						NULL); }
 			;
@@ -727,9 +728,9 @@ single_declaration	: fully_specified_type
 					NULL); }
 			;
 
-initializer		: assignment_expression { $$ = $1; }
-			| LEFT_BRACE initializer_list RIGHT_BRACE { $$ = $2; }
-			| LEFT_BRACE initializer_list COMMA RIGHT_BRACE { $$ = $2; }
+initializer		: assignment_expression { $$ = new_glsl_node(context, INITIALIZER, $1, NULL); }
+			| LEFT_BRACE initializer_list RIGHT_BRACE { $$ = new_glsl_node(context, INITIALIZER, $2, NULL); }
+			| LEFT_BRACE initializer_list COMMA RIGHT_BRACE { $$ = new_glsl_node(context, INITIALIZER, $2, NULL); }
 			;
 
 initializer_list	: initializer
@@ -893,7 +894,7 @@ type_specifier		: type_specifier_nonarray
 array_specifier_list	: array_specifier
 				{ $$ = new_glsl_node(context, ARRAY_SPECIFIER_LIST, $1, NULL); }
 
-		     	| array_specifier_list array_specifier
+			| array_specifier_list array_specifier
 				{ $$ = new_glsl_node(context, ARRAY_SPECIFIER_LIST, $1, $2, NULL); }
 			;
 
@@ -1114,7 +1115,7 @@ interpolation_qualifier : SMOOTH { $$ = new_glsl_node(context, SMOOTH, NULL); }
 invariant_qualifier	: INVARIANT { $$ = new_glsl_node(context, INVARIANT, NULL); }
 			;
 
-precise_qualifier 	: PRECISE { $$ = new_glsl_node(context, PRECISE, NULL); }
+precise_qualifier	: PRECISE { $$ = new_glsl_node(context, PRECISE, NULL); }
 			;
 
 storage_qualifier	: CONST { $$ = new_glsl_node(context, CONST, NULL); }
@@ -1172,7 +1173,7 @@ constant_expression	: conditional_expression { $$ = $1; }
 
 conditional_expression	: logical_or_expression { $$ = $1; }
 			| logical_or_expression QUESTION expression COLON assignment_expression
-				{ $$ = new_glsl_node(context, QUESTION, $1, $3, $5, NULL); }
+				{ $$ = new_glsl_node(context, TERNARY_EXPRESSION, $1, $3, $5, NULL); }
 			;
 
 logical_or_expression	: logical_xor_expression { $$ = $1; }
@@ -1363,9 +1364,11 @@ primary_expression	: variable_identifier { $$ = $1; }
 //The scanner macro, needed for integration with flex, causes problems below
 #undef scanner
 
-void glsl_error(GLSL_LTYPE *loc, struct glsl_parse_context *c, const char *s)
+static void glsl_error(GLSL_LTYPE *loc, struct glsl_parse_context *c, const char *s)
 {
-	fprintf(stderr, "GLSL parse error line %d(%d-%d): %s\n", loc->first_line, loc->first_column, loc->last_column, s);
+	c->error = true;
+	if (c->error_cb)
+		c->error_cb(s, loc->first_line, loc->first_column, loc->last_column);
 }
 
 int list_length(struct glsl_node *n, int list_token)
@@ -1414,8 +1417,9 @@ static void list_collapse(struct glsl_parse_context *context, struct glsl_node *
 	}
 }
 
-static void parse_internal(struct glsl_parse_context *context)
+static bool parse_internal(struct glsl_parse_context *context)
 {
+	context->error = false;
 	glsl_parse(context);
 	if (context->root) {
 		if (glsl_ast_is_list_node(context->root)) {
@@ -1439,24 +1443,29 @@ static void parse_internal(struct glsl_parse_context *context)
 
 		list_collapse(context, context->root);
 	}
+	return context->error;
 }
 
-void glsl_parse_file(struct glsl_parse_context *context, FILE *file)
+bool glsl_parse_file(struct glsl_parse_context *context, FILE *file)
 {
 	glsl_lex_init(&(context->scanner));
 
 	glsl_set_in(file, context->scanner);
 
-	parse_internal(context);
+	bool error;
+
+	error = parse_internal(context);
 
 	glsl_lex_destroy(context->scanner);
 	context->scanner = NULL;
+	return error;
 }
 
-void glsl_parse_string(struct glsl_parse_context *context, const char *str)
+bool glsl_parse_string(struct glsl_parse_context *context, const char *str)
 {
 	char *text;
 	size_t sz;
+	bool error;
 
 	glsl_lex_init(&(context->scanner));
 
@@ -1466,11 +1475,12 @@ void glsl_parse_string(struct glsl_parse_context *context, const char *str)
 	text[sz + 1] = 0;
 	glsl__scan_buffer(text, sz + 2, context->scanner);
 
-	parse_internal(context);
+	error = parse_internal(context);
 
 	free(text);
 	glsl_lex_destroy(context->scanner);
 	context->scanner = NULL;
+	return error;
 }
 
 void glsl_parse_context_init(struct glsl_parse_context *context)
@@ -1481,7 +1491,15 @@ void glsl_parse_context_init(struct glsl_parse_context *context)
 	context->cur_buffer_start = NULL;
 	context->cur_buffer = NULL;
 	context->cur_buffer_end = NULL;
+	context->error_cb = NULL;
+	context->error = false;
 }
+
+void glsl_parse_set_error_cb(struct glsl_parse_context *context, glsl_parse_error_cb_t error_cb)
+{
+	context->error_cb = error_cb;
+}
+
 
 void glsl_parse_context_destroy(struct glsl_parse_context *context)
 {

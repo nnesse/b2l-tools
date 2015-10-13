@@ -481,11 +481,12 @@ static const char *code_to_str[4096] = {
 	[LAYOUT_QUALIFIER_ID_LIST] = "LAYOUT_QUALIFIER_ID_LIST",
 	[SUBROUTINE_TYPE] = "SUBROUTINE_TYPE",
 	[PAREN_EXPRESSION] = "PAREN_EXPRESSION",
+	[INIT_DECLARATOR] = "INIT_DECLARATOR",
+	[INITIALIZER] = "INITIALIZER",
+	[TERNARY_EXPRESSION] = "TERNARY_EXPRESSION",
 	[SECTION] = "SECTION",
 	[DECLARATION_STATEMENT_LIST] = "DECLARATION_STATEMENT_LIST",
 	[SECTION_STATEMENT] = "SECTION_STATEMENT",
-	[INITIALIZER_OPT] = "INITIALIZER_OPT",
-	[INIT_DECLARATOR] = "INIT_DECLARATOR",
 	[NUM_GLSL_TOKEN] = ""
 };
 
@@ -769,7 +770,7 @@ static void _glsl_ast_gen_glsl(struct glsl_node *n, struct string *out, int dept
 	case RETURN_VALUE:
 		string_cat(out,"return ");
 		_glsl_ast_gen_glsl(n->children[0], out, depth);
-		string_cat(out,";\n");
+		string_cat(out,";");
 		break;
 	case SELECTION_STATEMENT_ELSE:
 		string_cat(out,"if (");
@@ -883,9 +884,32 @@ static void _glsl_ast_gen_glsl(struct glsl_node *n, struct string *out, int dept
 			_glsl_ast_gen_glsl(n->children[1], out, depth);
 		}
 		break;
-	case TYPE_SPECIFIER:
+	case INIT_DECLARATOR:
+		_glsl_ast_gen_glsl(n->children[0], out, depth);
+		if (n->children[1]->child_count) {
+			_glsl_ast_gen_glsl(n->children[1], out, depth);
+		}
+		if (n->child_count > 2) {
+			string_cat(out," = ");
+			_glsl_ast_gen_glsl(n->children[2], out, depth);
+		}
+		break;
 	case INIT_DECLARATOR_LIST:
+		print_list_as_glsl(n, "", ", ", "", out, depth);
+		break;
+	case INITIALIZER_LIST:
+		print_list_as_glsl(n, "{", ", ", "}", out, depth);
+		break;
+	case TERNARY_EXPRESSION:
+		_glsl_ast_gen_glsl(n->children[0], out, depth);
+		string_cat(out," ? ");
+		_glsl_ast_gen_glsl(n->children[1], out, depth);
+		string_cat(out," : ");
+		_glsl_ast_gen_glsl(n->children[2], out, depth);
+		break;
+	case TYPE_SPECIFIER:
 	case POSTFIX_EXPRESSION:
+	case INITIALIZER:
 	case CONDITION_OPT:
 	case EXPRESSION_CONDITION:
 		print_list_as_glsl(n, "", "", "", out, depth);
