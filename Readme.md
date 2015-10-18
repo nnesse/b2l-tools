@@ -6,7 +6,7 @@ glplatform
 Creating a window
 -----------------
 
-An window can be created in by calling `glplatform_create_window()` specifying its title, initial dimentions, framebuffer format, and a structure containing event callbacks. If no framebuffer format is specified then a framebuffer 24-bit color buffer and a 24-bit depth buffer will be requested. The event callbacks will be called inside `glplatform_process_events()` (see below).
+A window can be created in by calling `glplatform_create_window()` specifying its title, initial dimentions, framebuffer format, and a structure containing event callbacks. If no framebuffer format is specified then a framebuffer 24-bit color buffer and a 24-bit depth buffer will be requested. The event callbacks will be called inside `glplatform_process_events()` (see below).
 
 Example: Create a "Hello world" window
 
