@@ -10,6 +10,8 @@ A window can be created in by calling `glplatform_create_window()` specifying it
 
 Example: Create a "Hello world" window
 
+	#include <glplatform/glplatform.h>
+
 	void on_key_down(struct glplatform_win *win, int k)
 	{
 		printf("Key pressed: %c\n", k);
@@ -67,8 +69,8 @@ Once a context has been made current OpenGL calls cannot be issued until the Ope
 
 Example: Initializing OpenGL bindings
 
-	#include "glplatform.h"
-	#include "glplatform-glcore.h"
+	#include <glplatform/glplatform.h>
+	#include <glplatform/glplatform-glcore.h>
 
 	int main()
 	{
