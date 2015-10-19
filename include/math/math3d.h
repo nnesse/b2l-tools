@@ -50,6 +50,25 @@ void math3d_mat4_zero(struct math3d_mat4 *m);
 void math3d_mat4_identity(struct math3d_mat4 *m);
 
 //
+// math3d_mat4_perspective(fovy, width, height, z_near, z_far, m)
+//
+// Compute a perspective projection matrix
+//
+//   fovy - Field of view in the y direction in the range 0 to 1. A value
+//
+//          of 1 corresponds to 180 degrees
+//
+//   width - Width of viewport
+//
+//   height - Height of viewport
+//
+//   z_near - Location of near z clipping plane
+//
+//   z_far - Locaiton of far z clipping plane
+ //
+void math3d_mat4_perspective(float fovy, float width, float height, float z_near, float z_far, struct math3d_mat4 *m);
+
+//
 // math3d_vec3_dot(v1, v2)
 //
 // Returns v1 * v2

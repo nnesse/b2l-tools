@@ -31,9 +31,21 @@ void math3d_mat4_identity(struct math3d_mat4 *m)
 	m->v[3][3] = 1;
 }
 
+void math3d_mat4_perspective(float fovy, float width, float height, float z_near, float z_far, struct math3d_mat4 *m)
+{
+	float f = 1.0/tan((fovy*M_PI)/2);
+	float aspect = width / height;
+	math3d_mat4_zero(m);
+	m->v[0][0] = f/aspect;
+	m->v[1][1] = f;
+	m->v[2][2] = (z_far + z_near) / (z_near - z_far);
+	m->v[2][3] = -1;
+	m->v[3][2] = (2 * z_far * z_near) / (z_near - z_far);
+}
+
 float math3d_vec3_dot(const struct math3d_vec3 *v1, const struct math3d_vec3 *v2)
 {
-	return sqrtf(v1->v[0] * v1->v[0] + v1->v[1] * v2->v[1] + v1->v[2] * v2->v[2]);
+	return (v1->v[0] * v1->v[0] + v1->v[1] * v2->v[1] + v1->v[2] * v2->v[2]);
 }
 
 float math3d_vec3_length(const struct math3d_vec3 *v)
