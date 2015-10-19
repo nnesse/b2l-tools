@@ -3,6 +3,10 @@
 #include <math.h>
 #include <memory.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 void math3d_mat4_mul(const struct math3d_mat4 *m1, const struct math3d_mat4 *m2, struct math3d_mat4 *m3)
 {
 	int i, j, k;
@@ -45,7 +49,6 @@ void math3d_mat4_perspective(float fovy, float width, float height, float z_near
 
 void math3d_mat4_ortho(float x, float y, float z, float width, float height, float depth, struct math3d_mat4 *m)
 {
-	float f = 1.0/tan((fovy*M_PI)/2);
 	float aspect = width / height;
 	math3d_mat4_zero(m);
 	m->v[1][0] = 2/width;
