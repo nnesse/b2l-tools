@@ -43,6 +43,20 @@ void math3d_mat4_perspective(float fovy, float width, float height, float z_near
 	m->v[3][2] = (2 * z_far * z_near) / (z_near - z_far);
 }
 
+void math3d_mat4_ortho(float x, float y, float z, float width, float height, float depth, struct math3d_mat4 *m)
+{
+	float f = 1.0/tan((fovy*M_PI)/2);
+	float aspect = width / height;
+	math3d_mat4_zero(m);
+	m->v[1][0] = 2/width;
+	m->v[1][1] = 2/height;
+	m->v[2][2] = 2/depth;
+	m->v[3][0] = -x;
+	m->v[3][1] = -y;
+	m->v[3][2] = -z;
+	m->v[3][3] = 1;
+}
+
 float math3d_vec3_dot(const struct math3d_vec3 *v1, const struct math3d_vec3 *v2)
 {
 	return (v1->v[0] * v1->v[0] + v1->v[1] * v2->v[1] + v1->v[2] * v2->v[2]);

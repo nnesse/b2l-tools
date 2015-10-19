@@ -52,7 +52,7 @@ void math3d_mat4_identity(struct math3d_mat4 *m);
 //
 // math3d_mat4_perspective(fovy, width, height, z_near, z_far, m)
 //
-// Compute a perspective projection matrix
+// Construct perspective projection matrix
 //
 //   fovy - Field of view in the y direction in the range 0 to 1. A value
 //
@@ -67,6 +67,17 @@ void math3d_mat4_identity(struct math3d_mat4 *m);
 //   z_far - Locaiton of far z clipping plane
  //
 void math3d_mat4_perspective(float fovy, float width, float height, float z_near, float z_far, struct math3d_mat4 *m);
+
+//
+// math3d_mat4_ortho(x, y, z, width, height, depth, m)
+//
+// Construct an orthographic projection matrix
+//
+// x,y,z - Center of the cube to be projected
+//
+// width, height, depth - Size of the cube being projected
+//
+void math3d_mat4_ortho(float x, float y, float z, float width, float height, float depth, struct math3d_mat4 *m);
 
 //
 // math3d_vec3_dot(v1, v2)
