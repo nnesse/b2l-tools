@@ -37,7 +37,7 @@ void math3d_mat4_identity(struct math3d_mat4 *m)
 
 void math3d_mat4_perspective(float fovy, float width, float height, float z_near, float z_far, struct math3d_mat4 *m)
 {
-	float f = 1.0/tan((fovy*M_PI)/2);
+	float f = 1.0f/tanf((fovy*(float)M_PI)/2);
 	float aspect = width / height;
 	math3d_mat4_zero(m);
 	m->v[0][0] = f/aspect;
@@ -91,7 +91,7 @@ void math3d_vec3_normalize(struct math3d_vec3 *v)
 	float length = math3d_vec3_length(v);
 	if (length > 0) {
 		for (i = 0; i < 3; i++) {
-			v->v[i] *= 1.0/length;
+			v->v[i] *= 1.0f/length;
 		}
 	}
 }
@@ -101,7 +101,7 @@ void math3d_spherical_lerp(const struct math3d_vec3 *v1_, const struct math3d_ve
 	struct math3d_vec3 v1xv2;
 	struct math3d_vec3 temp;
 	struct math3d_vec3 v1;
-       	struct math3d_vec3 v2;
+	struct math3d_vec3 v2;
 	int i;
 	for (i = 0; i < 3; i++) {
 		v1.v[i] = v1_->v[i];
@@ -115,7 +115,7 @@ void math3d_spherical_lerp(const struct math3d_vec3 *v1_, const struct math3d_ve
 
 	math3d_vec3_cross(&v1, &v2, &v1xv2);
 
-	double theta;
+	float theta;
 
 	float dot = math3d_vec3_dot(&v1, &v2);
 	if (dot > 1) dot = 1;
@@ -126,13 +126,13 @@ void math3d_spherical_lerp(const struct math3d_vec3 *v1_, const struct math3d_ve
 		return;
 	}
 
-	double phi = d * theta;
+	float phi = d * theta;
 
 	math3d_vec3_normalize(&v1xv2);
 	math3d_vec3_cross(&v1xv2, &v1, &temp);
 
-	float cos_phi = cos(phi);
-	float sin_phi = sin(phi);
+	float cos_phi = cosf(phi);
+	float sin_phi = sinf(phi);
 	for (i = 0; i < 3; i++) {
 		v3->v[i] = (cos_phi * v1.v[i] + sin_phi * temp.v[i]) * (v1_norm * (1-d) + v2_norm * d);
 	}
@@ -172,10 +172,10 @@ void math3d_mat3_mul_vec3(const struct math3d_mat3 *m, const struct math3d_vec3 
 
 void math3d_quaternion_from_axis_angle(struct math3d_quaternion *q, const struct math3d_vec3 *axis, float angle)
 {
-	q->x = axis->v[0] * sin(angle/2);
-	q->y = axis->v[1] * sin(angle/2);
-	q->z = axis->v[2] * sin(angle/2);
-	q->w = cos(angle/2);
+	q->x = axis->v[0] * sinf(angle/2);
+	q->y = axis->v[1] * sinf(angle/2);
+	q->z = axis->v[2] * sinf(angle/2);
+	q->w = cosf(angle/2);
 }
 
 void math3d_quaternion_to_mat3(const struct math3d_quaternion *q, struct math3d_mat3 *m)
