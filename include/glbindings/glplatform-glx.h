@@ -114,7 +114,6 @@ typedef void ( *__GLXextFuncPtr)(void);
 #define GLX_DRAWABLE_TYPE 0x8010
 #define GLX_EVENT_MASK 0x801f
 #define GLX_EXTENSIONS 0x3
-#define GLX_EXTENSION_NAME 0x0
 #define GLX_FBCONFIG_ID 0x8013
 #define GLX_FRONT_LEFT_BUFFER_BIT 0x1
 #define GLX_FRONT_RIGHT_BUFFER_BIT 0x2
@@ -169,7 +168,6 @@ typedef void ( *__GLXextFuncPtr)(void);
 #define GLX_WIDTH 0x801d
 #define GLX_WINDOW 0x8022
 #define GLX_WINDOW_BIT 0x1
-#define GLX_X_NUMBER_EVENTS 0x11
 #define GLX_X_RENDERABLE 0x8012
 #define GLX_X_VISUAL_TYPE 0x22
 
