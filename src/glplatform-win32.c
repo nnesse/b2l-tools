@@ -3,6 +3,7 @@
 #define GLPLATFORM_ENABLE_WGL_ARB_create_context
 #define GLPLATFORM_ENABLE_WGL_ARB_create_context_profile
 #include "glplatform-wgl.h"
+#include <wingdi.h>
 
 //
 // wglGetProcAddress() only works if a WGL context is current so

@@ -3,6 +3,11 @@
 
 #include <stdlib.h>
 
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 bool fullscreen = false;
 
 void on_key_down(struct glplatform_win *win, int k)
@@ -21,7 +26,15 @@ void on_destroy(struct glplatform_win *win)
 	glplatform_destroy_window(win);
 }
 
+#ifdef _WIN32
+int CALLBACK WinMain(
+	_In_ HINSTANCE hInstance,
+	_In_ HINSTANCE hPrevInstance,
+	_In_ LPSTR     lpCmdLine,
+	_In_ int       nCmdShow)
+#else
 int main()
+#endif
 {
 	struct glplatform_win_callbacks cb = {
 		.on_destroy = on_destroy,
