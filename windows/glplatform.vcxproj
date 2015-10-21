@@ -30,6 +30,18 @@
     <ClCompile Include="..\src\glbindings\glplatform-wgl.c" />
     <ClCompile Include="..\src\glplatform-win32.c" />
     <ClCompile Include="..\src\math\math3d.c" />
+    <ClCompile Include="..\src\text\edtaa3func.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\text\gltext.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="freetype-2.6\builds\windows\vc2010\freetype.vcxproj">
+      <Project>{78b079bd-9fc7-4b9e-b4a6-96da0f00248b}</Project>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B3DB52F5-4246-4BD0-8A69-0DEAA39E5FB2}</ProjectGuid>
@@ -82,16 +94,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>../include/text;../include/glbindings;../include/math;../include;$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>../include/text;../include/glbindings;../include/math;../include;$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>../include/text;../include/glbindings;../include/math;../include;$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>../include/text;../include/glbindings;../include/math;../include;$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

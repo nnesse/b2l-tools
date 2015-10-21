@@ -15,6 +15,23 @@ enum vertex_attrib_locations {
 	GLYPH_INDEX_LOC = 1
 };
 
+#ifdef _WIN32
+#include <intrin.h>
+#include <Windows.h>
+
+uint32_t __inline clz(uint32_t value)
+{
+	DWORD leading_zero = 0;
+	if (_BitScanReverse(&leading_zero, value)) {
+		return 31 - leading_zero;
+	}
+	else {
+		return 32;
+	}
+}
+#else
+#define clz(x) __builtin_clz(x)
+#endif
 
 //
 // font
@@ -96,7 +113,7 @@ float gltext_get_advance(const struct gltext_glyph *prev, const struct gltext_gl
 				d += delta.x;
 			}
 		}
-		ret += d/64.0;
+		ret += (float)d/64.0f;
 	}
 	return ret;
 }
@@ -425,7 +442,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	f->max_char = inst->max_char;
 	FT_Face typeface = (FT_Face) f->typeface;
 
-	int total_glyphs = strlen(inst->charset);
+	int total_glyphs = (int)strlen(inst->charset);
 	f->total_glyphs = total_glyphs;
 
 	if (!typeface)
@@ -465,7 +482,7 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 	if (max_dim < 16) {
 		pot_size = 16;
 	} else {
-		pot_size = 1 << (32 - __builtin_clz(max_dim));
+		pot_size = 1 << (32 - clz(max_dim));
 	}
 	f->pot_size = pot_size;
 	f->glyph_array['\n'].c = '\n';
@@ -515,8 +532,8 @@ gltext_font_t gltext_font_create(gltext_renderer_t renderer, gltext_typeface_t t
 		index = 0;
 		for (int i = 0; i < g->bitmap_height + 16; i++) {
 			for (int j = 0; j < g->bitmap_width + 16; j++) {
-				float s = dist[index++];
-				int val = 128 - s*16.0;
+				float s = (float)dist[index++];
+				int val = (int)(128 - s*16.0);
 				if (val < 0) val = 0;
 				if (val > 255) val = 255;
 				temp[j] = val;
@@ -550,4 +567,5 @@ bool gltext_font_free(gltext_font_t font_)
 	free(font->atlas_buffer);
 	free(font->glyph_metric_array);
 	free(font);
+	return true;
 }
