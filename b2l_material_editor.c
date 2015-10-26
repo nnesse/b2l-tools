@@ -932,7 +932,7 @@ static void redraw(struct glplatform_win *win)
 		lua_getfield(L, -2, "_fs_text");
 		const char *vs_text = lua_tostring(L, -2);
 		const char *fs_text = lua_tostring(L, -1);
-		if (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text)) {
+		if ((vs_text && fs_text) && (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text))) {
 			program->vertex_text = strdup(vs_text);
 			program->fragment_text = strdup(fs_text);
 			program_compile(program);
