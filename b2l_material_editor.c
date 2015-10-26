@@ -1353,6 +1353,10 @@ int main(int argc, char **argv)
 			redraw(g_win);
 		}
 		block = !animation_playing;
+		if (!block) {
+			glplatform_get_events(false);
+			glplatform_process_events();
+		}
 		lua_gc(g_L, LUA_GCCOLLECT, 0);
 	}
 	return 0;
