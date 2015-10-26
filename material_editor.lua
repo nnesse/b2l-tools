@@ -177,7 +177,7 @@ function update_controls(uniforms)
 			active_material.params[k].value = value
 			controls[k] = {}
 			local widget = Gtk.CheckButton {
-				label = id,
+				label = "",
 				on_toggled = function(self)
 					if active_material.params[k].value ~= self.active then
 						setting_changed()
