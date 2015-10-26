@@ -9,9 +9,9 @@ out vec4 color;
 
 section Material {
 	uniform sampler2D diffuse_texture;
+	uniform bool use_normal_texture;
 	uniform sampler2D normal_texture;
-	uniform bool use_normal_map;
-	uniform float bump_depth;
+	uniform float normal_texture_scale;
 };
 
 section Lighting {
@@ -42,13 +42,13 @@ void main()
 	float angle_b = (light_angle_b) * 2 * 3.1415;
 	vec3 light_dir = vec3(cos(angle_b) * sin(angle_a), cos(angle_b) * cos(angle_a), sin(angle_b));
 
-	if (use_normal_map) {
+	if (use_normal_texture) {
 		vec3 snorm = texture(normal_texture, vec2(fs_in.uv.x, -fs_in.uv.y)).xyz;
 		snorm -= vec3(0.5);
-		snorm *= vec3(8 * bump_depth, 8 * bump_depth, 2);
+		snorm *= vec3(8 * normal_texture_scale, 8 * normal_texture_scale, 2);
 		normal += (snorm.z * normal) + (snorm.y * tangent) + (snorm.x * bitangent);
 		normal = normalize(normal);
 	}
 
-	color = shade(normal, tangent, bitangent, light_color, light_dir, light_intensity);
+	color = shade(normal, tangent, bitangent, light_color, light_dir, light_intensity) * vec4(1);
 }
