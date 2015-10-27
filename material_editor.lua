@@ -8,25 +8,6 @@ local GLib = lgi.require('GLib')
 local GdkPixbuf = lgi.require('GdkPixbuf')
 local pprint = require 'pprint'
 
-b2l_data = false
-current_scene = false
-current_object = false
-
-local window_main = Gtk.Window {
-   title = 'B2L Material Editor',
-   on_destroy = function()
-	   shutdown = true
-   end,
-   width_request = 250,
-   on_realize = function (window)
-	   capi.create_glwin(window:get_window():get_xid())
-   end,
-}
-
-vbox_settings = Gtk.VBox {
-	hexpand = true
-}
-
 editor_env = os.getenv("EDITOR")
 if editor_env then
 	editor = GLib.find_program_in_path(editor_env)
@@ -57,9 +38,34 @@ void main()\
 	gl_Position = vec4(vec3(pos.x, pos.y, -pos.z) * 1.0, 1);\
 }"
 
+b2l_data = false
+current_scene = false
+current_object = false
+
 controls = {}
 settings_expanders = {}
 settings_grids = {}
+materials = {}
+frame_start = 0
+frame_end = 0
+frame_delta = 1
+playing_animation = false
+shutdown = false
+
+local window_main = Gtk.Window {
+   title = 'B2L Material Editor',
+   on_destroy = function()
+	   shutdown = true
+   end,
+   width_request = 250,
+   on_realize = function (window)
+	   capi.create_glwin(window:get_window():get_xid())
+   end,
+}
+
+vbox_settings = Gtk.VBox {
+	hexpand = true
+}
 
 function queue_render()
 	capi:need_redraw()
@@ -84,8 +90,7 @@ function update_controls(uniforms)
 		return
 	end
 
-	--Remove references to controls this shader
-	--doesn't need
+	--Remove references to controls this shader doesn't need
 	for k, v in pairs(controls) do
 		if not uniforms[k] then
 			controls[k].widget = nil
@@ -305,47 +310,6 @@ function load_b2l_file(filename)
 		local mat_name = lua_name .. ".mat"
 		b2l_data = (loadfile(lua_name))()
 
-		scenes_store:clear()
-		objects_store:clear()
-		materials_store:clear()
-		actions_store:clear()
-		current_scene = false
-
-		objects = {}
-		for k, v in pairs(b2l_data.objects) do
-			local object = {}
-			objects[k] = object
-			if v.nla_tracks then
-				local actions = {}
-				object.actions = actions
-				for i, track in ipairs(v.nla_tracks) do
-					for j, action in ipairs(track) do
-						actions[action.name] = action
-					end
-				end
-			end
-			if v.type == 'MESH' then
-				objects_store:append {
-					[1] = k
-				}
-			end
-		end
-
-		for k, v in pairs(b2l_data.scenes) do
-			if not current_scene then
-				current_scene = k
-			end
-			scenes_store:append {
-				[1] = k
-			}
-		end
-
-		for i, v in ipairs(b2l_data.materials) do
-			materials_store:append {
-				[1] = v
-			}
-		end
-
 		capi.set_b2l_file(bin_name)
 
 		local material_fn = loadfile(mat_name)
@@ -355,10 +319,15 @@ function load_b2l_file(filename)
 			materials = {}
 		end
 
-		save_toolbutton.sensitive = false
+		scenes_store:clear()
+		for k, v in pairs(b2l_data.scenes) do
+			scenes_store:append {
+				[1] = k
+			}
+		end
 		scene_combo:set_active_iter(scenes_store:get_iter_first())
-		object_combo:set_active_iter(objects_store:get_iter_first())
-		material_combo:set_active_iter(materials_store:get_iter_first())
+		Gtk.main_iteration_do(false)
+		save_toolbutton.sensitive = false
 	end
 end
 
@@ -529,8 +498,19 @@ object_combo = Gtk.ComboBox {
 		local row = objects_store[active]
 		local object_name = row[1]
 		current_object = object_name
-		actions_store:clear()
 
+		local obj = b2l_data.objects[current_object]
+		local mesh = b2l_data.meshes[obj.data]
+
+		materials_store:clear()
+		for i, v in ipairs(mesh.submeshes) do
+			materials_store:append {
+				[1] = v.material_name
+			}
+		end
+		material_combo:set_active_iter(materials_store:get_iter_first())
+
+		actions_store:clear()
 		local armature_name = b2l_data.objects[object_name].armature_deform
 		local scene = b2l_data.scenes[current_scene]
 		if armature_name then
@@ -564,6 +544,7 @@ object_combo = Gtk.ComboBox {
 			end
 		end
 		action_combo:set_active_iter(actions_store:get_iter_first())
+		Gtk.main_iteration_do(false)
 		queue_render()
 	end
 }
@@ -585,6 +566,31 @@ scene_combo = Gtk.ComboBox {
 		end
 		local row = scenes_store[active]
 		current_scene = row[1]
+
+		objects_store:clear()
+		objects = {}
+		for k, v in pairs(b2l_data.scenes[current_scene].objects) do
+			local object = {}
+			objects[k] = object
+			obj_data = b2l_data.objects[k]
+			if obj_data.nla_tracks then
+				local actions = {}
+				object.actions = actions
+				for i, track in ipairs(obj_data.nla_tracks) do
+					for j, action in ipairs(track) do
+						actions[action.name] = action
+					end
+				end
+			end
+			if obj_data.type == 'MESH' then
+				objects_store:append {
+					[1] = k
+				}
+			end
+		end
+		object_combo:set_active_iter(objects_store:get_iter_first())
+		Gtk.main_iteration_do(false)
+
 		queue_render()
 	end
 }
@@ -622,10 +628,6 @@ material_combo = Gtk.ComboBox {
 	end
 }
 
-frame_start = 0
-frame_end = 0
-frame_delta = 1
-
 action_combo = Gtk.ComboBox {
 	id = "Action",
 	model = actions_store,
@@ -651,9 +653,6 @@ action_combo = Gtk.ComboBox {
 		action_scale:set_value(1)
 	end
 }
-
-playing_animation = false
-shutdown = false
 
 action_scale = Gtk.Scale {
 	adjustment = Gtk.Adjustment {
