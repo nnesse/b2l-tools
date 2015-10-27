@@ -309,6 +309,7 @@ function load_b2l_file(filename)
 		objects_store:clear()
 		materials_store:clear()
 		actions_store:clear()
+		current_scene = false
 
 		objects = {}
 		for k, v in pairs(b2l_data.objects) do
@@ -331,6 +332,9 @@ function load_b2l_file(filename)
 		end
 
 		for k, v in pairs(b2l_data.scenes) do
+			if not current_scene then
+				current_scene = k
+			end
 			scenes_store:append {
 				[1] = k
 			}
@@ -352,9 +356,9 @@ function load_b2l_file(filename)
 		end
 
 		save_toolbutton.sensitive = false
+		scene_combo:set_active_iter(scenes_store:get_iter_first())
 		object_combo:set_active_iter(objects_store:get_iter_first())
 		material_combo:set_active_iter(materials_store:get_iter_first())
-		scene_combo:set_active_iter(scenes_store:get_iter_first())
 	end
 end
 
@@ -528,16 +532,34 @@ object_combo = Gtk.ComboBox {
 		actions_store:clear()
 
 		local armature_name = b2l_data.objects[object_name].armature_deform
+		local scene = b2l_data.scenes[current_scene]
 		if armature_name then
 			local armature_obj = b2l_data.objects[armature_name]
 			if armature_obj.nla_tracks then
 				for i, track in ipairs(armature_obj.nla_tracks) do
 					for j, action in ipairs(track) do
-						actions_store:append {
-							[1] = action.name,
-							[2] = action.frame_start,
-							[3] = action.frame_end - 1
-						}
+						local frame_start
+						local frame_end
+
+						if action.frame_start < scene.frame_start then
+							frame_start = scene.frame_start
+						else
+							frame_start = action.frame_start
+						end
+
+						if action.frame_end > scene.frame_end then
+							frame_end = scene.frame_end
+						else
+							frame_end = action.frame_end
+						end
+
+						if frame_start < frame_end then
+							actions_store:append {
+								[1] = action.name,
+								[2] = frame_start,
+								[3] = frame_end - 1
+							}
+						end
 					end
 				end
 			end
