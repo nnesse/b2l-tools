@@ -31,7 +31,7 @@ void main()
 	n = vec3(0);
 	t = vec3(0);
 	float total_weight = 0;
-	for(i = 0; i < 4; i++) {
+	for(i = 0; i < 6; i++) {
 		float weight = (weights[i].y / (16535.0 * 0.5));
 		total_weight += weight;
 		int j = weights[i].x;

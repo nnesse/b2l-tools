@@ -6,6 +6,9 @@
 #include "glplatform-glcore.h"
 
 #include <stdint.h>
+
+#define MAX_VERTEX_WEIGHTS 6
+
 enum attributes {
 	ATTRIBUTE_VERTEX,
 	ATTRIBUTE_NORMAL,

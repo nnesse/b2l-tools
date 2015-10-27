@@ -174,7 +174,7 @@ void create_cone_geometry(struct geometry *g, int n)
 	create_geometry_end(g);
 }
 
-struct buffer_type buffer_type_mesh[2][6];
+struct buffer_type buffer_type_mesh[2][32];
 
 void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 {
@@ -253,7 +253,7 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 
 		int scount = 0;
 
-		for (i = 0; i < weights_per_vertex && i < 6; i++) {
+		for (i = 0; i < weights_per_vertex && i < MAX_VERTEX_WEIGHTS; i++) {
 			type->attribute[ATTRIBUTE_WEIGHT0 + i].integer = true;
 			type->attribute[ATTRIBUTE_WEIGHT0 + i].size = 2;
 			type->attribute[ATTRIBUTE_WEIGHT0 + i].type = GL_UNSIGNED_SHORT;
@@ -315,7 +315,7 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 		}
 
 		uint16_t *s = (uint16_t *)f;
-		for (j = 0; j < weights_per_vertex && j < 6; j++) {
+		for (j = 0; j < weights_per_vertex && j < MAX_VERTEX_WEIGHTS; j++) {
 			s[2*j] = weights_ptr[2*j];
 			s[2*j + 1] = weights_ptr[2*j + 1];
 		}
