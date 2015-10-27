@@ -22,22 +22,6 @@ if not editor then
 	editor = GLib.find_program_in_path("emacs")
 end
 
-fs_text =
-"#version 330\
-out vec4 color;\
-void main()\
-{\
-	color = vec4(1);\
-}"
-
-vs_text=
-"#version 330\
-in vec3 pos;\
-void main()\
-{\
-	gl_Position = vec4(vec3(pos.x, pos.y, -pos.z) * 1.0, 1);\
-}"
-
 b2l_data = false
 current_scene = false
 current_object = false
@@ -319,6 +303,25 @@ function load_b2l_file(filename)
 			materials = {}
 		end
 
+		for k, v in pairs(materials) do
+			if v.shaders.fs_filename then
+				local abs_filename = b2l_absolute_path(v.shaders.fs_filename)
+				local text, err = GLib.file_get_contents(abs_filename)
+				if text then
+					v.shaders['_fs_text_org'] = text
+					v.shaders['_fs_text'] = capi.filter_shader_text(text)
+				end
+			end
+			if v.shaders.vs_filename then
+				local abs_filename = b2l_absolute_path(v.shaders.vs_filename)
+				local text, err = GLib.file_get_contents(abs_filename)
+				if text then
+					v.shaders['_vs_text_org'] = text
+					v.shaders['_vs_text'] = capi.filter_shader_text(text)
+				end
+			end
+		end
+
 		scenes_store:clear()
 		for k, v in pairs(b2l_data.scenes) do
 			scenes_store:append {
@@ -346,15 +349,6 @@ if b2l_filename then
 	b2l_file_button:set_filename(b2l_filename)
 end
 
-function reload_fs(filename)
-	if filename then
-		local fs_text_next, err = GLib.file_get_contents(filename)
-		if fs_text_next then
-			fs_text = fs_text_next
-		end
-	end
-end
-
 fs_edit_button = Gtk.Button {
 		label = "Edit",
 		sensitive = false,
@@ -379,31 +373,28 @@ fs_chooser = Gtk.FileChooserButton {
 			if filename and active_material.shaders['fs_filename'] ~= filename then
 				setting_changed()
 			end
-			reload_fs(abs_filename)
-			local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
-			if uniforms then
-				update_controls(uniforms)
-				if filename then
-					fs_edit_button.sensitive = true
-				else
-					fs_edit_button.sensitive = false
-				end
-				if filename then
+			if filename then
+				local text, err = GLib.file_get_contents(abs_filename)
+				if text then
 					active_material.shaders['fs_filename'] = filename
-					active_material.shaders['_fs_text'] = capi.filter_shader_text(fs_text)
+					active_material.shaders['_fs_text_org'] = text
+					active_material.shaders['_fs_text'] = capi.filter_shader_text(text)
+					local fs_text = active_material.shaders['_fs_text_org']
+					local vs_text = active_material.shaders['_vs_text_org']
+					if fs_text and vs_text then
+						local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
+						if uniforms then
+							update_controls(uniforms)
+						end
+					end
 				end
+				fs_edit_button.sensitive = true
+			else
+				fs_edit_button.sensitive = false
 			end
+
 		end,
 	}
-
-function reload_vs(filename)
-	if filename then
-		local vs_text_next, err = GLib.file_get_contents(filename)
-		if vs_text_next then
-			vs_text = vs_text_next
-		end
-	end
-end
 
 
 vs_edit_button = Gtk.Button {
@@ -426,23 +417,26 @@ vs_chooser = Gtk.FileChooserButton {
 	filter = vert_glsl_filter,
 	on_selection_changed = function(chooser)
 		local abs_filename = chooser:get_filename()
-		filename = b2l_relative_path(chooser:get_filename())
-		if filename and filename ~= active_material.shaders['vs_filename'] then
-			setting_changed()
-		end
-		reload_vs(abs_filename)
-		local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
-		if uniforms then
-			update_controls(uniforms)
-			if filename then
-				vs_edit_button.sensitive = true
-			else
-				vs_edit_button.sensitive = false
+		local filename = b2l_relative_path(chooser:get_filename())
+		if filename then
+			local text, err = GLib.file_get_contents(abs_filename)
+			if text then
+				setting_changed()
+				active_material.shaders['vs_filename'] = filename
+				active_material.shaders['_vs_text_org'] = text
+				active_material.shaders['_vs_text'] = capi.filter_shader_text(text)
+				local fs_text = active_material.shaders['_fs_text_org']
+				local vs_text = active_material.shaders['_vs_text_org']
+				if fs_text and vs_text then
+					local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
+					if uniforms then
+						update_controls(uniforms)
+					end
+				end
 			end
-			if filename then
-				active_material.shaders.vs_filename = filename
-				active_material.shaders['_vs_text'] = capi.filter_shader_text(vs_text)
-			end
+			vs_edit_button.sensitive = true
+		else
+			vs_edit_button.sensitive = false
 		end
 	end,
 }
@@ -715,11 +709,32 @@ local vbox_main = Gtk.VBox {
 			Gtk.ToolButton {
 				icon_name = "view-refresh",
 				on_clicked = function()
-					reload_fs(fs_chooser:get_filename())
-					reload_vs(vs_chooser:get_filename())
-					local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
-					if uniforms then
-						update_controls(uniforms)
+					local vs_filaname = active_material.shaders['vs_filename']
+					local fs_filename = active_material.shaders['fs_filename']
+					if vs_filename then
+						local abs_filename = b2l_absolute_path(vs_filename)
+						local text, err = GLib.file_get_contents(abs_filename)
+						if text then
+							active_material.shaders['_vs_text_org'] = text
+							active_material.shaders['_vs_text'] = capi.filter_shader_text(text)
+						end
+					end
+					if fs_filename then
+						local abs_filename = b2l_absolute_path(fs_filename)
+						local text, err = GLib.file_get_contents(abs_filename)
+						if text then
+							active_material.shaders['_fs_text_org'] = text
+							active_material.shaders['_fs_text'] = capi.filter_shader_text(text)
+						end
+					end
+
+					local fs_text = active_material.shaders['_fs_text_org']
+					local vs_text = active_material.shaders['_vs_text_org']
+					if fs_text and vs_text then
+						local uniforms = capi.get_shader_uniforms(vs_text, fs_text)
+						if uniforms then
+							update_controls(uniforms)
+						end
 					end
 				end,
 			},

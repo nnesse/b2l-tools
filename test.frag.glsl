@@ -50,5 +50,5 @@ void main()
 		normal = normalize(normal);
 	}
 
-	color = shade(normal, tangent, bitangent, light_color, light_dir, light_intensity) * vec4(1);
+	color = shade(normal, tangent, bitangent, light_color, light_dir, light_intensity);
 }
