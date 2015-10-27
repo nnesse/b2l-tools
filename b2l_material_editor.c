@@ -940,12 +940,12 @@ static void redraw(struct glplatform_win *win)
 			glBindAttribLocation(program->program, ATTRIBUTE_NORMAL, "normal");
 			glBindAttribLocation(program->program, ATTRIBUTE_UV, "uv");
 			glBindAttribLocation(program->program, ATTRIBUTE_TANGENT, "tangent");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weight[0]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weight[1]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weight[2]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weight[3]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weight[4]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weight[5]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weights[0]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weights[1]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weights[2]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weights[3]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weights[4]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weights[5]");
 			program_link(program);
 		}
 
