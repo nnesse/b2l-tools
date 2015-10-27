@@ -541,19 +541,18 @@ object_combo = Gtk.ComboBox {
 						local frame_start
 						local frame_end
 
-						if action.frame_start < scene.frame_start then
-							frame_start = scene.frame_start
-						else
-							frame_start = action.frame_start
+						frame_start = action.frame_start - scene.frame_start
+						if frame_start < 0 then
+							frame_start = 0
 						end
 
 						if action.frame_end > scene.frame_end then
-							frame_end = scene.frame_end
+							frame_end = scene.frame_end - scene.frame_start
 						else
-							frame_end = action.frame_end
+							frame_end = action.frame_end - scene.frame_start
 						end
 
-						if frame_start < frame_end then
+						if frame_start <= frame_end then
 							actions_store:append {
 								[1] = action.name,
 								[2] = frame_start,
@@ -623,9 +622,9 @@ material_combo = Gtk.ComboBox {
 	end
 }
 
-frame_start = 1
+frame_start = 0
+frame_end = 0
 frame_delta = 1
-frame_end = 1
 
 action_combo = Gtk.ComboBox {
 	id = "Action",
@@ -659,7 +658,7 @@ shutdown = false
 action_scale = Gtk.Scale {
 	adjustment = Gtk.Adjustment {
 		lower = 1,
-		upper = 100,
+		upper = 1,
 		step_increment = 1,
 		page_increment = 1,
 	},
@@ -818,12 +817,14 @@ local vbox_main = Gtk.VBox {
 						Gtk.ToolButton {
 							icon_name = "media-playback-start",
 							on_clicked = function(button)
-								if button.icon_name == "media-playback-start" then
-									playing_animation = true
-									button.icon_name = "media-playback-stop"
-								else
-									playing_animation = false
-									button.icon_name = "media-playback-start"
+								if frame_start ~= frame_end then
+									if button.icon_name == "media-playback-start" then
+										playing_animation = true
+										button.icon_name = "media-playback-stop"
+									else
+										playing_animation = false
+										button.icon_name = "media-playback-start"
+									end
 								end
 								queue_render()
 							end,
