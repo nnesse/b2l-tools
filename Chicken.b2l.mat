@@ -21,6 +21,10 @@ return {
         tag = 'Material',
         value = 'ChickenE.png' 
       },
+      groups = { 
+        datatype = 'mat4',
+        tag = 'Misc' 
+      },
       light_angle_a = { 
         datatype = 'float',
         tag = 'Lighting',
@@ -50,9 +54,19 @@ return {
         tag = 'Material',
         value = 'ChickenE_nor.png' 
       },
+      normal_texture_scale = { 
+        datatype = 'float',
+        tag = 'Material',
+        value = 0.5 
+      },
       proj = { 
         datatype = 'mat4',
         tag = 'Misc' 
+      },
+      use_normal_texture = { 
+        datatype = 'bool',
+        tag = 'Material',
+        value = true 
       },
       view = { 
         datatype = 'mat4',

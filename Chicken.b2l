@@ -51,8 +51,8 @@ objects = {
 				},
 				{
 					name = 'Idle',
-					frame_start = 106,
-					frame_end = 169,
+					frame_start = 120,
+					frame_end = 183,
 				},
 			},
 			{
@@ -75,13 +75,13 @@ objects = {
 				name = 'NlaTrack.001',
 				{
 					name = 'Die',
-					frame_start = 59,
-					frame_end = 82,
+					frame_start = 62,
+					frame_end = 85,
 				},
 				{
 					name = 'Sleep',
-					frame_start = 82,
-					frame_end = 106,
+					frame_start = 89,
+					frame_end = 113,
 				},
 			},
 		},
