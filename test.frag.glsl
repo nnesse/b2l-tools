@@ -8,6 +8,8 @@ in FS_IN {
 out vec4 color;
 
 section Material {
+	uniform bool use_diffuse_texture;
+	uniform vec3 diffuse_color;
 	uniform sampler2D diffuse_texture;
 	uniform bool use_normal_texture;
 	uniform sampler2D normal_texture;
@@ -25,8 +27,11 @@ section Lighting {
 vec4 shade(vec3 normal, vec3 tangent, vec3 bitangent, vec3 light_color, vec3 light_dir, float light_intensity)
 {
 	float diffuse_intensity = max(dot(normal, light_dir),0);
-	vec3 diffuse_color = texture(diffuse_texture, vec2(fs_in.uv.x, -fs_in.uv.y)).xyz;
-	return vec4(diffuse_color *
+
+	vec3 dcolor = diffuse_color;
+	if (use_diffuse_texture)
+		dcolor *= texture(diffuse_texture, vec2(fs_in.uv.x, -fs_in.uv.y)).xyz;
+	return vec4(dcolor *
 		light_color *
 		light_intensity * 2 *
 		mix(diffuse_intensity, 1, ambient_light), 1);

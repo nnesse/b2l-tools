@@ -20,6 +20,10 @@ out FS_IN {
 	vec4 tangent;
 } vs_out;
 
+section Animation {
+	uniform bool skinned;
+};
+
 void main()
 {
 	vs_out.uv = uv;
@@ -30,19 +34,25 @@ void main()
 	v = vec3(0);
 	n = vec3(0);
 	t = vec3(0);
-	float total_weight = 0;
-	for(i = 0; i < 6; i++) {
-		float weight = (weights[i].y / (16535.0 * 0.5));
-		total_weight += weight;
-		int j = weights[i].x;
-		if (j < 0)
-			break;
-		v += weight * (groups[j] * vec4(vertex,1)).xyz;
-		n += weight * (groups[j] * vec4(normal, 0)).xyz;
-		t += weight * (groups[j] * vec4(tangent.xyz, 0)).xyz;
+	if (skinned) {
+		float total_weight = 0;
+		for(i = 0; i < 6; i++) {
+			float weight = (weights[i].y / (16535.0 * 0.5));
+			total_weight += weight;
+			int j = weights[i].x;
+			if (j < 0)
+				break;
+			v += weight * (groups[j] * vec4(vertex,1)).xyz;
+			n += weight * (groups[j] * vec4(normal, 0)).xyz;
+			t += weight * (groups[j] * vec4(tangent.xyz, 0)).xyz;
+		}
+		v /= total_weight;
+		n /= total_weight;
+	} else {
+		v = vertex;
+		n = normal;
+		t = tangent.xyz;
 	}
-	v /= total_weight;
-	n /= total_weight;
 
 	mat4 modelview = view * model;
 

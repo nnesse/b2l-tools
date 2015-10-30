@@ -6,6 +6,11 @@ return {
         tag = 'Lighting',
         value = 0.5 
       },
+      diffuse_color = { 
+        datatype = 'vec3',
+        tag = 'Material',
+        value = { 1, 1, 1 } 
+      },
       diffuse_texture = { 
         datatype = 'sampler2D',
         tag = 'Material',
@@ -52,6 +57,16 @@ return {
       proj = { 
         datatype = 'mat4',
         tag = 'Misc' 
+      },
+      skinned = { 
+        datatype = 'bool',
+        tag = 'Misc',
+        value = false 
+      },
+      use_diffuse_texture = { 
+        datatype = 'bool',
+        tag = 'Material',
+        value = true 
       },
       use_normal_texture = { 
         datatype = 'bool',
