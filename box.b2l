@@ -1,0 +1,61 @@
+return {
+scenes = {
+	['Scene'] = {
+		frame_start = 1.000000,
+		frame_end= 250.000000,
+		frame_step = 1.000000,
+		objects = {
+			['Cube'] = {
+				num_frames = 1,
+				object_transform_array_offset = 0,
+			},
+			['Lamp'] = {
+				num_frames = 1,
+				object_transform_array_offset = 64,
+			},
+			['Camera'] = {
+				num_frames = 1,
+				object_transform_array_offset = 128,
+			},
+		},
+	},
+},
+objects = {
+	['Camera'] = {
+		type = 'CAMERA',
+		data = 'Camera',
+	},
+	['Cube'] = {
+		type = 'MESH',
+		data = 'Cube',
+	},
+	['Lamp'] = {
+		type = 'LAMP',
+		data = 'Lamp',
+	},
+},
+meshes={
+	['Cube'] = {
+		num_triangles = 12,
+		num_verticies = 36,
+		uv_layers = {
+		},
+		weights_per_vertex = 0,
+		submeshes = {
+			{
+				material_name = 'Material',
+				triangle_no = 0,
+				triangle_count = 12,
+			},
+		},
+		index_array_offset = 192,
+		vertex_co_array_offset = 264,
+		vertex_normal_array_offset = 696,
+	},
+},
+armatures={
+},
+materials={
+	'Material',
+},
+}

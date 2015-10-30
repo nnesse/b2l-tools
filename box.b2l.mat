@@ -1,0 +1,84 @@
+return { 
+  Material = { 
+    params = { 
+      ambient_light = { 
+        datatype = 'float',
+        tag = 'Lighting',
+        value = 0.5 
+      },
+      diffuse_color = { 
+        datatype = 'vec3',
+        tag = 'Material',
+        value = { 1, 1, 1 } 
+      },
+      diffuse_texture = { 
+        datatype = 'sampler2D',
+        tag = 'Material' 
+      },
+      groups = { 
+        datatype = 'mat4',
+        tag = 'Misc' 
+      },
+      light_angle_a = { 
+        datatype = 'float',
+        tag = 'Lighting',
+        value = 0.5 
+      },
+      light_angle_b = { 
+        datatype = 'float',
+        tag = 'Lighting',
+        value = 0.5 
+      },
+      light_color = { 
+        datatype = 'vec3',
+        tag = 'Lighting',
+        value = { 1, 1, 1 } 
+      },
+      light_intensity = { 
+        datatype = 'float',
+        tag = 'Lighting',
+        value = 0.5 
+      },
+      model = { 
+        datatype = 'mat4',
+        tag = 'Misc' 
+      },
+      normal_texture = { 
+        datatype = 'sampler2D',
+        tag = 'Material' 
+      },
+      normal_texture_scale = { 
+        datatype = 'float',
+        tag = 'Material',
+        value = 0.5 
+      },
+      proj = { 
+        datatype = 'mat4',
+        tag = 'Misc' 
+      },
+      skinned = { 
+        datatype = 'bool',
+        tag = 'Animation',
+        value = false 
+      },
+      use_diffuse_texture = { 
+        datatype = 'bool',
+        tag = 'Material',
+        value = false 
+      },
+      use_normal_texture = { 
+        datatype = 'bool',
+        tag = 'Material',
+        value = false 
+      },
+      view = { 
+        datatype = 'mat4',
+        tag = 'Misc' 
+      } 
+    },
+    shaders = { 
+      fs_filename = 'test.frag.glsl',
+      vs_filename = 'test.vert.glsl' 
+    } 
+  } 
+}
