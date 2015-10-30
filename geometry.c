@@ -197,9 +197,10 @@ void create_mesh(struct mesh *m, lua_State *L, uint8_t *blob)
 	lua_pushnil(L);
 	if (lua_next(L, -2)) {
 		has_uv_layers = true;
+		lua_pop(L, 3);
+	} else {
 		lua_pop(L, 1);
 	}
-	lua_pop(L, 2);
 	m->has_uv_layers = true;
 
 	lua_getfield(L, -1, "weights_per_vertex");
