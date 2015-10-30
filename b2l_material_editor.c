@@ -767,6 +767,11 @@ int mesh_gc(lua_State *L)
 	return 0;
 }
 
+static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const char *object_name, double frame,
+		struct mat4 *model,
+		struct mat4 *view,
+		struct mat4 *proj);
+
 static void redraw(struct glplatform_win *win)
 {
 	struct glplatform_thread_state thread_state;
@@ -802,39 +807,6 @@ static void redraw(struct glplatform_win *win)
 
 	int top_idx = lua_gettop(L);
 
-	lua_getglobal(L, "b2l_data"); //1
-	if (!lua_istable(L, -1)) {
-		lua_pop(L, 1);
-		goto end;
-	}
-	int b2l_data_idx = lua_gettop(L);
-	lua_getfield(L, b2l_data_idx, "objects");
-	lua_getglobal(L, "current_object");
-	if (!lua_isstring(L, -1)) {
-		lua_pop(L, 3);
-		goto end;
-	}
-	const char *current_object = lua_tostring(L, -1);
-	lua_getfield(L, -2, current_object);
-	if (lua_isnil(L, -1)) {
-		lua_pop(L, 4);
-		goto end;
-	}
-	int object_idx = lua_gettop(L);
-
-	lua_getfield(L, object_idx, "type");
-	if (strcmp(lua_tostring(L, -1), "MESH")) {
-		lua_pop(L, 5);
-		goto end;
-	}
-	lua_getfield(L, object_idx, "data");
-	lua_getfield(L, b2l_data_idx, "meshes");
-	lua_getfield(L, -1, lua_tostring(L, -2));
-
-	if (lua_isnil(L, -1)) {
-		goto end;
-	}
-
 	if (!g_gl_state.initialized)
 		init_gl_state();
 
@@ -842,42 +814,25 @@ static void redraw(struct glplatform_win *win)
 		goto end;
 	}
 
-	int mesh_idx = lua_gettop(L);
-
-	lua_getfield(L, mesh_idx, "mesh");
-	struct mesh *m = (struct mesh *)lua_touserdata(L, -1);
-	if (!m) {
+	lua_getglobal(L, "b2l_data"); //1
+	if (!lua_istable(L, -1)) {
 		lua_pop(L, 1);
-
-		lua_getfield(L, mesh_idx, "submeshes");
-		lua_len(L, -1);
-		int num_submesh = lua_tointeger(L, -1);
-		lua_pop(L, 2);
-
-		size_t mesh_size = offsetof(struct mesh, submesh[num_submesh]);
-		m = (struct mesh *)lua_newuserdata(L, mesh_size);
-		memset(m, 0, mesh_size);
-
-		lua_newtable(L);
-		lua_pushcfunction(L, mesh_gc);
-		lua_setfield(L, -2, "__gc");
-		lua_setmetatable(L, -2);
-
-		lua_setfield(L, mesh_idx, "mesh");
-		create_mesh(m, L, g_gl_state.blob);
-	} else {
-		lua_pop(L, 1);
+		goto end;
 	}
-
-	lua_getfield(L, object_idx, "vertex_groups");
-	int num_vertex_groups;
-	if (lua_isnil(L, -1)) {
-		num_vertex_groups = 0;
-	} else {
-		lua_len(L, -1);
-		num_vertex_groups = lua_tointeger(L, -1);
-		lua_pop(L, 1);
+	int b2l_data_idx = lua_gettop(L);
+	lua_getglobal(L, "current_object");
+	if (!lua_isstring(L, -1)) {
+		goto end;
 	}
+	const char *current_object = lua_tostring(L, -1);
+
+	double frame;
+	int frame_start;
+
+	lua_getglobal(L, "frame_start");
+	frame_start = lua_tointeger(L, -1);
+	lua_getglobal(L, "frame_delta");
+	frame = frame_start + lua_tonumber(L, -1);
 
 	struct mat4 view;
 	struct mat4 model;
@@ -901,11 +856,86 @@ static void redraw(struct glplatform_win *win)
 	proj.v[3][3] = 1.0;
 
 	lua_getglobal(L, "materials");
-	int materials = lua_gettop(L);
+	int materials_idx = lua_gettop(L);
+
+	draw_mesh(L, b2l_data_idx, materials_idx, current_object, frame,
+			&model,
+			&view,
+			&proj);
+end:
+	lua_settop(L, top_idx);
+	{
+		GLenum err = glGetError();
+		if (err)
+			printf("render_scene GL error = %d\n", err);
+	}
+	glplatform_swap_buffers(g_win);
+	glplatform_set_thread_state(&thread_state);
+	g_need_redraw = false;
+	return;
+}
+
+static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const char *object_name, double frame,
+		struct mat4 *model,
+		struct mat4 *view,
+		struct mat4 *proj)
+{
+	int top_idx = lua_gettop(L);
+	lua_getfield(L, b2l_data_idx, "objects");
+	lua_getfield(L, -1, object_name);
+	if (lua_isnil(L, -1)) {
+		goto end;
+	}
+	int object_idx = lua_gettop(L);
+
+	lua_getfield(L, object_idx, "type");
+	if (strcmp(lua_tostring(L, -1), "MESH")) {
+		goto end;
+	}
+	lua_getfield(L, object_idx, "data");
+	lua_getfield(L, b2l_data_idx, "meshes");
+	lua_getfield(L, -1, lua_tostring(L, -2));
+
+	if (lua_isnil(L, -1)) {
+		goto end;
+	}
+
+	int mesh_idx = lua_gettop(L);
+
+	lua_getfield(L, mesh_idx, "mesh");
+	struct mesh *m = (struct mesh *)lua_touserdata(L, -1);
+	if (!m) {
+		lua_getfield(L, mesh_idx, "submeshes");
+		lua_len(L, -1);
+		int num_submesh = lua_tointeger(L, -1);
+
+		size_t mesh_size = offsetof(struct mesh, submesh[num_submesh]);
+		m = (struct mesh *)lua_newuserdata(L, mesh_size);
+		memset(m, 0, mesh_size);
+		int mesh_data_idx = lua_gettop(L);
+
+		lua_newtable(L);
+		lua_pushcfunction(L, mesh_gc);
+		lua_setfield(L, -2, "__gc");
+		lua_setmetatable(L, -2);
+
+		lua_setfield(L, mesh_idx, "mesh");
+		lua_pushvalue(L, mesh_idx); 
+		create_mesh(m, L, g_gl_state.blob);
+	}
+
+	lua_getfield(L, object_idx, "vertex_groups");
+	int num_vertex_groups;
+	if (lua_isnil(L, -1)) {
+		num_vertex_groups = 0;
+	} else {
+		lua_len(L, -1);
+		num_vertex_groups = lua_tointeger(L, -1);
+	}
 
 	int i;
 	for (i = 0; i < m->num_submesh; i++) {
-		lua_getfield(L, materials, m->submesh[i].material_name);
+		lua_getfield(L, materials_idx, m->submesh[i].material_name);
 		int material_idx = lua_gettop(L);
 		lua_getfield(L, material_idx, "program");
 
@@ -953,9 +983,9 @@ static void redraw(struct glplatform_win *win)
 		}
 
 		glUseProgram(program->program);
-		glUniformMatrix4fv(glGetUniformLocation(program->program, "model"), 1, GL_FALSE, (GLfloat *)&model);
-		glUniformMatrix4fv(glGetUniformLocation(program->program, "proj"), 1, GL_FALSE, (GLfloat *)&proj);
-		glUniformMatrix4fv(glGetUniformLocation(program->program, "view"), 1, GL_FALSE, (GLfloat *)&view);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "model"), 1, GL_FALSE, (GLfloat *)model);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "proj"), 1, GL_FALSE, (GLfloat *)proj);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "view"), 1, GL_FALSE, (GLfloat *)view);
 
 		//
 		// Compute armature matrix transforms
@@ -964,18 +994,7 @@ static void redraw(struct glplatform_win *win)
 		if (groups_index >= 0 && m->weights_per_vertex) {
 			static int render_count = 0;
 			render_count++;
-			double frame;
-			int frame_start;
-			int frame_end;
-
 			int prev_top = lua_gettop(L);
-
-			lua_getglobal(L, "frame_start");
-			frame_start = lua_tointeger(L, -1);
-			lua_getglobal(L, "frame_end");
-			frame_end = lua_tointeger(L, -1);
-			lua_getglobal(L, "frame_delta");
-			frame = frame_start + lua_tonumber(L, -1);
 			int frame_i = floorf(frame);
 			double frame_fract = frame - frame_i;
 
@@ -986,7 +1005,7 @@ static void redraw(struct glplatform_win *win)
 				goto end;
 			}
 			lua_getfield(L, -1, "objects");
-			lua_getfield(L, -1, current_object);
+			lua_getfield(L, -1, object_name);
 			lua_getfield(L, -1, "vertex_group_transform_array_offset");
 			int offset = lua_tointeger(L, -1);
 			int stride = sizeof(float) * 4 * 4 * num_vertex_groups;
@@ -1160,15 +1179,6 @@ static void redraw(struct glplatform_win *win)
 	}
 end:
 	lua_settop(L, top_idx);
-	{
-		GLenum err = glGetError();
-		if (err)
-			printf("render_scene GL error = %d\n", err);
-	}
-	glplatform_swap_buffers(g_win);
-	glplatform_set_thread_state(&thread_state);
-	g_need_redraw = false;
-	return;
 }
 
 static int set_b2l_file(lua_State *L)
