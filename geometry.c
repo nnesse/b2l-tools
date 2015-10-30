@@ -10,32 +10,35 @@
 
 #include "lua.h"
 
-void buffer_type_init(struct buffer_type *t)
+void buffer_type_init(struct buffer_type *t, struct attribute *attribute, int num_attributes)
 {
 	glGenVertexArrays(1, &t->vao);
 	glBindVertexArray(t->vao);
 
 	int pos;
-	for (pos = 0; pos < NUM_ATTRIBUTES; pos++) {
-		if (!t->attribute[pos].size)
+	for (pos = 0; pos < num_attributes; pos++) {
+		struct attribute *attrib = attribute + pos;
+		if (!attribute[pos].size)
 			continue;
 		glEnableVertexAttribArray(pos);
-		glVertexAttribBinding(pos, 0);
-		if (t->attribute[pos].integer) {
+		glVertexAttribBinding(pos, attrib->binding_index);
+		if (attribute[pos].integer) {
 			glVertexAttribIFormat(pos,
-				t->attribute[pos].size,
-				t->attribute[pos].type,
-				t->attribute[pos].offset);
+				attribute[pos].size,
+				attribute[pos].type,
+				attribute[pos].offset);
 		} else {
 			glVertexAttribFormat(pos,
-				t->attribute[pos].size,
-				t->attribute[pos].type,
+				attribute[pos].size,
+				attribute[pos].type,
 				GL_FALSE,
-				t->attribute[pos].offset);
+				attribute[pos].offset);
 		}
 	}
+	t->valid = 1;
 }
 
+#if 0
 struct buffer_type buffer_type_v3f = {
 	.element_size = 3 * sizeof(float),
 	.attribute = {
@@ -47,6 +50,7 @@ struct buffer_type buffer_type_v3f = {
 		}
 	}
 };
+#endif
 
 void create_geometry_begin(struct geometry *g, void ** const vertex_buffer, uint16_t ** const index_buffer)
 {
@@ -56,7 +60,7 @@ void create_geometry_begin(struct geometry *g, void ** const vertex_buffer, uint
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g->index_array);
 
 	glBufferStorage(GL_ARRAY_BUFFER,
-			g->type->element_size * g->num_verticies,
+			g->type->element_size[0] * g->num_verticies,
 			NULL,
 			GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
 	glBufferStorage(GL_ELEMENT_ARRAY_BUFFER,
@@ -81,6 +85,7 @@ void delete_geometry(struct geometry *g)
 	glDeleteBuffers(1, &g->index_array);
 }
 
+#if 0
 void geometry_init()
 {
 	buffer_type_init(&buffer_type_v3f);
@@ -173,23 +178,29 @@ void create_cone_geometry(struct geometry *g, int n)
 	r[2] = 0;
 	create_geometry_end(g);
 }
+#endif
 
-struct buffer_type buffer_type_mesh[2][32];
+static struct buffer_type buffer_type_mesh[2][32];
 
-void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
+void create_mesh(struct mesh *m, lua_State *L, uint8_t *blob)
 {
 	lua_getfield(L, -1, "num_triangles");
-	g->num_triangles = lua_tointeger(L, -1);
+	m->num_triangles = lua_tointeger(L, -1);
 	lua_pop(L, 1);
 
 	lua_getfield(L, -1, "num_verticies");
-	g->num_verticies = lua_tointeger(L, -1);
+	m->num_verticies = lua_tointeger(L, -1);
 	lua_pop(L, 1);
 
+	int has_uv_layers = false;
 	lua_getfield(L, -1, "uv_layers");
-	lua_len(L, -1);
-	int num_uv_layers = lua_tointeger(L, -1);
+	lua_pushnil(L);
+	if (lua_next(L, -2)) {
+		has_uv_layers = true;
+		lua_pop(L, 1);
+	}
 	lua_pop(L, 2);
+	m->has_uv_layers = true;
 
 	lua_getfield(L, -1, "weights_per_vertex");
 	int weights_per_vertex = lua_tointeger(L, -1);
@@ -200,11 +211,11 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 	int num_submesh = lua_tointeger(L, -1);
 	lua_pop(L, 1);
 
-	g->num_submesh = num_submesh;
+	m->num_submesh = num_submesh;
 
 	int i;
 	for (i = 1; i <= num_submesh; i++) {
-		struct submesh *submesh = g->submesh + i - 1;
+		struct submesh *submesh = m->submesh + i - 1;
 		lua_rawgeti(L, -1, i);
 		lua_getfield(L, -1, "material_name");
 		submesh->material_name = strdup(lua_tostring(L, -1));
@@ -221,56 +232,56 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 	}
 	lua_pop(L, 1);
 
-	int fcount = 0;
 
-	struct buffer_type *type = &(buffer_type_mesh[(num_uv_layers > 0) ? 0 : 1][weights_per_vertex]);
-	if (!type->element_size) {
-		type->attribute[ATTRIBUTE_VERTEX].integer = false;
-		type->attribute[ATTRIBUTE_VERTEX].size = 3;
-		type->attribute[ATTRIBUTE_VERTEX].type = GL_FLOAT;
-		type->attribute[ATTRIBUTE_VERTEX].offset = 0;
+	struct attribute attribute[NUM_ATTRIBUTES];
+
+	memset(attribute, 0, sizeof(attribute));
+
+	struct buffer_type *type = &(buffer_type_mesh[(has_uv_layers > 0) ? 1 : 0][weights_per_vertex]);
+	if (!type->valid) {
+		int fcount = 0;
+		int scount = 0;
+		attribute[ATTRIBUTE_VERTEX].integer = false;
+		attribute[ATTRIBUTE_VERTEX].size = 3;
+		attribute[ATTRIBUTE_VERTEX].type = GL_FLOAT;
+		attribute[ATTRIBUTE_VERTEX].offset = 0;
+		attribute[ATTRIBUTE_VERTEX].binding_index = 0;
 		fcount += 3;
 
-		type->attribute[ATTRIBUTE_NORMAL].integer = false;
-		type->attribute[ATTRIBUTE_NORMAL].size = 3;
-		type->attribute[ATTRIBUTE_NORMAL].type = GL_FLOAT;
-		type->attribute[ATTRIBUTE_NORMAL].offset = sizeof(float) * fcount;
+		attribute[ATTRIBUTE_NORMAL].integer = false;
+		attribute[ATTRIBUTE_NORMAL].size = 3;
+		attribute[ATTRIBUTE_NORMAL].type = GL_FLOAT;
+		attribute[ATTRIBUTE_NORMAL].offset = sizeof(float) * fcount;
+		attribute[ATTRIBUTE_NORMAL].binding_index = 0;
 		fcount += 3;
-
-		if (num_uv_layers > 0) {
-			type->attribute[ATTRIBUTE_UV].integer = false;
-			type->attribute[ATTRIBUTE_UV].size = 2;
-			type->attribute[ATTRIBUTE_UV].type = GL_FLOAT;
-			type->attribute[ATTRIBUTE_UV].offset = sizeof(float) * fcount;
-			fcount += 2;
-
-			type->attribute[ATTRIBUTE_TANGENT].integer = false;
-			type->attribute[ATTRIBUTE_TANGENT].size = 4;
-			type->attribute[ATTRIBUTE_TANGENT].type = GL_FLOAT;
-			type->attribute[ATTRIBUTE_TANGENT].offset = sizeof(float) * fcount;
-			fcount += 4;
+		if (has_uv_layers) {
+			attribute[ATTRIBUTE_UV].integer = false;
+			attribute[ATTRIBUTE_UV].size = 2;
+			attribute[ATTRIBUTE_UV].type = GL_FLOAT;
+			attribute[ATTRIBUTE_UV].offset = 0;
+			attribute[ATTRIBUTE_UV].binding_index = 1;
+			attribute[ATTRIBUTE_TANGENT].integer = false;
+			attribute[ATTRIBUTE_TANGENT].size = 4;
+			attribute[ATTRIBUTE_TANGENT].type = GL_FLOAT;
+			attribute[ATTRIBUTE_TANGENT].offset = sizeof(float) * 2;
+			attribute[ATTRIBUTE_TANGENT].binding_index = 1;
 		}
 
-		int scount = 0;
-
 		for (i = 0; i < weights_per_vertex && i < MAX_VERTEX_WEIGHTS; i++) {
-			type->attribute[ATTRIBUTE_WEIGHT0 + i].integer = true;
-			type->attribute[ATTRIBUTE_WEIGHT0 + i].size = 2;
-			type->attribute[ATTRIBUTE_WEIGHT0 + i].type = GL_UNSIGNED_SHORT;
-			type->attribute[ATTRIBUTE_WEIGHT0 + i].offset = sizeof(float) * fcount + sizeof(uint16_t) * scount;
+			attribute[ATTRIBUTE_WEIGHT0 + i].integer = true;
+			attribute[ATTRIBUTE_WEIGHT0 + i].size = 2;
+			attribute[ATTRIBUTE_WEIGHT0 + i].type = GL_UNSIGNED_SHORT;
+			attribute[ATTRIBUTE_WEIGHT0 + i].offset = sizeof(float) * fcount + sizeof(uint16_t) * scount;
+			attribute[ATTRIBUTE_WEIGHT0 + i].binding_index = 0;
 			scount += 2;
 		}
 
-		type->element_size = sizeof(float) * fcount + sizeof(uint16_t) * scount;
-		buffer_type_init(type);
+		type->element_size[0] = sizeof(float) * fcount + sizeof(uint16_t) * scount;
+		type->element_size[1] = sizeof(float) * 6;
+		buffer_type_init(type, attribute, NUM_ATTRIBUTES);
 	}
-	g->type = type;
-
-	float *vertex_buffer;
-	uint16_t *index_buffer;
-
-	create_geometry_begin(g, (void **)&vertex_buffer, &index_buffer);
-	uint8_t *ptr = (uint8_t *) vertex_buffer;
+	m->weights_per_vertex = weights_per_vertex;
+	m->type = type;
 
 	lua_getfield(L, -1, "vertex_co_array_offset");
 	float *vertex_ptr = (float *)(blob + lua_tointeger(L, -1));
@@ -280,20 +291,31 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 	float *normal_ptr = (float *)(blob + lua_tointeger(L, -1));
 	lua_pop(L, 1);
 
-	lua_getfield(L, -1, "uv_array_offset");
-	float *uv_ptr = (float *)(blob + lua_tointeger(L, -1));
-	lua_pop(L, 1);
-
-	lua_getfield(L, -1, "tangent_array_offset");
-	float *tangent_ptr = (float *)(blob + lua_tointeger(L, -1));
-	lua_pop(L, 1);
-
 	lua_getfield(L, -1, "weights_array_offset");
 	uint16_t *weights_ptr = (uint16_t *)(blob + lua_tointeger(L, -1));
 	lua_pop(L, 1);
 
+	glGenBuffers(1, &m->vertex_array);
+	glGenBuffers(1, &m->index_array);
+	glGenBuffers(MAX_UV_LAYERS, m->uv_array);
+	glBindBuffer(GL_ARRAY_BUFFER, m->vertex_array);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->index_array);
+
+	glBufferStorage(GL_ARRAY_BUFFER,
+			m->type->element_size[0] * m->num_verticies,
+			NULL,
+			GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+	glBufferStorage(GL_ELEMENT_ARRAY_BUFFER,
+			sizeof(uint16_t) * 3 * m->num_triangles,
+			NULL,
+			GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+
+
+	uint8_t *ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+	uint16_t *index_buffer = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
+
 	int j;
-	for (i = 0; i < g->num_verticies; i++) {
+	for (i = 0; i < m->num_verticies; i++) {
 		float *f = (float *)ptr;
 
 		*(f++) = *(vertex_ptr++);
@@ -304,16 +326,6 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 		*(f++) = *(normal_ptr++);
 		*(f++) = *(normal_ptr++);
 
-		if (num_uv_layers > 0) {
-			*(f++) = *(uv_ptr++);
-			*(f++) = *(uv_ptr++);
-
-			*(f++) = *(tangent_ptr++);
-			*(f++) = *(tangent_ptr++);
-			*(f++) = *(tangent_ptr++);
-			*(f++) = *(tangent_ptr++);
-		}
-
 		uint16_t *s = (uint16_t *)f;
 		for (j = 0; j < weights_per_vertex && j < MAX_VERTEX_WEIGHTS; j++) {
 			s[2*j] = weights_ptr[2*j];
@@ -321,23 +333,78 @@ void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob)
 		}
 		s += 2 * j;
 		weights_ptr += 2 * weights_per_vertex;
-		ptr += g->type->element_size;
+		ptr += m->type->element_size[0];
 	}
-
 	lua_getfield(L, -1, "index_array_offset");
-	memcpy(index_buffer, blob + lua_tointeger(L, -1), sizeof(uint16_t) * 3 * g->num_triangles);
+	memcpy(index_buffer, blob + lua_tointeger(L, -1), sizeof(uint16_t) * 3 * m->num_triangles);
 	lua_pop(L, 1);
+	glUnmapBuffer(GL_ARRAY_BUFFER);
+	glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
 
-	create_geometry_end(g);
+	lua_getfield(L, -1, "uv_layers");
+	lua_pushnil(L);
+	i = 0;
+	while (lua_next(L, -2)) {
+		lua_pushinteger(L, i);
+		lua_setfield(L, -2, "idx");
+
+		lua_getfield(L, -1, "uv_array_offset");
+		int uv_array_offset = lua_tointeger(L, -1);
+		lua_pop(L, 1);
+
+		lua_getfield(L, -1, "tangent_array_offset");
+		int tangent_array_offset = lua_tointeger(L, -1);
+		lua_pop(L, 1);
+		float *uv_ptr = (float *)(blob + uv_array_offset);
+		float *tangent_ptr = (float *)(blob + tangent_array_offset);
+
+		glBindBuffer(GL_ARRAY_BUFFER, m->uv_array[i]);
+		glBufferStorage(GL_ARRAY_BUFFER, sizeof(float) * 6 * m->num_verticies, NULL, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
+		ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+		for (j = 0; j < m->num_verticies; j++) {
+			float *f = (float *)ptr;
+			*(f++) = *(uv_ptr++);
+			*(f++) = *(uv_ptr++);
+			*(f++) = *(tangent_ptr++);
+			*(f++) = *(tangent_ptr++);
+			*(f++) = *(tangent_ptr++);
+			*(f++) = *(tangent_ptr++);
+			ptr += m->type->element_size[1];
+		}
+		glUnmapBuffer(GL_ARRAY_BUFFER);
+		lua_pop(L, 1);
+		i++;
+	}
+	lua_pop(L, 2);
 }
 
-void render_geometry(struct geometry *g, int submesh)
+void render_mesh(struct mesh *m, int submesh, int uvmap)
+{
+	glBindVertexArray(m->type->vao);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->index_array);
+	glBindVertexBuffer(0, m->vertex_array, 0, m->type->element_size[0]);
+	if (m->has_uv_layers)
+		glBindVertexBuffer(1, m->uv_array[uvmap], 0, m->type->element_size[1]);
+	glDrawElements(GL_TRIANGLES,
+		m->submesh[submesh].triangle_count * 3,
+		GL_UNSIGNED_SHORT,
+		(void *)(m->submesh[submesh].triangle_no * 3 * sizeof(uint16_t)));
+}
+
+void render_geometry(struct geometry *g)
 {
 	glBindVertexArray(g->type->vao);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g->index_array);
-	glBindVertexBuffer(0, g->vertex_array, 0, g->type->element_size);
+	glBindVertexBuffer(0, g->vertex_array, 0, g->type->element_size[0]);
 	glDrawElements(GL_TRIANGLES,
-		g->submesh[submesh].triangle_count * 3,
+		g->triangle_count * 3,
 		GL_UNSIGNED_SHORT,
-		(void *)(g->submesh[submesh].triangle_no * 3 * sizeof(uint16_t)));
+		(void *)(g->triangle_no * 3 * sizeof(uint16_t)));
+}
+
+void delete_mesh(struct mesh *m)
+{
+	glDeleteBuffers(1, &m->vertex_array);
+	glDeleteBuffers(1, &m->index_array);
+	glDeleteBuffers(MAX_UV_LAYERS, m->uv_array);
 }

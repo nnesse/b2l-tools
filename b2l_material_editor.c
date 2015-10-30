@@ -761,9 +761,9 @@ static void init_gl_state()
 
 int mesh_gc(lua_State *L)
 {
-	struct geometry *g = lua_touserdata(L, -1);
-	if (g)
-		delete_geometry(g);
+	struct mesh *m = lua_touserdata(L, -1);
+	if (m)
+		delete_mesh(m);
 	return 0;
 }
 
@@ -844,9 +844,9 @@ static void redraw(struct glplatform_win *win)
 
 	int mesh_idx = lua_gettop(L);
 
-	lua_getfield(L, mesh_idx, "geometry");
-	struct geometry *g = (struct geometry *)lua_touserdata(L, -1);
-	if (!g) {
+	lua_getfield(L, mesh_idx, "mesh");
+	struct mesh *m = (struct mesh *)lua_touserdata(L, -1);
+	if (!m) {
 		lua_pop(L, 1);
 
 		lua_getfield(L, mesh_idx, "submeshes");
@@ -854,17 +854,17 @@ static void redraw(struct glplatform_win *win)
 		int num_submesh = lua_tointeger(L, -1);
 		lua_pop(L, 2);
 
-		size_t geometry_size = offsetof(struct geometry, submesh[num_submesh]);
-		g = (struct geometry *)lua_newuserdata(L, geometry_size);
-		memset(g, 0, geometry_size);
+		size_t mesh_size = offsetof(struct mesh, submesh[num_submesh]);
+		m = (struct mesh *)lua_newuserdata(L, mesh_size);
+		memset(m, 0, mesh_size);
 
 		lua_newtable(L);
 		lua_pushcfunction(L, mesh_gc);
 		lua_setfield(L, -2, "__gc");
 		lua_setmetatable(L, -2);
 
-		lua_setfield(L, mesh_idx, "geometry");
-		create_mesh_geometry(g, L, g_gl_state.blob);
+		lua_setfield(L, mesh_idx, "mesh");
+		create_mesh(m, L, g_gl_state.blob);
 	} else {
 		lua_pop(L, 1);
 	}
@@ -904,8 +904,8 @@ static void redraw(struct glplatform_win *win)
 	int materials = lua_gettop(L);
 
 	int i;
-	for (i = 0; i < g->num_submesh; i++) {
-		lua_getfield(L, materials, g->submesh[i].material_name);
+	for (i = 0; i < m->num_submesh; i++) {
+		lua_getfield(L, materials, m->submesh[i].material_name);
 		int material_idx = lua_gettop(L);
 		lua_getfield(L, material_idx, "program");
 
@@ -948,6 +948,9 @@ static void redraw(struct glplatform_win *win)
 			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weights[5]");
 			program_link(program);
 		}
+		if (!program->linked) {
+			goto end;
+		}
 
 		glUseProgram(program->program);
 		glUniformMatrix4fv(glGetUniformLocation(program->program, "model"), 1, GL_FALSE, (GLfloat *)&model);
@@ -958,7 +961,7 @@ static void redraw(struct glplatform_win *win)
 		// Compute armature matrix transforms
 		//
 		GLint groups_index = glGetUniformLocation(program->program, "groups");
-		if (groups_index >= 0 && g->type->attribute[ATTRIBUTE_WEIGHT0].size > 0) {
+		if (groups_index >= 0 && m->weights_per_vertex) {
 			static int render_count = 0;
 			render_count++;
 			double frame;
@@ -994,12 +997,6 @@ static void redraw(struct glplatform_win *win)
 				struct mat4 M2;
 				struct mat4 *base = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + frame_i * stride);
 				struct mat4 *next = (struct mat4 *)(g_gl_state.blob + offset + (i * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
-
-				if (frame_i == (frame_end-1)) {
-					next = (struct mat4 *)(g_gl_state.blob + offset + i * sizeof(float) * 4 * 4 + (frame_start) * stride);
-				} else if (frame_fract == 0) {
-					next = base;
-				}
 
 #if USE_SLERP
 				struct mat4 temp;
@@ -1044,6 +1041,19 @@ static void redraw(struct glplatform_win *win)
 		//
 		// Grab material state from LUA controls
 		//
+		lua_getfield(L, material_idx, "uv_layer");
+		int uv_idx = 0;
+		if (!lua_isnil(L, -1)) {
+			lua_getfield(L, mesh_idx, "uv_layers");
+			if (!lua_isnil(L, -1)) {
+				lua_getfield(L, -1, lua_tostring(L, -2));
+				if (!lua_isnil(L, -1)) {
+					lua_getfield(L, -1, "idx");
+					uv_idx = lua_tointeger(L , -1);
+				}
+			}
+		}
+
 		lua_getfield(L, material_idx, "params");
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, -2)) {
@@ -1145,7 +1155,7 @@ static void redraw(struct glplatform_win *win)
 			free((void *)datatype);
 			lua_settop(L, variable_idx - 1);
 		} //while (lua_next(L, -2) != 0)
-		render_geometry(g, i);
+		render_mesh(m, i, uv_idx);
 		lua_pop(L, 1);
 	}
 end:

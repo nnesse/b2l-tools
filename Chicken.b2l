@@ -145,7 +145,12 @@ meshes={
 	['Chicken'] = {
 		num_triangles = 430,
 		num_verticies = 307,
-		uv_layers = {'UVMap2',},
+		uv_layers = {
+			['UVMap2'] = {
+				uv_array_offset = 509952,
+				tangent_array_offset = 512408,
+			},
+		},
 		weights_per_vertex = 11,
 		submeshes = {
 			{
@@ -154,12 +159,10 @@ meshes={
 				triangle_count = 430,
 			},
 		},
-		index_array_offset = 509952,
-		vertex_co_array_offset = 512532,
-		vertex_normal_array_offset = 516216,
-		uv_array_offset = 519900,
-		weights_array_offset = 522356,
-		tangent_array_offset = 535864,
+		index_array_offset = 517320,
+		vertex_co_array_offset = 519900,
+		vertex_normal_array_offset = 523584,
+		weights_array_offset = 527268,
 	},
 },
 armatures={

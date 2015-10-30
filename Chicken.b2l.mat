@@ -4,17 +4,7 @@ return {
       ambient_light = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.32558139534884 
-      },
-      bump = { 
-        datatype = 'bool',
-        tag = 'Material',
-        value = true 
-      },
-      bump_depth = { 
-        datatype = 'float',
-        tag = 'Material',
-        value = 0.45378151260504 
+        value = 0.5 
       },
       diffuse_texture = { 
         datatype = 'sampler2D',
@@ -28,12 +18,12 @@ return {
       light_angle_a = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.17829457364341 
+        value = 0.5 
       },
       light_angle_b = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.70642201834862 
+        value = 0.5 
       },
       light_color = { 
         datatype = 'vec3',
@@ -43,7 +33,7 @@ return {
       light_intensity = { 
         datatype = 'float',
         tag = 'Lighting',
-        value = 0.58914728682171 
+        value = 0.5 
       },
       model = { 
         datatype = 'mat4',
@@ -76,6 +66,7 @@ return {
     shaders = { 
       fs_filename = 'test.frag.glsl',
       vs_filename = 'test.vert.glsl' 
-    } 
+    },
+    uv_layer = 'UVMap2' 
   } 
 }

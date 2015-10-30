@@ -8,6 +8,8 @@
 #include <stdint.h>
 
 #define MAX_VERTEX_WEIGHTS 6
+#define MAX_UV_LAYERS 16
+#define MAX_VERTEX_ATTRIB_BINDINGS 64
 
 enum attributes {
 	ATTRIBUTE_VERTEX,
@@ -24,6 +26,7 @@ enum attributes {
 };
 
 struct attribute {
+	int binding_index;
 	bool integer;
 	GLint size;
 	GLenum type;
@@ -32,8 +35,20 @@ struct attribute {
 
 struct buffer_type {
 	GLuint vao;
-	size_t element_size;
-	struct attribute attribute[NUM_ATTRIBUTES];
+	int valid;
+	size_t element_size[MAX_VERTEX_ATTRIB_BINDINGS];
+};
+
+struct geometry {
+	struct buffer_type *type;
+	int num_verticies;
+	int num_triangles;
+
+	GLuint vertex_array;
+	GLuint index_array;
+	const char *material_name;
+	int triangle_count;
+	int triangle_no;
 };
 
 struct submesh {
@@ -42,14 +57,16 @@ struct submesh {
 	int triangle_no;
 };
 
-struct geometry {
+struct mesh {
 	struct buffer_type *type;
 	int num_verticies;
 	int num_triangles;
 	int num_submesh;
-
+	int weights_per_vertex;
+	int has_uv_layers;
 	GLuint vertex_array;
 	GLuint index_array;
+	GLuint uv_array[MAX_UV_LAYERS];
 	struct submesh submesh[];
 };
 
@@ -59,14 +76,18 @@ void create_geometry_begin(struct geometry *g, void ** const vertex_buffer, uint
 
 void create_geometry_end(struct geometry *g);
 
-void create_mesh_geometry(struct geometry *g, lua_State *L, uint8_t *blob);
-
 void create_cylinder_geometry(struct geometry *g, int m, int n);
 
 void create_cone_geometry(struct geometry *g, int n);
 
-void render_geometry(struct geometry *g, int submesh);
+void render_geometry(struct geometry *g);
 
 void delete_geometry(struct geometry *g);
+
+void create_mesh(struct mesh *m, lua_State *L, uint8_t *blob);
+
+void render_mesh(struct mesh *m, int submesh, int uvmap);
+
+void delete_mesh(struct mesh *m);
 
 #endif

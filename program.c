@@ -49,6 +49,7 @@ bool program_link(struct program *p)
 		glGetProgramInfoLog(p->program, 1000, NULL, info_log);
 		fprintf(stderr, "Program link failed:\n %s\n", info_log);
 	}
+	p->linked = link_status == GL_TRUE;
 	return link_status;
 }
 

@@ -286,6 +286,10 @@ actions_store = Gtk.ListStore.new {
 	[3] = GObject.Type.INT,
 }
 
+uv_layer_store = Gtk.ListStore.new {
+	[1] = GObject.Type.STRING,
+}
+
 function load_b2l_file(filename)
 	local lua_name = filename
 
@@ -474,6 +478,30 @@ save_toolbutton = Gtk.ToolButton {
 	end,
 }
 
+uv_layer_combo = Gtk.ComboBox {
+	id = "UV layer",
+	model = uv_layer_store,
+	active = 0,
+	cells = {
+		{
+			Gtk.CellRendererText(),
+			{ text = 1 }
+		}
+	},
+	on_changed = function(combo)
+		local active = combo:get_active_iter()
+		if not active then
+			return
+		end
+		local row = combo.model[active]
+		if active_material.uv_layer ~= row[1] then
+			active_material.uv_layer = row[1]
+			setting_changed()
+			queue_render()
+		end
+	end
+}
+
 object_combo = Gtk.ComboBox {
 	id = "Object",
 	model = objects_store,
@@ -495,6 +523,13 @@ object_combo = Gtk.ComboBox {
 
 		local obj = b2l_data.objects[current_object]
 		local mesh = b2l_data.meshes[obj.data]
+
+		uv_layer_store:clear()
+		for k, v in pairs(mesh.uv_layers) do
+			uv_layer_store:append {
+				[1] = k,
+			}
+		end
 
 		materials_store:clear()
 		for i, v in ipairs(mesh.submeshes) do
@@ -618,6 +653,19 @@ material_combo = Gtk.ComboBox {
 			if active_material.shaders['fs_filename'] then
 				fs_chooser:set_filename(b2l_absolute_path(active_material.shaders['fs_filename']))
 			end
+
+			iter = uv_layer_store:get_iter_first()
+			uv_layer_combo:set_active_iter(iter)
+			if active_material.uv_layer then
+				while iter do
+					local uv_layer_row = uv_layer_store[iter]
+					if uv_layer_row[1] == active_material.uv_layer then
+						uv_layer_combo:set_active_iter(iter)
+					end
+					iter = uv_layer_store:next(iter)
+				end
+			end
+			Gtk.main_iteration_do(false)
 		end
 	end
 }
@@ -805,16 +853,29 @@ local vbox_main = Gtk.VBox {
 			},
 			{
 				Gtk.Label {
-					label = "Action",
+					label = "UV layer",
 					xalign = 0,
 				},
 				left_attach = 0,
 				top_attach = 4,
 			},
 			{
-				action_combo,
+				uv_layer_combo,
 				left_attach = 1,
 				top_attach = 4,
+			},
+			{
+				Gtk.Label {
+					label = "Action",
+					xalign = 0,
+				},
+				left_attach = 0,
+				top_attach = 5,
+			},
+			{
+				action_combo,
+				left_attach = 1,
+				top_attach = 5,
 				width = 1,
 			},
 			{
@@ -823,7 +884,7 @@ local vbox_main = Gtk.VBox {
 					xalign = 0,
 				},
 				left_attach = 0,
-				top_attach = 5,
+				top_attach = 6,
 			},
 			{
 				Gtk.HBox {
@@ -848,7 +909,7 @@ local vbox_main = Gtk.VBox {
 					action_scale,
 				},
 				left_attach = 1,
-				top_attach = 5,
+				top_attach = 6,
 				width = 1,
 			},
 			{
@@ -857,7 +918,7 @@ local vbox_main = Gtk.VBox {
 					xalign = 0,
 				},
 				left_attach = 0,
-				top_attach = 6,
+				top_attach = 7,
 			},
 			{
 				Gtk.HBox {
@@ -869,7 +930,7 @@ local vbox_main = Gtk.VBox {
 					},
 				},
 				left_attach = 1,
-				top_attach = 6,
+				top_attach = 7,
 				width = 1,
 			},
 			{
@@ -878,7 +939,7 @@ local vbox_main = Gtk.VBox {
 					xalign = 0,
 				},
 				left_attach = 0,
-				top_attach = 7,
+				top_attach = 8,
 			},
 			{
 				Gtk.HBox {
@@ -890,7 +951,7 @@ local vbox_main = Gtk.VBox {
 					},
 				},
 				left_attach = 1,
-				top_attach = 7,
+				top_attach = 8,
 				width = 1,
 			},
 		},

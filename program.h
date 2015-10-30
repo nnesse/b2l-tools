@@ -9,6 +9,7 @@ struct program {
 	GLuint vertex_shader;
 	GLuint fragment_shader;
 	GLuint program;
+	bool linked;
 };
 
 void program_init(struct program *p);
