@@ -60,18 +60,7 @@ struct submesh {
 	int triangle_no;
 };
 
-struct mesh {
-	struct buffer_type *type;
-	int num_verticies;
-	int num_triangles;
-	int num_submesh;
-	int weights_per_vertex;
-	int has_uv_layers;
-	GLuint vertex_array;
-	GLuint index_array;
-	GLuint uv_array[MAX_UV_LAYERS];
-	struct submesh submesh[];
-};
+void buffer_type_init(struct buffer_type *t, struct attribute *attribute, int num_attributes);
 
 void create_geometry_begin(struct geometry *g, void ** const vertex_buffer, uint16_t ** const index_buffer);
 
@@ -84,17 +73,5 @@ void create_cone_geometry(struct geometry *g, int n);
 void render_geometry(struct geometry *g);
 
 void delete_geometry(struct geometry *g);
-
-void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_t *blob,
-		const char *object_name, double frame,
-		struct mat4 *model,
-		struct mat4 *view,
-		struct mat4 *proj);
-
-void create_mesh(struct mesh *m, lua_State *L, const uint8_t *blob);
-
-void render_submesh(struct mesh *m, int submesh, int uvmap);
-
-void delete_mesh(struct mesh *m);
 
 #endif

@@ -17,6 +17,7 @@
 #include "glsl_parser.h"
 #include "glsl_ast.h"
 
+#include "mesh.h"
 #include "geometry.h"
 #include "program.h"
 #include "vectormath.h"

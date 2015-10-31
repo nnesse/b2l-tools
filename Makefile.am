@@ -140,4 +140,5 @@ b2l_material_editor_SOURCES:= $(LUA_SRC) \
 	b2l_material_editor.c \
 	vectormath.c \
 	geometry.c \
+	mesh.c \
 	program.c
