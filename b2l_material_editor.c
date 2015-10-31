@@ -858,6 +858,125 @@ static void redraw(struct glplatform_win *win)
 	lua_getglobal(L, "materials");
 	int materials_idx = lua_gettop(L);
 
+	if (lua_isnil(L, -1))
+		goto end;
+
+	lua_pushnil(L);
+	while(lua_next(L, -2)) {
+		int material_idx = lua_gettop(L);
+		lua_getfield(L, material_idx, "program");
+
+		//
+		// Create material program object if it's missing
+		//
+		struct program *program = lua_touserdata(L, -1);
+		if (!program) {
+			program = lua_newuserdata(L, sizeof(struct program));
+			program_init(program);
+			int program_idx = lua_gettop(L);
+			lua_newtable(L);
+			lua_pushcfunction(L, program_gc);
+			lua_setfield(L, -2, "__gc");
+			lua_setmetatable(L, program_idx);
+			lua_setfield(L, material_idx, "program");
+		}
+
+		//
+		// Recompile material program if shader text has changed
+		//
+		lua_getfield(L, material_idx, "shaders");
+		lua_getfield(L, -1, "_vs_text");
+		lua_getfield(L, -2, "_fs_text");
+		const char *vs_text = lua_tostring(L, -2);
+		const char *fs_text = lua_tostring(L, -1);
+		if ((vs_text && fs_text) && (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text))) {
+			program->vertex_text = strdup(vs_text);
+			program->fragment_text = strdup(fs_text);
+			program_compile(program);
+			glBindAttribLocation(program->program, ATTRIBUTE_VERTEX, "vertex");
+			glBindAttribLocation(program->program, ATTRIBUTE_NORMAL, "normal");
+			glBindAttribLocation(program->program, ATTRIBUTE_UV, "uv");
+			glBindAttribLocation(program->program, ATTRIBUTE_TANGENT, "tangent");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weights[0]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weights[1]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weights[2]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weights[3]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weights[4]");
+			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weights[5]");
+			program_link(program);
+		}
+		if (!program->linked) {
+			goto end;
+		}
+
+		lua_getfield(L, material_idx, "params");
+		lua_pushnil(L);  /* first key */
+		while (lua_next(L, -2)) {
+			int texunit = 0;
+			int variable_idx = lua_gettop(L);
+			lua_getfield(L, variable_idx, "datatype");
+			const char *datatype = lua_tostring(L, -1);
+			if (!strcmp(datatype,"sampler2D")) {
+				lua_getfield(L, variable_idx, "_needs_upload");
+				int needs_upload = lua_toboolean(L, -1);
+
+				GLuint texid = 0;
+				if (needs_upload) {
+					const char *variable_name = lua_tostring(L, variable_idx - 1);
+					int uniform_loc = glGetUniformLocation(program->program, variable_name);
+					GdkPixbuf *pbuf;
+
+					//
+					// Delete existing texture if there is one
+					//
+					lua_getfield(L, variable_idx, "_texid");
+					if (lua_isnumber(L, -1)) {
+						texid = lua_tointeger(L, -1);
+						glDeleteTextures(1, &texid);
+					}
+
+					//
+					// Upload pbuf to texture
+					//
+					lua_getfield(L, variable_idx, "_pbuf");
+					lua_getfield(L, -1, "_native");
+					pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
+					glActiveTexture(GL_TEXTURE0 + texunit);
+
+					glGenTextures(1, &texid);
+					glBindTexture(GL_TEXTURE_2D, texid);
+					lua_pushinteger(L, texid);
+					lua_setfield(L, variable_idx, "_texid");
+
+					int width = gdk_pixbuf_get_width(pbuf);
+					int height = gdk_pixbuf_get_height(pbuf);
+					int n_chan = gdk_pixbuf_get_n_channels(pbuf);
+					glPixelStorei(GL_UNPACK_ROW_LENGTH, gdk_pixbuf_get_rowstride(pbuf)/ n_chan);
+					glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+					glTexImage2D(GL_TEXTURE_2D,
+						0, /* level */
+						n_chan > 3 ? GL_RGBA : GL_RGB,
+						width,
+						height,
+						0, /* border */
+						n_chan > 3 ? GL_RGBA : GL_RGB,
+						GL_UNSIGNED_BYTE,
+						gdk_pixbuf_get_pixels(pbuf));
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+					glGenerateMipmap(GL_TEXTURE_2D);
+					glUniform1i(uniform_loc, texunit);
+					lua_pushboolean(L, 0);
+					lua_setfield(L, variable_idx, "_needs_upload");
+				}
+				texunit++;
+
+			}
+			lua_settop(L, variable_idx - 1);
+		}
+		lua_settop(L, material_idx - 1);
+	}
+
 	draw_mesh(L, b2l_data_idx, materials_idx, current_object, frame,
 			&model,
 			&view,
@@ -912,7 +1031,6 @@ static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const c
 		size_t mesh_size = offsetof(struct mesh, submesh[num_submesh]);
 		m = (struct mesh *)lua_newuserdata(L, mesh_size);
 		memset(m, 0, mesh_size);
-		int mesh_data_idx = lua_gettop(L);
 
 		lua_newtable(L);
 		lua_pushcfunction(L, mesh_gc);
@@ -920,7 +1038,7 @@ static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const c
 		lua_setmetatable(L, -2);
 
 		lua_setfield(L, mesh_idx, "mesh");
-		lua_pushvalue(L, mesh_idx); 
+		lua_pushvalue(L, mesh_idx);
 		create_mesh(m, L, g_gl_state.blob);
 	}
 
@@ -939,49 +1057,7 @@ static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const c
 		int material_idx = lua_gettop(L);
 		lua_getfield(L, material_idx, "program");
 
-		//
-		// Create material program object if it's missing
-		//
 		struct program *program = lua_touserdata(L, -1);
-		if (!program) {
-			program = lua_newuserdata(L, sizeof(struct program));
-			program_init(program);
-			int program_idx = lua_gettop(L);
-			lua_newtable(L);
-			lua_pushcfunction(L, program_gc);
-			lua_setfield(L, -2, "__gc");
-			lua_setmetatable(L, program_idx);
-			lua_setfield(L, material_idx, "program");
-		}
-
-		//
-		// Recompile material program if shader text has changed
-		//
-		lua_getfield(L, material_idx, "shaders");
-		lua_getfield(L, -1, "_vs_text");
-		lua_getfield(L, -2, "_fs_text");
-		const char *vs_text = lua_tostring(L, -2);
-		const char *fs_text = lua_tostring(L, -1);
-		if ((vs_text && fs_text) && (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text))) {
-			program->vertex_text = strdup(vs_text);
-			program->fragment_text = strdup(fs_text);
-			program_compile(program);
-			glBindAttribLocation(program->program, ATTRIBUTE_VERTEX, "vertex");
-			glBindAttribLocation(program->program, ATTRIBUTE_NORMAL, "normal");
-			glBindAttribLocation(program->program, ATTRIBUTE_UV, "uv");
-			glBindAttribLocation(program->program, ATTRIBUTE_TANGENT, "tangent");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weights[0]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weights[1]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weights[2]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weights[3]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weights[4]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weights[5]");
-			program_link(program);
-		}
-		if (!program->linked) {
-			goto end;
-		}
-
 		glUseProgram(program->program);
 		glUniformMatrix4fv(glGetUniformLocation(program->program, "model"), 1, GL_FALSE, (GLfloat *)model);
 		glUniformMatrix4fv(glGetUniformLocation(program->program, "proj"), 1, GL_FALSE, (GLfloat *)proj);
@@ -1058,7 +1134,7 @@ static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const c
 		int texunit = 0;
 
 		//
-		// Grab material state from LUA controls
+		// Grab material state
 		//
 		lua_getfield(L, material_idx, "uv_layer");
 		int uv_idx = 0;
@@ -1086,8 +1162,7 @@ static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const c
 			lua_getfield(L, variable_idx, "value");
 			int value_idx = variable_idx + 1;
 			lua_getfield(L, variable_idx, "datatype");
-			const char *datatype = strdup(lua_tostring(L, -1));
-			lua_pop(L, 1);
+			const char *datatype = lua_tostring(L, -1);
 			if (!strcmp(datatype, "bool")) {
 				int bool_value = lua_toboolean(L, value_idx);
 				glUniform1i(uniform_loc, bool_value);
@@ -1100,80 +1175,24 @@ static void draw_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const c
 				val[1] = (float)lua_tonumber(L, -2);
 				val[2] = (float)lua_tonumber(L, -1);
 				glUniform3fv(uniform_loc, 1, val);
-				lua_pop(L, 3);
 			} else if (!strcmp(datatype, "float")) {
 				float fval = lua_tonumber(L, value_idx);
 				glUniform1f(uniform_loc, fval);
 			} else if (!strcmp(datatype, "sampler2D")) {
-				lua_getfield(L, variable_idx, "_needs_upload");
-				int needs_upload = lua_toboolean(L, -1);
-				lua_pop(L, 1);
-
-				GLuint texid = 0;
-				if (needs_upload) {
-					GdkPixbuf *pbuf;
-
-					//
-					// Delete existing texture if there is one
-					//
-					lua_getfield(L, variable_idx, "_texid");
-					if (lua_isnumber(L, -1)) {
-						texid = lua_tointeger(L, -1);
-						glDeleteTextures(1, &texid);
-					}
-
-					//
-					// Upload pbuf to texture
-					//
-					lua_getfield(L, variable_idx, "_pbuf");
-					lua_getfield(L, -1, "_native");
-					pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
-					lua_pop(L, 2);
+				//
+				// Bind texture
+				//
+				lua_getfield(L, variable_idx, "_texid");
+				if (lua_isnumber(L, -1)) {
+					GLuint texid = lua_tointeger(L, -1);
 					glActiveTexture(GL_TEXTURE0 + texunit);
-
-					glGenTextures(1, &texid);
 					glBindTexture(GL_TEXTURE_2D, texid);
-					lua_pushinteger(L, texid);
-					lua_setfield(L, variable_idx, "_texid");
-
-					int width = gdk_pixbuf_get_width(pbuf);
-					int height = gdk_pixbuf_get_height(pbuf);
-					int n_chan = gdk_pixbuf_get_n_channels(pbuf);
-					glPixelStorei(GL_UNPACK_ROW_LENGTH, gdk_pixbuf_get_rowstride(pbuf)/ n_chan);
-					glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-					glTexImage2D(GL_TEXTURE_2D,
-						0, /* level */
-						n_chan > 3 ? GL_RGBA : GL_RGB,
-						width,
-						height,
-						0, /* border */
-						n_chan > 3 ? GL_RGBA : GL_RGB,
-						GL_UNSIGNED_BYTE,
-						gdk_pixbuf_get_pixels(pbuf));
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-					glGenerateMipmap(GL_TEXTURE_2D);
 					glUniform1i(uniform_loc, texunit);
-					lua_pushboolean(L, 0);
-					lua_setfield(L, variable_idx, "_needs_upload");
-				} else {
-					//
-					// Bind previously generated texture if present
-					//
-					lua_getfield(L, variable_idx, "_texid");
-					if (lua_isnumber(L, -1)) {
-						texid = lua_tointeger(L, -1);
-						glActiveTexture(GL_TEXTURE0 + texunit);
-						glBindTexture(GL_TEXTURE_2D, texid);
-						glUniform1i(uniform_loc, texunit);
-					}
-					lua_pop(L, 1);
 				}
 				texunit++;
 			}
-			free((void *)datatype);
 			lua_settop(L, variable_idx - 1);
-		} //while (lua_next(L, -2) != 0)
+		}
 		render_mesh(m, i, uv_idx);
 		lua_pop(L, 1);
 	}
