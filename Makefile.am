@@ -138,5 +138,6 @@ b2l_material_editor_SOURCES:= $(LUA_SRC) \
 	$(GLSL_PARSER_SRC) \
 	$(GLPLATFORM_SRC) \
 	b2l_material_editor.c \
+	vectormath.c \
 	geometry.c \
 	program.c

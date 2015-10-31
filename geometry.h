@@ -7,6 +7,9 @@
 
 #include <stdint.h>
 
+#include "lua.h"
+#include "vectormath.h"
+
 #define MAX_VERTEX_WEIGHTS 6
 #define MAX_UV_LAYERS 16
 #define MAX_VERTEX_ATTRIB_BINDINGS 64
@@ -70,8 +73,6 @@ struct mesh {
 	struct submesh submesh[];
 };
 
-#include "lua.h"
-
 void create_geometry_begin(struct geometry *g, void ** const vertex_buffer, uint16_t ** const index_buffer);
 
 void create_geometry_end(struct geometry *g);
@@ -84,9 +85,15 @@ void render_geometry(struct geometry *g);
 
 void delete_geometry(struct geometry *g);
 
-void create_mesh(struct mesh *m, lua_State *L, uint8_t *blob);
+void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_t *blob,
+		const char *object_name, double frame,
+		struct mat4 *model,
+		struct mat4 *view,
+		struct mat4 *proj);
 
-void render_mesh(struct mesh *m, int submesh, int uvmap);
+void create_mesh(struct mesh *m, lua_State *L, const uint8_t *blob);
+
+void render_submesh(struct mesh *m, int submesh, int uvmap);
 
 void delete_mesh(struct mesh *m);
 

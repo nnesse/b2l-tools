@@ -1,5 +1,9 @@
 #include "geometry.h"
 
+#include "vectormath.h"
+
+#include "program.h"
+
 #define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
 #define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
@@ -9,6 +13,14 @@
 #include <math.h>
 
 #include "lua.h"
+
+int mesh_gc(lua_State *L)
+{
+	struct mesh *m = lua_touserdata(L, -1);
+	if (m)
+		delete_mesh(m);
+	return 0;
+}
 
 void buffer_type_init(struct buffer_type *t, struct attribute *attribute, int num_attributes)
 {
@@ -182,7 +194,7 @@ void create_cone_geometry(struct geometry *g, int n)
 
 static struct buffer_type buffer_type_mesh[2][32];
 
-void create_mesh(struct mesh *m, lua_State *L, uint8_t *blob)
+void create_mesh(struct mesh *m, lua_State *L, const uint8_t *blob)
 {
 	lua_getfield(L, -1, "num_triangles");
 	m->num_triangles = lua_tointeger(L, -1);
@@ -379,7 +391,214 @@ void create_mesh(struct mesh *m, lua_State *L, uint8_t *blob)
 	lua_pop(L, 2);
 }
 
-void render_mesh(struct mesh *m, int submesh, int uvmap)
+void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_t *blob,
+		const char *object_name, double frame,
+		struct mat4 *model,
+		struct mat4 *view,
+		struct mat4 *proj)
+{
+	int top_idx = lua_gettop(L);
+	lua_getfield(L, b2l_data_idx, "objects");
+	lua_getfield(L, -1, object_name);
+	if (lua_isnil(L, -1)) {
+		goto end;
+	}
+	int object_idx = lua_gettop(L);
+
+	lua_getfield(L, object_idx, "type");
+	if (strcmp(lua_tostring(L, -1), "MESH")) {
+		goto end;
+	}
+	lua_getfield(L, object_idx, "data");
+	lua_getfield(L, b2l_data_idx, "meshes");
+	lua_getfield(L, -1, lua_tostring(L, -2));
+
+	if (lua_isnil(L, -1)) {
+		goto end;
+	}
+
+	int mesh_idx = lua_gettop(L);
+
+	lua_getfield(L, mesh_idx, "mesh");
+	struct mesh *m = (struct mesh *)lua_touserdata(L, -1);
+	if (!m) {
+		lua_getfield(L, mesh_idx, "submeshes");
+		lua_len(L, -1);
+		int num_submesh = lua_tointeger(L, -1);
+
+		size_t mesh_size = offsetof(struct mesh, submesh[num_submesh]);
+		m = (struct mesh *)lua_newuserdata(L, mesh_size);
+		memset(m, 0, mesh_size);
+
+		lua_newtable(L);
+		lua_pushcfunction(L, mesh_gc);
+		lua_setfield(L, -2, "__gc");
+		lua_setmetatable(L, -2);
+
+		lua_setfield(L, mesh_idx, "mesh");
+		lua_pushvalue(L, mesh_idx);
+		create_mesh(m, L, blob);
+	}
+
+	lua_getfield(L, object_idx, "vertex_groups");
+	int num_vertex_groups;
+	if (lua_isnil(L, -1)) {
+		num_vertex_groups = 0;
+	} else {
+		lua_len(L, -1);
+		num_vertex_groups = lua_tointeger(L, -1);
+	}
+
+	int i;
+	for (i = 0; i < m->num_submesh; i++) {
+		lua_getfield(L, materials_idx, m->submesh[i].material_name);
+		int material_idx = lua_gettop(L);
+		lua_getfield(L, material_idx, "program");
+
+		struct program *program = lua_touserdata(L, -1);
+		glUseProgram(program->program);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "model"), 1, GL_FALSE, (GLfloat *)model);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "proj"), 1, GL_FALSE, (GLfloat *)proj);
+		glUniformMatrix4fv(glGetUniformLocation(program->program, "view"), 1, GL_FALSE, (GLfloat *)view);
+
+		//
+		// Compute armature matrix transforms
+		//
+		GLint groups_index = glGetUniformLocation(program->program, "groups");
+		if (groups_index >= 0 && m->weights_per_vertex) {
+			static int render_count = 0;
+			render_count++;
+			int prev_top = lua_gettop(L);
+			int frame_i = floorf(frame);
+			double frame_fract = frame - frame_i;
+
+			lua_getfield(L, b2l_data_idx, "scenes");
+			lua_getglobal(L, "current_scene");
+			lua_getfield(L, -2, lua_tostring(L, -1));
+			if (!lua_istable(L, -1)) {
+				goto end;
+			}
+			lua_getfield(L, -1, "objects");
+			lua_getfield(L, -1, object_name);
+			lua_getfield(L, -1, "vertex_group_transform_array_offset");
+			int offset = lua_tointeger(L, -1);
+			int stride = sizeof(float) * 4 * 4 * num_vertex_groups;
+			int i;
+			for (i = 0; i < num_vertex_groups; i++) {
+				struct mat4 res;
+				struct mat4 M1;
+				struct mat4 M2;
+				struct mat4 *base = (struct mat4 *)(blob + offset + (i * sizeof(float) * 4 * 4) + frame_i * stride);
+				struct mat4 *next = (struct mat4 *)(blob + offset + (i * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
+
+#if USE_SLERP
+				struct mat4 temp;
+				mat4_zero(&temp);
+				temp.v[3][3] = 1;
+				M1 = *base;
+				M2 = *next;
+				spherical_lerp(M1.v[0], M2.v[0], frame_fract, temp.v[0]);
+				spherical_lerp(M1.v[1], M2.v[1], frame_fract, temp.v[1]);
+				spherical_lerp(M1.v[2], M2.v[2], frame_fract, temp.v[2]);
+				mat4_transpose(&temp, &res);
+				float v1[3];
+				float v2[3];
+				v1[0] = M1.v[0][3];
+				v1[1] = M1.v[1][3];
+				v1[2] = M1.v[2][3];
+				v2[0] = M2.v[0][3];
+				v2[1] = M2.v[1][3];
+				v2[2] = M2.v[2][3];
+				lerp(v1, v2, frame_fract, res.v[3]);
+#else
+				mat4_zero(&res);
+				res.v[3][3] = 1;
+				mat4_transpose(base, &M1);
+				mat4_transpose(next, &M2);
+				lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
+				lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
+				lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
+				lerp(M1.v[3], M2.v[3], frame_fract, res.v[3]);
+#endif
+
+				glUniformMatrix4fv(groups_index + i,
+						1,
+						GL_FALSE,
+						(GLfloat *)&res);
+			}
+			lua_settop(L, prev_top);
+		}
+
+		int texunit = 0;
+
+		//
+		// Grab material state
+		//
+		lua_getfield(L, material_idx, "uv_layer");
+		int uv_idx = 0;
+		if (!lua_isnil(L, -1)) {
+			lua_getfield(L, mesh_idx, "uv_layers");
+			if (!lua_isnil(L, -1)) {
+				lua_getfield(L, -1, lua_tostring(L, -2));
+				if (!lua_isnil(L, -1)) {
+					lua_getfield(L, -1, "idx");
+					uv_idx = lua_tointeger(L , -1);
+				}
+			}
+		}
+
+		lua_getfield(L, material_idx, "params");
+		lua_pushnil(L);  /* first key */
+		while (lua_next(L, -2)) {
+			int variable_idx = lua_gettop(L);
+			const char *variable_name = lua_tostring(L, variable_idx - 1);
+			int uniform_loc = glGetUniformLocation(program->program, variable_name);
+			if (uniform_loc == -1) {
+				lua_pop(L, 1);
+				continue;
+			}
+			lua_getfield(L, variable_idx, "value");
+			int value_idx = variable_idx + 1;
+			lua_getfield(L, variable_idx, "datatype");
+			const char *datatype = lua_tostring(L, -1);
+			if (!strcmp(datatype, "bool")) {
+				int bool_value = lua_toboolean(L, value_idx);
+				glUniform1i(uniform_loc, bool_value);
+			} else if (!strcmp(datatype, "vec3")) {
+				lua_rawgeti(L, value_idx, 1);
+				lua_rawgeti(L, value_idx, 2);
+				lua_rawgeti(L, value_idx, 3);
+				float val[3];
+				val[0] = (float)lua_tonumber(L, -3);
+				val[1] = (float)lua_tonumber(L, -2);
+				val[2] = (float)lua_tonumber(L, -1);
+				glUniform3fv(uniform_loc, 1, val);
+			} else if (!strcmp(datatype, "float")) {
+				float fval = lua_tonumber(L, value_idx);
+				glUniform1f(uniform_loc, fval);
+			} else if (!strcmp(datatype, "sampler2D")) {
+				//
+				// Bind texture
+				//
+				lua_getfield(L, variable_idx, "_texid");
+				if (lua_isnumber(L, -1)) {
+					GLuint texid = lua_tointeger(L, -1);
+					glActiveTexture(GL_TEXTURE0 + texunit);
+					glBindTexture(GL_TEXTURE_2D, texid);
+					glUniform1i(uniform_loc, texunit);
+				}
+				texunit++;
+			}
+			lua_settop(L, variable_idx - 1);
+		}
+		render_submesh(m, i, uv_idx);
+		lua_pop(L, 1);
+	}
+end:
+	lua_settop(L, top_idx);
+}
+
+void render_submesh(struct mesh *m, int submesh, int uvmap)
 {
 	glBindVertexArray(m->type->vao);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m->index_array);
