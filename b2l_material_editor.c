@@ -77,18 +77,6 @@ static void on_mouse_wheel(struct glplatform_win *, int, int, int);
 
 static void redraw(struct glplatform_win *win);
 
-struct lua_program {
-	struct program program;
-};
-
-int program_gc(lua_State *L)
-{
-	struct program *p = lua_touserdata(L, -1);
-	if (p)
-		program_destroy(p);
-	return 0;
-}
-
 static struct quaternion q_cur = {0,0,0,1};
 static struct quaternion q_delta = {0,0,0,1};
 static float g_offset[3] = {0,0,0};
@@ -608,46 +596,33 @@ static void redraw(struct glplatform_win *win)
 		//
 		// Create material program object if it's missing
 		//
-		struct program *program = lua_touserdata(L, -1);
-		if (!program) {
-			program = lua_newuserdata(L, sizeof(struct program));
-			program_init(program);
-			int program_idx = lua_gettop(L);
-			lua_newtable(L);
-			lua_pushcfunction(L, program_gc);
-			lua_setfield(L, -2, "__gc");
-			lua_setmetatable(L, program_idx);
+		if (!lua_isuserdata(L, -1)) {
+			lprogram_create(L);
 			lua_setfield(L, material_idx, "program");
 		}
+		lua_getfield(L, material_idx, "program");
+		int program_idx = lua_gettop(L);
+		struct program *program = lua_touserdata(L, program_idx);
 
 		//
-		// Recompile material program if shader text has changed
+		// Assign shaders to the program. The shaders
+		// will be compiled and the program will be linked
+		// if the values are different than previously
+		// specified
 		//
 		lua_getfield(L, material_idx, "shaders");
 		lua_getfield(L, -1, "_vs_text");
 		lua_getfield(L, -2, "_fs_text");
 		const char *vs_text = lua_tostring(L, -2);
 		const char *fs_text = lua_tostring(L, -1);
-		if ((vs_text && fs_text) && (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text))) {
-			program->vertex_text = strdup(vs_text);
-			program->fragment_text = strdup(fs_text);
-			program_compile(program);
-			glBindAttribLocation(program->program, ATTRIBUTE_VERTEX, "vertex");
-			glBindAttribLocation(program->program, ATTRIBUTE_NORMAL, "normal");
-			glBindAttribLocation(program->program, ATTRIBUTE_UV, "uv");
-			glBindAttribLocation(program->program, ATTRIBUTE_TANGENT, "tangent");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weights[0]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weights[1]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weights[2]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weights[3]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weights[4]");
-			glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weights[5]");
-			program_link(program);
-		}
-		if (!program->linked) {
+		lua_pushvalue(L, program_idx);
+		if (!lprogram_set_shaders(L, vs_text, fs_text)) {
 			goto end;
 		}
 
+		//
+		// Upload textures if neccisary
+		//
 		lua_getfield(L, material_idx, "params");
 		lua_pushnil(L);  /* first key */
 		while (lua_next(L, -2)) {

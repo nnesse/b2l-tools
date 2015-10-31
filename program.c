@@ -1,6 +1,15 @@
 #include "program.h"
+#include "geometry.h"
 
 #include <stdio.h>
+
+static int program_gc(lua_State *L)
+{
+	struct program *p = lua_touserdata(L, -1);
+	if (p)
+		program_destroy(p);
+	return 0;
+}
 
 void program_init(struct program *p)
 {
@@ -12,6 +21,42 @@ void program_init(struct program *p)
 	p->linked = false;
 	glAttachShader(p->program, p->vertex_shader);
 	glAttachShader(p->program, p->fragment_shader);
+}
+
+void lprogram_create(lua_State *L)
+{
+	struct program *program = lua_newuserdata(L, sizeof(struct program));
+	program_init(program);
+	int program_idx = lua_gettop(L);
+	lua_newtable(L);
+	lua_pushcfunction(L, program_gc);
+	lua_setfield(L, -2, "__gc");
+	lua_setmetatable(L, program_idx);
+}
+
+bool lprogram_set_shaders(lua_State *L, const char *vs_text, const char *fs_text)
+{
+	struct program *program = lua_touserdata(L, -1);
+	if ((vs_text && fs_text) && (strcmp(program->vertex_text, vs_text) || strcmp(program->fragment_text, fs_text))) {
+		program->linked = false;
+		program->vertex_text = strdup(vs_text);
+		program->fragment_text = strdup(fs_text);
+		if (!program_compile(program)) {
+			return false;
+		}
+		glBindAttribLocation(program->program, ATTRIBUTE_VERTEX, "vertex");
+		glBindAttribLocation(program->program, ATTRIBUTE_NORMAL, "normal");
+		glBindAttribLocation(program->program, ATTRIBUTE_UV, "uv");
+		glBindAttribLocation(program->program, ATTRIBUTE_TANGENT, "tangent");
+		glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT0, "weights[0]");
+		glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT1, "weights[1]");
+		glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT2, "weights[2]");
+		glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT3, "weights[3]");
+		glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT4, "weights[4]");
+		glBindAttribLocation(program->program, ATTRIBUTE_WEIGHT5, "weights[5]");
+		program_link(program);
+	}
+	return program->linked;
 }
 
 bool program_compile(struct program *p)
