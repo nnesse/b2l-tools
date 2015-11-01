@@ -55,8 +55,6 @@ luaL_Reg lua_b2l_material_editor_capi[] = {
 	{ NULL, NULL }
 };
 
-static GLuint g_texture_names[MAX_TEXTURE_UNITS];
-
 static glplatform_gl_context_t g_ctx;
 static struct glplatform_win *g_win;
 static lua_State *g_L;
@@ -258,7 +256,6 @@ struct gl_state {
 	const uint8_t *blob;
 	size_t blob_size;
 	bool initialized;
-	bool blob_updated;
 	GLuint vao;
 } g_gl_state;
 
@@ -495,7 +492,6 @@ static void init_gl_state()
 	printf("OpenGL version %s\n", glGetString(GL_VERSION));
 	glGenVertexArrays(1, &g_gl_state.vao);
 	glBindVertexArray(g_gl_state.vao);
-	glGenTextures(MAX_TEXTURE_UNITS, g_texture_names);
 	g_gl_state.initialized = true;
 }
 
@@ -625,8 +621,8 @@ static void redraw(struct glplatform_win *win)
 		//
 		lua_getfield(L, material_idx, "params");
 		lua_pushnil(L);  /* first key */
+		int texunit = 0;
 		while (lua_next(L, -2)) {
-			int texunit = 0;
 			int variable_idx = lua_gettop(L);
 			lua_getfield(L, variable_idx, "datatype");
 			const char *datatype = lua_tostring(L, -1);
@@ -719,7 +715,6 @@ static int set_b2l_file(lua_State *L)
 	}
 	g_gl_state.blob = blob;
 	g_gl_state.blob_size = blob_size;
-	g_gl_state.blob_updated = true;
 	return 0;
 }
 
