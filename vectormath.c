@@ -1,4 +1,6 @@
 #include "vectormath.h"
+#include <math.h>
+#include <memory.h>
 
 void mat4_mul(const struct mat4 *m1, const struct mat4 *m2, struct mat4 *m3)
 {
