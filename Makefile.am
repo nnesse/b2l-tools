@@ -60,6 +60,9 @@ LUA_SRC := lua/src/lapi.c \
 	lua/src/loadlib.c \
 	lua/src/linit.c
 
+noinst_LIBRARIES = liblua.a liblgi.a
+liblua_a_SOURCES = $(LUA_SRC)
+
 LGI_SRC := lgi/lgi/buffer.c \
 	lgi/lgi/callable.c \
 	lgi/lgi/core.c \
@@ -67,6 +70,9 @@ LGI_SRC := lgi/lgi/buffer.c \
 	lgi/lgi/marshal.c \
 	lgi/lgi/object.c \
 	lgi/lgi/record.c
+
+liblgi_a_SOURCES = $(LGI_SRC)
+
 
 GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
 	glsl-parser/glsl.lexer.c \
@@ -133,12 +139,11 @@ lgi_lgi_override_DATA := lgi/lgi/override/Clutter.lua \
 	lgi/lgi/override/Gio.lua
 
 bin_PROGRAMS=b2l_material_editor
-b2l_material_editor_SOURCES:= $(LUA_SRC) \
-	$(LGI_SRC) \
-	$(GLSL_PARSER_SRC) \
+b2l_material_editor_SOURCES= $(GLSL_PARSER_SRC) \
 	$(GLPLATFORM_SRC) \
 	b2l_material_editor.c \
 	vectormath.c \
 	geometry.c \
 	mesh.c \
 	program.c
+b2l_material_editor_LDADD = liblua.a liblgi.a
