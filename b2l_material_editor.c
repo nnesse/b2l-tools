@@ -549,6 +549,12 @@ static void redraw(struct glplatform_win *win)
 	}
 	const char *current_object = lua_tostring(L, -1);
 
+	lua_getglobal(L, "current_scene");
+	if (!lua_isstring(L, -1)) {
+		goto end;
+	}
+	const char *current_scene = lua_tostring(L, -1);
+
 	double frame;
 	int frame_start;
 
@@ -688,6 +694,7 @@ static void redraw(struct glplatform_win *win)
 	}
 
 	render_mesh(L, b2l_data_idx, materials_idx, g_gl_state.blob,
+			current_scene,
 			current_object, frame,
 			&model,
 			&view,

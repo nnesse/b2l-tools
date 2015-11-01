@@ -60,7 +60,7 @@ LUA_SRC := lua/src/lapi.c \
 	lua/src/loadlib.c \
 	lua/src/linit.c
 
-noinst_LIBRARIES = liblua.a liblgi.a
+noinst_LIBRARIES = liblua.a liblgi.a libglplatform.a libglslparser.a
 liblua_a_SOURCES = $(LUA_SRC)
 
 LGI_SRC := lgi/lgi/buffer.c \
@@ -73,15 +73,18 @@ LGI_SRC := lgi/lgi/buffer.c \
 
 liblgi_a_SOURCES = $(LGI_SRC)
 
-
 GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
 	glsl-parser/glsl.lexer.c \
 	glsl-parser/glsl_regen.c \
 	glsl-parser/glsl_ast.c
 
+libglslparser_a_SOURCES = $(GLSL_PARSER_SRC)
+
 GLPLATFORM_SRC := glplatform/glplatform-linux.c \
 	glplatform/glplatform-glcore.c \
 	glplatform/glplatform-glx.c
+
+libglplatform_a_SOURCES = $(GLPLATFORM_SRC)
 
 BUILT_SOURCES=glsl-parser/glsl.lexer.c \
 	      glsl-parser/glsl.parser.c
@@ -138,12 +141,21 @@ lgi_lgi_override_DATA := lgi/lgi/override/Clutter.lua \
 	lgi/lgi/override/GLib.lua \
 	lgi/lgi/override/Gio.lua
 
-bin_PROGRAMS=b2l_material_editor
-b2l_material_editor_SOURCES= $(GLSL_PARSER_SRC) \
-	$(GLPLATFORM_SRC) \
-	b2l_material_editor.c \
+bin_PROGRAMS = b2l_material_editor b2l_model_viewer
+b2l_material_editor_SOURCES = b2l_material_editor.c \
 	vectormath.c \
 	geometry.c \
 	mesh.c \
 	program.c
-b2l_material_editor_LDADD = liblua.a liblgi.a
+b2l_material_editor_LDADD = liblua.a \
+	liblgi.a \
+	libglplatform.a \
+	libglslparser.a
+b2l_model_viewer_SOURCES = b2l_model_viewer.c \
+	vectormath.c \
+	geometry.c \
+	mesh.c \
+	program.c
+b2l_model_viewer_LDADD = liblua.a \
+	libglplatform.a \
+	libglslparser.a

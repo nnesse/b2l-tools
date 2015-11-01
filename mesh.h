@@ -23,7 +23,9 @@ struct mesh {
 };
 
 void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_t *blob,
-		const char *object_name, double frame,
+		const char *scene_name,
+		const char *object_name,
+		double frame,
 		struct mat4 *model,
 		struct mat4 *view,
 		struct mat4 *proj);

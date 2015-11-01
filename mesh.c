@@ -231,7 +231,9 @@ void create_mesh(struct mesh *m, lua_State *L, const uint8_t *blob)
 }
 
 void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_t *blob,
-		const char *object_name, double frame,
+		const char *scene_name,
+		const char *object_name,
+		double frame,
 		struct mat4 *model,
 		struct mat4 *view,
 		struct mat4 *proj)
@@ -312,8 +314,7 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 			double frame_fract = frame - frame_i;
 
 			lua_getfield(L, b2l_data_idx, "scenes");
-			lua_getglobal(L, "current_scene");
-			lua_getfield(L, -2, lua_tostring(L, -1));
+			lua_getfield(L, -1, scene_name);
 			if (!lua_istable(L, -1)) {
 				goto end;
 			}
