@@ -152,6 +152,7 @@ b2l_material_editor_LDADD = liblua.a \
 	libglplatform.a \
 	libglslparser.a
 b2l_model_viewer_SOURCES = b2l_model_viewer.c \
+	b2l.c \
 	vectormath.c \
 	geometry.c \
 	mesh.c \

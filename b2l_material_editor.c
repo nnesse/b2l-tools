@@ -622,6 +622,8 @@ static void redraw(struct glplatform_win *win)
 			goto end;
 		}
 
+		glUseProgram(program->program);
+
 		//
 		// Upload textures if neccisary
 		//
