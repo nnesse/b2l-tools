@@ -19,8 +19,6 @@ extern char *metalval;
 #include <glib.h>
 #include "glplatform.h"
 #include "mesh.h"
-#define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
-#define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
 
 #define MAX_TEXTURE_UNITS 8

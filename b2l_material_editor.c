@@ -11,8 +11,6 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-#define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
-#define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
 #include "glsl_parser.h"
 #include "glsl_ast.h"
@@ -21,6 +19,7 @@
 #include "geometry.h"
 #include "program.h"
 #include "vectormath.h"
+#include "texture.h"
 
 extern char *metalval;
 
@@ -635,57 +634,16 @@ static void redraw(struct glplatform_win *win)
 			lua_getfield(L, variable_idx, "datatype");
 			const char *datatype = lua_tostring(L, -1);
 			if (!strcmp(datatype,"sampler2D")) {
-				lua_getfield(L, variable_idx, "_needs_upload");
-				int needs_upload = lua_toboolean(L, -1);
-
-				GLuint texid = 0;
-				if (needs_upload) {
-					const char *variable_name = lua_tostring(L, variable_idx - 1);
-					int uniform_loc = glGetUniformLocation(program->program, variable_name);
-					GdkPixbuf *pbuf;
-
-					//
-					// Delete existing texture if there is one
-					//
-					lua_getfield(L, variable_idx, "_texid");
-					if (lua_isnumber(L, -1)) {
-						texid = lua_tointeger(L, -1);
-						glDeleteTextures(1, &texid);
-					}
-
-					//
-					// Upload pbuf to texture
-					//
+				lua_getfield(L, variable_idx, "_texture");
+				if (!lua_isuserdata(L, -1)) {
 					lua_getfield(L, variable_idx, "_pbuf");
-					lua_getfield(L, -1, "_native");
-					pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
-					glActiveTexture(GL_TEXTURE0 + texunit);
-
-					glGenTextures(1, &texid);
-					glBindTexture(GL_TEXTURE_2D, texid);
-					lua_pushinteger(L, texid);
-					lua_setfield(L, variable_idx, "_texid");
-
-					int width = gdk_pixbuf_get_width(pbuf);
-					int height = gdk_pixbuf_get_height(pbuf);
-					int n_chan = gdk_pixbuf_get_n_channels(pbuf);
-					glPixelStorei(GL_UNPACK_ROW_LENGTH, gdk_pixbuf_get_rowstride(pbuf)/ n_chan);
-					glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-					glTexImage2D(GL_TEXTURE_2D,
-						0, /* level */
-						n_chan > 3 ? GL_RGBA : GL_RGB,
-						width,
-						height,
-						0, /* border */
-						n_chan > 3 ? GL_RGBA : GL_RGB,
-						GL_UNSIGNED_BYTE,
-						gdk_pixbuf_get_pixels(pbuf));
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-					glGenerateMipmap(GL_TEXTURE_2D);
-					glUniform1i(uniform_loc, texunit);
-					lua_pushboolean(L, 0);
-					lua_setfield(L, variable_idx, "_needs_upload");
+					if (lua_isuserdata(L, -1)) {
+						GdkPixbuf *pbuf;
+						lua_getfield(L, -1, "_native");
+						pbuf = (GdkPixbuf *)lua_touserdata(L, -1);
+						ltexture_create(L, pbuf);
+						lua_setfield(L, variable_idx, "_texture");
+					}
 				}
 				texunit++;
 

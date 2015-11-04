@@ -6,8 +6,6 @@
 
 #include "program.h"
 
-#define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
-#define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
 
 #include <stdint.h>
@@ -15,6 +13,8 @@
 #include <math.h>
 
 #include "lua.h"
+
+#include "texture.h"
 
 static void delete_mesh(struct mesh *m)
 {
@@ -420,11 +420,11 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 				//
 				// Bind texture
 				//
-				lua_getfield(L, variable_idx, "_texid");
-				if (lua_isnumber(L, -1)) {
-					GLuint texid = lua_tointeger(L, -1);
+				lua_getfield(L, variable_idx, "_texture");
+				if (lua_isuserdata(L, -1)) {
+					struct texture *t = lua_touserdata(L, -1);
 					glActiveTexture(GL_TEXTURE0 + texunit);
-					glBindTexture(GL_TEXTURE_2D, texid);
+					glBindTexture(GL_TEXTURE_2D, t->texid);
 					glUniform1i(uniform_loc, texunit);
 				}
 				texunit++;

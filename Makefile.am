@@ -2,7 +2,9 @@ AM_CFLAGS:=-Wall -Wno-unused-function
 
 AM_CFLAGS+= -DLUA_USE_LINUX \
 	-DLUA_COMPAT_ALL \
-	-DDATA_DIR=\"$(datadir)/b2l\"
+	-DDATA_DIR=\"$(datadir)/b2l\" \
+	-DGLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding \
+	-DGLPLATFORM_ENABLE_GL_ARB_buffer_storage
 
 AM_CFLAGS+= -I$(builddir) \
 	-I$(builddir)/glsl-parser \
@@ -146,6 +148,7 @@ b2l_material_editor_SOURCES = b2l_material_editor.c \
 	vectormath.c \
 	geometry.c \
 	mesh.c \
+	texture.c \
 	program.c
 b2l_material_editor_LDADD = liblua.a \
 	liblgi.a \
@@ -156,6 +159,7 @@ b2l_model_viewer_SOURCES = b2l_model_viewer.c \
 	vectormath.c \
 	geometry.c \
 	mesh.c \
+	texture.c \
 	program.c
 b2l_model_viewer_LDADD = liblua.a \
 	libglplatform.a \

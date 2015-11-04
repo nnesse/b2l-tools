@@ -196,7 +196,7 @@ function update_controls(uniforms)
 						if pbuf then
 							active_material.params[k].value = filename
 							active_material.params[k]._pbuf = pbuf
-							active_material.params[k]._needs_upload = true
+							active_material.params[k]._texture = nil
 							queue_render()
 						else
 							local dialog = Gtk.MessageDialog {

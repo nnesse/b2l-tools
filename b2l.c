@@ -5,14 +5,13 @@
 #include "lauxlib.h"
 
 #include "program.h"
+#include "texture.h"
 
 #include <stdio.h>
 
 #include "glsl_parser.h"
 #include "glsl_ast.h"
 
-#define GLPLATFORM_ENABLE_GL_ARB_vertex_attrib_binding
-#define GLPLATFORM_ENABLE_GL_ARB_buffer_storage
 #include "glplatform-glcore.h"
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -197,13 +196,9 @@ bool b2l_materials_gl_setup(lua_State *L, const char *b2l_file_name, int materia
 			lua_getfield(L, variable_idx, "datatype");
 			const char *datatype = lua_tostring(L, -1);
 			if (!strcmp(datatype,"sampler2D")) {
-				lua_getfield(L, variable_idx, "_texid");
+				lua_getfield(L, variable_idx, "_texture");
 
-				GLuint texid = 0;
-				if (lua_isnil(L, -1)) {
-					const char *variable_name = lua_tostring(L, variable_idx - 1);
-					int uniform_loc = glGetUniformLocation(program->program, variable_name);
-
+				if (!lua_isuserdata(L, -1)) {
 					lua_getfield(L, variable_idx, "value");
 					if (lua_isstring(L, -1)) {
 
@@ -214,31 +209,8 @@ bool b2l_materials_gl_setup(lua_State *L, const char *b2l_file_name, int materia
 							//
 							// Upload pbuf to texture
 							//
-							glActiveTexture(GL_TEXTURE0 + texunit);
-
-							glGenTextures(1, &texid);
-							glBindTexture(GL_TEXTURE_2D, texid);
-							lua_pushinteger(L, texid);
-							lua_setfield(L, variable_idx, "_texid");
-
-							int width = gdk_pixbuf_get_width(pbuf);
-							int height = gdk_pixbuf_get_height(pbuf);
-							int n_chan = gdk_pixbuf_get_n_channels(pbuf);
-							glPixelStorei(GL_UNPACK_ROW_LENGTH, gdk_pixbuf_get_rowstride(pbuf)/ n_chan);
-							glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-							glTexImage2D(GL_TEXTURE_2D,
-								0, /* level */
-								n_chan > 3 ? GL_RGBA : GL_RGB,
-								width,
-								height,
-								0, /* border */
-								n_chan > 3 ? GL_RGBA : GL_RGB,
-								GL_UNSIGNED_BYTE,
-								gdk_pixbuf_get_pixels(pbuf));
-							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-							glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-							glGenerateMipmap(GL_TEXTURE_2D);
-							glUniform1i(uniform_loc, texunit);
+							ltexture_create(L, pbuf);
+							lua_setfield(L, variable_idx, "_texture");
 							g_object_unref(pbuf);
 						} else {
 							fprintf(stderr, "Failed to load image file: %s\n", abs_filename);
