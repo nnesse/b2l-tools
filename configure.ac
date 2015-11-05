@@ -1,5 +1,5 @@
 AC_PREREQ(2.59)
-AC_INIT(glplatform, 0.2)
+AC_INIT(glplatform, 0.3)
 
 AC_ARG_ENABLE([text], AS_HELP_STRING([--enable-text], [Enables text rendering API]))
 
