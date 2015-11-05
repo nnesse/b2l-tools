@@ -18,6 +18,31 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\glbindings\glplatform-glcore.h" />
+    <ClInclude Include="..\include\glbindings\glplatform-wgl.h" />
+    <ClInclude Include="..\include\glplatform.h" />
+    <ClInclude Include="..\include\math\math3d.h" />
+    <ClInclude Include="..\include\text\gltext.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\glbindings\glplatform-glcore.c" />
+    <ClCompile Include="..\src\glbindings\glplatform-wgl.c" />
+    <ClCompile Include="..\src\glplatform-win32.c" />
+    <ClCompile Include="..\src\math\math3d.c" />
+    <ClCompile Include="..\src\text\edtaa3func.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\src\text\gltext.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="freetype-2.6\builds\windows\vc2010\freetype.vcxproj">
+      <Project>{78b079bd-9fc7-4b9e-b4a6-96da0f00248b}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B3DB52F5-4246-4BD0-8A69-0DEAA39E5FB2}</ProjectGuid>
     <RootNamespace>glplatform</RootNamespace>
@@ -69,16 +94,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir);$(IncludePath)</IncludePath>
+    <IncludePath>../include/text;../include/glbindings;../include/math;../include;freetype-2.6/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -132,16 +157,6 @@
       <AdditionalDependencies>OpenGL32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="..\glplatform-win32.c" />
-    <ClCompile Include="glplatform-glcore.c" />
-    <ClCompile Include="glplatform-wgl.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\glplatform.h" />
-    <ClInclude Include="glplatform-glcore.h" />
-    <ClInclude Include="glplatform-wgl.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

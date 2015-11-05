@@ -9,8 +9,9 @@ AM_CFLAGS+= -DLUA_USE_LINUX \
 AM_CFLAGS+= -I$(builddir) \
 	-I$(builddir)/glsl-parser \
 	-I$(srcdir)/glsl-parser \
-	-I$(builddir)/glplatform \
-	-I$(srcdir)/glplatform \
+	-I$(srcdir)/glplatform/include \
+	-I$(srcdir)/glplatform/include/math \
+	-I$(srcdir)/glplatform/include/glbindings \
 	-I$(srcdir) \
 	-I${srcdir}/lua/src \
 	-I${srcdir}/lgi/lgi
@@ -82,9 +83,10 @@ GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
 
 libglslparser_a_SOURCES = $(GLSL_PARSER_SRC)
 
-GLPLATFORM_SRC := glplatform/glplatform-linux.c \
-	glplatform/glplatform-glcore.c \
-	glplatform/glplatform-glx.c
+GLPLATFORM_SRC := glplatform/src/glplatform-linux.c \
+	glplatform/src/glbindings/glplatform-glcore.c \
+	glplatform/src/glbindings/glplatform-glx.c \
+	glplatform/src/math/math3d.c
 
 libglplatform_a_SOURCES = $(GLPLATFORM_SRC)
 
