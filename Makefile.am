@@ -26,7 +26,7 @@ simple_window_SOURCES = src/examples/simple_window.c
 simple_window_LDADD = libglplatform.la
 
 text_render_SOURCES = src/examples/text_render.c
-text_render_CFLAGS = -DTTF_PATH=\"${abs_srcdir}/src/examples/ttf\"
+text_render_CFLAGS = -DTTF_PATH=\"${abs_srcdir}/src/examples/ttf/\"
 text_render_LDADD = libglplatform.la
 
 pkginclude_HEADERS = include/glbindings/glplatform-glcore.h \

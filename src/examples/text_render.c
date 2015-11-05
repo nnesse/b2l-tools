@@ -5,12 +5,24 @@
 #include "gltext.h"
 #include "glplatform-glcore.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 void on_destroy(struct glplatform_win *win)
 {
 	glplatform_destroy_window(win);
 }
 
+#ifdef _WIN32
+int CALLBACK WinMain(
+	_In_ HINSTANCE hInstance,
+	_In_ HINSTANCE hPrevInstance,
+	_In_ LPSTR     lpCmdLine,
+	_In_ int       nCmdShow)
+#else
 int main()
+#endif
 {
 	gltext_renderer_t renderer;
 	gltext_font_t font;
@@ -40,7 +52,7 @@ int main()
 	glplatform_make_current(win, ctx);
 	glplatform_glcore_init(3, 3);
 
-	font = gltext_font_create(renderer, gltext_renderer_get_typeface(renderer, TTF_PATH "/LiberationSans-Regular.ttf"), 20);
+	font = gltext_font_create(renderer, gltext_renderer_get_typeface(renderer, TTF_PATH "LiberationSans-Regular.ttf"), 20);
 	if (!font) {
 		fprintf(stderr, "Failed to create font\n");
 		exit(-1);
@@ -54,13 +66,13 @@ int main()
 		glClearColor(0,0,0,1);
 		glClear(GL_COLOR_BUFFER_BIT);
 		float mvp[16] = {
-			2.0/width,0,0,0,
-			0,-2.0/height,0,0,
+			2.0f/width,0,0,0,
+			0,-2.0f/height,0,0,
 			0,0,1,0,
 			-1,0,0,1};
 
 		const char *str = "The quick brown fox jumps over the lazy dog()'\"0123456789`~!@#$%^&*()_+;/?.>,<={}[]\\";
-		struct gltext_glyph_instance *r = gltext_renderer_prepare_render(renderer, font, strlen(str));
+		struct gltext_glyph_instance *r = gltext_renderer_prepare_render(renderer, font, (int)strlen(str));
 
 		const struct gltext_glyph *g_prev = NULL;
 		float x_pos = 0;
