@@ -110,6 +110,15 @@ void math3d_vec3_cross(struct math3d_vec3 *a, struct math3d_vec3 *b, struct math
 void math3d_vec3_lerp(const struct math3d_vec3 *v1, const struct math3d_vec3 *v2, float d, struct math3d_vec3 *v3);
 
 //
+// math3d_mat4_lerp(m1, m2, d, m3)
+//
+// Linearly interpolate between m1 and m2
+//
+// m3 = m1 * (1 - d) + m2 * d
+//
+void math3d_mat4_lerp(const struct math3d_mat4 *m1, const struct math3d_mat4 *m2, float d, struct math3d_mat4 *res);
+
+//
 // math3d_vec3_normalize(v)
 //
 // v = v / length(v)

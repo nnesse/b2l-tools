@@ -49,7 +49,6 @@ void math3d_mat4_perspective(float fovy, float width, float height, float z_near
 
 void math3d_mat4_ortho(float x, float y, float z, float width, float height, float depth, struct math3d_mat4 *m)
 {
-	float aspect = width / height;
 	math3d_mat4_zero(m);
 	m->v[1][0] = 2/width;
 	m->v[1][1] = 2/height;
@@ -82,6 +81,16 @@ void math3d_vec3_lerp(const struct math3d_vec3 *v1, const struct math3d_vec3 *v2
 	int i;
 	for (i = 0; i < 3; i++) {
 		v3->v[i] = v1->v[i] * (1-d) + v2->v[i] * d;
+	}
+}
+
+void math3d_mat4_lerp(const struct math3d_mat4 *m1, const struct math3d_mat4 *m2, float d, struct math3d_mat4 *res)
+{
+	int k, l;
+	for (k = 0; k < 4; k++) {
+		for (l = 0; l < 4; l++) {
+			res->v[k][l] = m1->v[k][l] * (1 - d) + m2->v[k][l] * d;
+		}
 	}
 }
 
