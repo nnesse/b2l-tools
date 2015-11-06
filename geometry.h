@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "lua.h"
-#include "vectormath.h"
 
 #define MAX_VERTEX_WEIGHTS 6
 #define MAX_UV_LAYERS 16

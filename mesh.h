@@ -1,12 +1,9 @@
 #ifndef MESH_H
 #define MESH_H
 
-#include "vectormath.h"
-
 #include "lua.h"
-
 #include "geometry.h"
-
+#include "math3d.h"
 #include <stdint.h>
 
 struct mesh {
@@ -26,9 +23,9 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 		const char *scene_name,
 		const char *object_name,
 		double frame,
-		struct mat4 *model,
-		struct mat4 *view,
-		struct mat4 *proj);
+		struct math3d_mat4 *model,
+		struct math3d_mat4 *view,
+		struct math3d_mat4 *proj);
 
 void create_mesh(struct mesh *m, lua_State *L, const uint8_t *blob);
 

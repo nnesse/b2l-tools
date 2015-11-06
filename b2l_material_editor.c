@@ -18,7 +18,8 @@
 #include "mesh.h"
 #include "geometry.h"
 #include "program.h"
-#include "vectormath.h"
+#include "math3d.h"
+#include "math3d.h"
 #include "texture.h"
 
 extern char *metalval;
@@ -74,16 +75,16 @@ static void on_mouse_wheel(struct glplatform_win *, int, int, int);
 
 static void redraw(struct glplatform_win *win);
 
-static struct quaternion q_cur = {0,0,0,1};
-static struct quaternion q_delta = {0,0,0,1};
-static float g_offset[3] = {0,0,0};
-static float g_offset_next[3] = {0,0,0};
+static struct math3d_quaternion q_cur = {0,0,0,1};
+static struct math3d_quaternion q_delta = {0,0,0,1};
+static struct math3d_vec3 g_offset = {{0,0,0}};
+static struct math3d_vec3 g_offset_next = {{0,0,0}};
 
 static void on_mouse_button_up(struct glplatform_win *win, int button, int x, int y)
 {
 	if (g_mouse_down[0] && button == 1) {
-		struct quaternion next;
-		quaternion_mul(&q_delta, &q_cur, &next);
+		struct math3d_quaternion next;
+		math3d_quaternion_mul(&q_delta, &q_cur, &next);
 		q_cur = next;
 		q_delta.x = 0;
 		q_delta.y = 0;
@@ -92,12 +93,12 @@ static void on_mouse_button_up(struct glplatform_win *win, int button, int x, in
 		need_redraw(g_L);
 	}
 	if (g_mouse_down[2] && button == 3) {
-		g_offset[0] += g_offset_next[0];
-		g_offset[1] += g_offset_next[1];
-		g_offset[2] += g_offset_next[2];
-		g_offset_next[0] = 0;
-		g_offset_next[1] = 0;
-		g_offset_next[2] = 0;
+		g_offset.v[0] += g_offset_next.v[0];
+		g_offset.v[1] += g_offset_next.v[1];
+		g_offset.v[2] += g_offset_next.v[2];
+		g_offset_next.v[0] = 0;
+		g_offset_next.v[1] = 0;
+		g_offset_next.v[2] = 0;
 		need_redraw(g_L);
 	}
 	g_mouse_down[button -1] = false;
@@ -112,38 +113,29 @@ static void on_mouse_button_down(struct glplatform_win *win, int button, int x, 
 	on_mouse_move(win, x, y);
 }
 
-static void print_quaternion(struct quaternion *q)
-{
-	printf("%f %f %f %f\n", q->x, q->y, q->z, q->w);
-}
-
 static void on_mouse_move(struct glplatform_win *win, int x, int y)
 {
-	struct quaternion next;
-	quaternion_mul(&q_delta, &q_cur, &next);
+	struct math3d_quaternion next;
+	math3d_quaternion_mul(&q_delta, &q_cur, &next);
 	if (g_mouse_down[0]) {
-		float axis[3];
-		axis[0] = g_dy[0] - y;
-		axis[1] = g_dx[0] - x;
-		axis[2] = 0;
-		float norm = sqrtf((axis[0] * axis[0]) + (axis[1] * axis[1]) + (axis[2] * axis[2]));
-		if (norm > 0) {
-			axis[0] /= norm;
-			axis[1] /= norm;
-			axis[2] /= norm;
-		}
-		quaternion_from_axis_angle(&q_delta, axis[0], axis[1], axis[2], norm * 3 / win->width);
+		struct math3d_vec3 axis;
+		axis.v[0] = g_dy[0] - y;
+		axis.v[1] = g_dx[0] - x;
+		axis.v[2] = 0;
+		float length = math3d_vec3_length(&axis);
+		math3d_vec3_normalize(&axis);
+		math3d_quaternion_from_axis_angle(&q_delta, &axis, length * 3 / win->width);
 		need_redraw(g_L);
 	}
 	if (g_mouse_down[2]) {
-		float delta[3];
-		delta[0] = (g_dx[2] - x) * 2.0 / win->width;
-		delta[1] = -(g_dy[2] - y) * 2.0 / win->height;
-		delta[2] = 0;
-		quaternion_unit_inv_mul_vec3(&next, delta, g_offset_next);
-		g_offset_next[0] = -g_offset_next[0];
-		g_offset_next[1] = -g_offset_next[1];
-		g_offset_next[2] = -g_offset_next[2];
+		struct math3d_vec3 delta;
+		delta.v[0] = (g_dx[2] - x) * 2.0 / win->width;
+		delta.v[1] = -(g_dy[2] - y) * 2.0 / win->height;
+		delta.v[2] = 0;
+		math3d_quaternion_unit_inv_mul_vec3(&next, &delta, &g_offset_next);
+		g_offset_next.v[0] = -g_offset_next.v[0];
+		g_offset_next.v[1] = -g_offset_next.v[1];
+		g_offset_next.v[2] = -g_offset_next.v[2];
 		need_redraw(g_L);
 	}
 }
@@ -562,22 +554,22 @@ static void redraw(struct glplatform_win *win)
 	lua_getglobal(L, "frame_delta");
 	frame = frame_start + lua_tonumber(L, -1);
 
-	struct mat4 view;
-	struct mat4 model;
-	struct mat4 proj;
-	struct quaternion next;
+	struct math3d_mat4 view;
+	struct math3d_mat4 model;
+	struct math3d_mat4 proj;
+	struct math3d_quaternion next;
 
-	quaternion_mul(&q_delta, &q_cur, &next);
-	quaternion_to_mat4(&next, &view);
+	math3d_quaternion_mul(&q_delta, &q_cur, &next);
+	math3d_quaternion_to_mat4(&next, &view);
 	view.v[3][3] = 1;
-	mat4_identity(&model);
-	model.v[3][0] = g_offset[0] + g_offset_next[0];
-	model.v[3][1] = g_offset[1] + g_offset_next[1];
-	model.v[3][2] = g_offset[2] + g_offset_next[2];
+	math3d_mat4_identity(&model);
+	model.v[3][0] = g_offset.v[0] + g_offset_next.v[0];
+	model.v[3][1] = g_offset.v[1] + g_offset_next.v[1];
+	model.v[3][2] = g_offset.v[2] + g_offset_next.v[2];
 
 	float zoom = exp(g_log_zoom);
 	float zr = 100;
-	mat4_zero(&proj);
+	math3d_mat4_zero(&proj);
 	proj.v[0][0] = 1.0/zoom;
 	proj.v[1][1] = 1.0*win->width/(zoom*win->height);
 	proj.v[2][2] = 1.0/zr;

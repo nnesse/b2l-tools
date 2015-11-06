@@ -1,7 +1,5 @@
 #include "geometry.h"
 
-#include "vectormath.h"
-
 #include "program.h"
 
 #include "glplatform-glcore.h"

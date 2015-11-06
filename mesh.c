@@ -1,20 +1,13 @@
 #include "mesh.h"
-
-#include "geometry.h"
-
-#include "vectormath.h"
-
-#include "program.h"
-
-#include "glplatform-glcore.h"
-
 #include <stdint.h>
-
 #include <math.h>
 
+#include "geometry.h"
+#include "program.h"
+#include "glplatform-glcore.h"
 #include "lua.h"
-
 #include "texture.h"
+#include "math3d.h"
 
 static void delete_mesh(struct mesh *m)
 {
@@ -234,9 +227,9 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 		const char *scene_name,
 		const char *object_name,
 		double frame,
-		struct mat4 *model,
-		struct mat4 *view,
-		struct mat4 *proj)
+		struct math3d_mat4 *model,
+		struct math3d_mat4 *view,
+		struct math3d_mat4 *proj)
 {
 	int top_idx = lua_gettop(L);
 	lua_getfield(L, b2l_data_idx, "objects");
@@ -323,45 +316,40 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 			lua_getfield(L, -1, "vertex_group_transform_array_offset");
 			int offset = lua_tointeger(L, -1);
 			int stride = sizeof(float) * 4 * 4 * num_vertex_groups;
-			int i;
-			for (i = 0; i < num_vertex_groups; i++) {
-				struct mat4 res;
-				struct mat4 M1;
-				struct mat4 M2;
-				struct mat4 *base = (struct mat4 *)(blob + offset + (i * sizeof(float) * 4 * 4) + frame_i * stride);
-				struct mat4 *next = (struct mat4 *)(blob + offset + (i * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
+			int j;
+			for (j = 0; j < num_vertex_groups; j++) {
+				struct math3d_mat4 res;
+				struct math3d_mat4 M1;
+				struct math3d_mat4 M2;
+				struct math3d_mat4 *base = (struct math3d_mat4 *)(blob + offset + (j * sizeof(float) * 4 * 4) + frame_i * stride);
+				struct math3d_mat4 *next = (struct math3d_mat4 *)(blob + offset + (j * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
 
 #if USE_SLERP
-				struct mat4 temp;
-				mat4_zero(&temp);
+				struct math3d_mat4 temp;
+				math3d_mat4_zero(&temp);
 				temp.v[3][3] = 1;
 				M1 = *base;
 				M2 = *next;
 				spherical_lerp(M1.v[0], M2.v[0], frame_fract, temp.v[0]);
 				spherical_lerp(M1.v[1], M2.v[1], frame_fract, temp.v[1]);
 				spherical_lerp(M1.v[2], M2.v[2], frame_fract, temp.v[2]);
-				mat4_transpose(&temp, &res);
-				float v1[3];
-				float v2[3];
+				math3d_mat4_transpose(&temp, &res);
+				struct math3d_vec3 v1[3];
+				struct math3d_vec3 v2[3];
 				v1[0] = M1.v[0][3];
 				v1[1] = M1.v[1][3];
 				v1[2] = M1.v[2][3];
 				v2[0] = M2.v[0][3];
 				v2[1] = M2.v[1][3];
 				v2[2] = M2.v[2][3];
-				lerp(v1, v2, frame_fract, res.v[3]);
+				math3d_vec3_lerp(&v1, &v2, frame_fract, res.v[3]);
 #else
-				mat4_zero(&res);
-				res.v[3][3] = 1;
-				mat4_transpose(base, &M1);
-				mat4_transpose(next, &M2);
-				lerp(M1.v[0], M2.v[0], frame_fract, res.v[0]);
-				lerp(M1.v[1], M2.v[1], frame_fract, res.v[1]);
-				lerp(M1.v[2], M2.v[2], frame_fract, res.v[2]);
-				lerp(M1.v[3], M2.v[3], frame_fract, res.v[3]);
+				math3d_mat4_transpose(base, &M1);
+				math3d_mat4_transpose(next, &M2);
+				math3d_mat4_lerp(&M1, &M2, frame_fract, &res);
 #endif
 
-				glUniformMatrix4fv(groups_index + i,
+				glUniformMatrix4fv(groups_index + j,
 						1,
 						GL_FALSE,
 						(GLfloat *)&res);

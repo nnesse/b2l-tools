@@ -147,7 +147,6 @@ lgi_lgi_override_DATA := lgi/lgi/override/Clutter.lua \
 
 bin_PROGRAMS = b2l_material_editor b2l_model_viewer
 b2l_material_editor_SOURCES = b2l_material_editor.c \
-	vectormath.c \
 	geometry.c \
 	mesh.c \
 	texture.c \
@@ -158,7 +157,6 @@ b2l_material_editor_LDADD = liblua.a \
 	libglslparser.a
 b2l_model_viewer_SOURCES = b2l_model_viewer.c \
 	b2l.c \
-	vectormath.c \
 	geometry.c \
 	mesh.c \
 	texture.c \
