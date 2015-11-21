@@ -51,8 +51,8 @@ objects = {
 				},
 				{
 					name = 'Idle',
-					frame_start = 120,
-					frame_end = 183,
+					frame_start = 113,
+					frame_end = 176,
 				},
 			},
 			{

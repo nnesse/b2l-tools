@@ -319,12 +319,12 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 			int j;
 			for (j = 0; j < num_vertex_groups; j++) {
 				struct math3d_mat4 res;
-				struct math3d_mat4 M1;
-				struct math3d_mat4 M2;
 				struct math3d_mat4 *base = (struct math3d_mat4 *)(blob + offset + (j * sizeof(float) * 4 * 4) + frame_i * stride);
 				struct math3d_mat4 *next = (struct math3d_mat4 *)(blob + offset + (j * sizeof(float) * 4 * 4) + (frame_i + 1) * stride);
 
 #if USE_SLERP
+				struct math3d_mat4 M1;
+				struct math3d_mat4 M2;
 				struct math3d_mat4 temp;
 				math3d_mat4_zero(&temp);
 				temp.v[3][3] = 1;
@@ -333,7 +333,6 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 				spherical_lerp(M1.v[0], M2.v[0], frame_fract, temp.v[0]);
 				spherical_lerp(M1.v[1], M2.v[1], frame_fract, temp.v[1]);
 				spherical_lerp(M1.v[2], M2.v[2], frame_fract, temp.v[2]);
-				math3d_mat4_transpose(&temp, &res);
 				struct math3d_vec3 v1[3];
 				struct math3d_vec3 v2[3];
 				v1[0] = M1.v[0][3];
@@ -342,11 +341,9 @@ void render_mesh(lua_State *L, int b2l_data_idx, int materials_idx, const uint8_
 				v2[0] = M2.v[0][3];
 				v2[1] = M2.v[1][3];
 				v2[2] = M2.v[2][3];
-				math3d_vec3_lerp(&v1, &v2, frame_fract, res.v[3]);
+				math3d_vec3_lerp(&v1, &v2, frame_fract, temp.v[3]);
 #else
-				math3d_mat4_transpose(base, &M1);
-				math3d_mat4_transpose(next, &M2);
-				math3d_mat4_lerp(&M1, &M2, frame_fract, &res);
+				math3d_mat4_lerp(base, next, frame_fract, &res);
 #endif
 
 				glUniformMatrix4fv(groups_index + j,
