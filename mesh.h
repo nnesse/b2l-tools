@@ -3,7 +3,7 @@
 
 #include "lua.h"
 #include "geometry.h"
-#include "math3d.h"
+#include <glplatform/math3d.h>
 #include <stdint.h>
 
 struct mesh {

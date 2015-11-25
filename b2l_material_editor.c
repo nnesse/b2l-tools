@@ -11,15 +11,15 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
+#include <glplatform/math3d.h>
+#include <glplatform/glplatform.h>
 #include "glsl_parser.h"
 #include "glsl_ast.h"
 
 #include "mesh.h"
 #include "geometry.h"
 #include "program.h"
-#include "math3d.h"
-#include "math3d.h"
 #include "texture.h"
 
 extern char *metalval;
@@ -28,7 +28,6 @@ extern char *metalval;
 
 #include <glib.h>
 #include <glib-unix.h>
-#include <glplatform.h>
 
 #define MAX_TEXTURE_UNITS 8
 

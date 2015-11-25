@@ -9,9 +9,6 @@ AM_CFLAGS+= -DLUA_USE_LINUX \
 AM_CFLAGS+= -I$(builddir) \
 	-I$(builddir)/glsl-parser \
 	-I$(srcdir)/glsl-parser \
-	-I$(srcdir)/glplatform/include \
-	-I$(srcdir)/glplatform/include/math \
-	-I$(srcdir)/glplatform/include/glbindings \
 	-I$(srcdir) \
 	-I${srcdir}/lua/src \
 	-I${srcdir}/lgi/lgi
@@ -63,7 +60,7 @@ LUA_SRC := lua/src/lapi.c \
 	lua/src/loadlib.c \
 	lua/src/linit.c
 
-noinst_LIBRARIES = liblua.a liblgi.a libglplatform.a libglslparser.a
+noinst_LIBRARIES = liblua.a liblgi.a libglslparser.a
 liblua_a_SOURCES = $(LUA_SRC)
 
 LGI_SRC := lgi/lgi/buffer.c \
@@ -82,13 +79,6 @@ GLSL_PARSER_SRC := glsl-parser/glsl.parser.c \
 	glsl-parser/glsl_ast.c
 
 libglslparser_a_SOURCES = $(GLSL_PARSER_SRC)
-
-GLPLATFORM_SRC := glplatform/src/glplatform-linux.c \
-	glplatform/src/glbindings/glplatform-glcore.c \
-	glplatform/src/glbindings/glplatform-glx.c \
-	glplatform/src/math/math3d.c
-
-libglplatform_a_SOURCES = $(GLPLATFORM_SRC)
 
 BUILT_SOURCES=glsl-parser/glsl.lexer.c \
 	      glsl-parser/glsl.parser.c
@@ -153,7 +143,6 @@ b2l_material_editor_SOURCES = b2l_material_editor.c \
 	program.c
 b2l_material_editor_LDADD = liblua.a \
 	liblgi.a \
-	libglplatform.a \
 	libglslparser.a
 b2l_model_viewer_SOURCES = b2l_model_viewer.c \
 	b2l.c \
@@ -162,5 +151,4 @@ b2l_model_viewer_SOURCES = b2l_model_viewer.c \
 	texture.c \
 	program.c
 b2l_model_viewer_LDADD = liblua.a \
-	libglplatform.a \
 	libglslparser.a

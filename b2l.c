@@ -12,7 +12,7 @@
 #include "glsl_parser.h"
 #include "glsl_ast.h"
 
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
 

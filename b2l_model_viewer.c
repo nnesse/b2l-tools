@@ -11,13 +11,13 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
-#include "math3d.h"
+#include <glplatform/glplatform-glcore.h>
+#include <glplatform/math3d.h>
+#include <glplatform/glplatform.h>
 #include "b2l.h"
 
 #include <glib.h>
-#include "glplatform.h"
 #include "mesh.h"
-#include "glplatform-glcore.h"
 
 static int g_dx[3];
 static int g_dy[3];

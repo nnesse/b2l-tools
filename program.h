@@ -1,7 +1,7 @@
 #ifndef PROGRAM_H
 #define PROGRAM_H
 
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
 
 #include "lua.h"
 

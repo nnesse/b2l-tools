@@ -2,7 +2,7 @@
 
 #include "program.h"
 
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
 
 #include <stdint.h>
 

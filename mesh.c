@@ -4,10 +4,10 @@
 
 #include "geometry.h"
 #include "program.h"
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
+#include <glplatform/math3d.h>
 #include "lua.h"
 #include "texture.h"
-#include "math3d.h"
 
 static void delete_mesh(struct mesh *m)
 {

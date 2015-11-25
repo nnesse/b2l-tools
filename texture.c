@@ -2,7 +2,7 @@
 
 #include "lua.h"
 
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
 
 static int texture_gc(lua_State *L)
 {

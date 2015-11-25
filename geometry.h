@@ -1,7 +1,7 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
-#include "glplatform-glcore.h"
+#include <glplatform/glplatform-glcore.h>
 
 #include <stdint.h>
 
