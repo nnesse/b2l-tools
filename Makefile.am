@@ -135,7 +135,7 @@ lgi_lgi_override_DATA := lgi/lgi/override/Clutter.lua \
 	lgi/lgi/override/GLib.lua \
 	lgi/lgi/override/Gio.lua
 
-bin_PROGRAMS = b2l_material_editor b2l_model_viewer
+bin_PROGRAMS = b2l_material_editor b2l_model_viewer b2l_scene_viewer
 b2l_material_editor_SOURCES = b2l_material_editor.c \
 	geometry.c \
 	mesh.c \
@@ -151,4 +151,12 @@ b2l_model_viewer_SOURCES = b2l_model_viewer.c \
 	texture.c \
 	program.c
 b2l_model_viewer_LDADD = liblua.a \
+	libglslparser.a
+b2l_scene_viewer_SOURCES = b2l_scene_viewer.c \
+	b2l.c \
+	geometry.c \
+	mesh.c \
+	texture.c \
+	program.c
+b2l_scene_viewer_LDADD = liblua.a \
 	libglslparser.a
